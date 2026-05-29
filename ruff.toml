@@ -1,0 +1,26 @@
+target-version = "py310"
+line-length = 120
+
+[lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "B",    # flake8-bugbear
+  "UP",   # pyupgrade
+  "SIM",  # flake8-simplify
+]
+ignore = [
+  "E501",   # line too long (handled by formatter)
+  "B008",   # function call in default arg (FastAPI Depends)
+  "B904",   # raise without from (too noisy in except handlers)
+  "SIM108", # ternary instead of if/else (readability)
+  "UP007",  # X | Y union syntax (pydantic v1 compat)
+]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+quote-style = "double"
