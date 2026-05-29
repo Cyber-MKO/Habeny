@@ -1,0 +1,3433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habeny - Multi-SIEM Container Emulation Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --panel-border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --danger: #dc2626;
+      --chip: #e2e8f0;
+      --shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 260px;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 6px;
+    }
+
+    .nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .nav-item {
+      border: none;
+      background: transparent;
+      color: #cbd5f5;
+      padding: 10px 12px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .nav-item.active,
+    .nav-item:hover {
+      background: rgba(37, 99, 235, 0.2);
+      color: #ffffff;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: #cbd5f5;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--danger);
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .content {
+      flex: 1;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .topbar {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .inline-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .topbar-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: var(--chip);
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .page {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .page.active {
+      display: flex;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .page-subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid.stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .stat-meta {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .kv-list {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kv-row span:first-child {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+
+    .badge.success { background: #dcfce7; color: #166534; }
+    .badge.warning { background: #fef3c7; color: #92400e; }
+    .badge.danger { background: #fee2e2; color: #991b1b; }
+    .badge.info { background: #dbeafe; color: #1e40af; }
+
+    .button {
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .button.primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .button.success { background: #16a34a; color: #ffffff; }
+    .button.warning { background: #f59e0b; color: #ffffff; }
+    .button.danger { background: #dc2626; color: #ffffff; }
+    .button.ghost { background: transparent; border: 1px solid var(--panel-border); }
+
+    .input,
+    .select,
+    .textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      font-size: 13px;
+    }
+
+    .textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .form-grid.two {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--panel-border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e2e8f0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill.running { background: #dcfce7; color: #166534; }
+    .pill.stopped { background: #fee2e2; color: #991b1b; }
+    .pill.error { background: #fecaca; color: #991b1b; }
+    .pill.pending { background: #fef3c7; color: #92400e; }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .selection-list {
+      max-height: 240px;
+      overflow-y: auto;
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+    }
+
+    .selection-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 2000;
+    }
+
+    .toast {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+    .toast.info { background: #2563eb; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--panel);
+      border-radius: 16px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--panel-border);
+    }
+
+    #consoleTerminal {
+      height: 420px;
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 6px;
+      border: 1px solid #1e293b;
+    }
+
+    .console-status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .modal-header,
+    .modal-footer {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-footer {
+      border-top: 1px solid var(--panel-border);
+      border-bottom: none;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .modal-body {
+      padding: 18px;
+    }
+
+    .icon-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--muted);
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 4000;
+      flex-direction: column;
+      gap: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid var(--primary);
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+      .nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+      .content {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout" id="appLayout">
+    <aside class="sidebar">
+      <div>
+        <div class="brand-title"><i class="fas fa-shield-alt"></i> Habeny</div>
+        <div class="brand-subtitle">Multi-SIEM Container Emulation</div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-page="overview"><i class="fas fa-chart-pie"></i> Overview</button>
+        <button class="nav-item" data-page="system"><i class="fas fa-microchip"></i> System</button>
+        <button class="nav-item" data-page="agents"><i class="fas fa-server"></i> Containers</button>
+        <button class="nav-item" data-page="groups"><i class="fas fa-layer-group"></i> Groups</button>
+        <button class="nav-item" data-page="deploy"><i class="fas fa-rocket"></i> Deploy</button>
+        <button class="nav-item" data-page="bulk"><i class="fas fa-layer-group"></i> Bulk Ops</button>
+        <button class="nav-item" data-page="simulations"><i class="fas fa-bug"></i> Simulations</button>
+        <button class="nav-item" data-page="logs"><i class="fas fa-file-upload"></i> Log Upload</button>
+        <button class="nav-item" data-page="configs"><i class="fas fa-cogs"></i> Configs</button>
+        <button class="nav-item" data-page="reports"><i class="fas fa-file-lines"></i> Reports</button>
+        <button class="nav-item" data-page="activity"><i class="fas fa-history"></i> Activity</button>
+        <button class="nav-item" data-page="siem"><i class="fas fa-shield-virus"></i> SIEM Stats</button>
+        <button class="nav-item" data-page="api"><i class="fas fa-code"></i> API Explorer</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span><span class="status-dot" id="apiDot"></span><span id="apiStatusText">Offline</span></span>
+          <span id="apiLatency">--</span>
+        </div>
+        <div class="status-row">
+          <span class="muted">Last refresh</span>
+          <span id="lastRefresh">Never</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <span class="inline-label">API Base</span>
+          <input id="apiBaseInput" class="input" type="text" placeholder="http://localhost:9000">
+          <button class="button" id="saveApiBase">Save</button>
+          <button class="button primary" id="refreshAll">Refresh All</button>
+        </div>
+        <div class="topbar-right">
+          <div class="chip" id="rootBadge">Root: Unknown</div>
+          <div class="chip" id="healthBadge">Health: Unknown</div>
+        </div>
+      </header>
+
+      <section id="page-overview" class="page active">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Overview</h1>
+            <p class="page-subtitle">Key metrics across containers, simulations, and platform health.</p>
+          </div>
+          <div class="actions">
+            <button class="button primary" data-page-target="deploy"><i class="fas fa-rocket"></i> Deploy Containers</button>
+            <button class="button" data-page-target="simulations"><i class="fas fa-bug"></i> Start Simulation</button>
+            <button class="button" data-page-target="reports"><i class="fas fa-file-lines"></i> Generate Report</button>
+          </div>
+        </div>
+
+        <div class="grid stats-grid">
+          <div class="card">
+            <div class="stat-label">Total Containers</div>
+            <div class="stat-value" id="statTotalAgents">0</div>
+            <div class="stat-meta" id="statAgentsBySiem">Wazuh: 0 · OSSEC: 0 · OSSIM: 0 · UTMstack: 0</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">Running Containers</div>
+            <div class="stat-value" id="statRunningAgents">0</div>
+            <div class="stat-meta">Lifecycle status running</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">Stopped Containers</div>
+            <div class="stat-value" id="statStoppedAgents">0</div>
+            <div class="stat-meta">Lifecycle status stopped</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">Container Errors</div>
+            <div class="stat-value" id="statErrorAgents">0</div>
+            <div class="stat-meta">Lifecycle status error</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">Active Simulations</div>
+            <div class="stat-value" id="statActiveSimulations">0</div>
+            <div class="stat-meta" id="statTotalSimulations">Total simulations: 0</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">Containers</div>
+            <div class="stat-value" id="statContainerCount">0</div>
+            <div class="stat-meta" id="statRunningContainers">Running: 0</div>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>System Health</h3>
+            <div id="healthSummary" class="muted">No health data loaded.</div>
+            <div class="kv-list" id="healthDetails"></div>
+          </div>
+          <div class="card">
+            <h3>Container Stats</h3>
+            <div class="grid two">
+              <div>
+                <div class="stat-label">By SIEM Type</div>
+                <div class="kv-list" id="agentStatsBySiem"></div>
+              </div>
+              <div>
+                <div class="stat-label">By Status</div>
+                <div class="kv-list" id="agentStatsByStatus"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recent Activity</h3>
+          <div class="muted">Latest logs captured by the activity endpoint.</div>
+          <div id="recentActivity"></div>
+        </div>
+      </section>
+
+      <section id="page-system" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">System</h1>
+            <p class="page-subtitle">Platform metadata, container counts, and supported features.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshSystem"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Platform</h3>
+            <div class="kv-list" id="systemPlatform"></div>
+          </div>
+          <div class="card">
+            <h3>System</h3>
+            <div class="kv-list" id="systemStats"></div>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Containers</h3>
+            <div class="kv-list" id="systemContainers"></div>
+          </div>
+          <div class="card">
+            <h3>Supported Features</h3>
+            <div class="kv-list" id="systemFeatures"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Templates</h3>
+          <div id="systemTemplates" class="kv-list"></div>
+        </div>
+      </section>
+
+      <section id="page-agents" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Containers</h1>
+            <p class="page-subtitle">Browse, start/stop, and delete containers.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshAgentsBtn"><i class="fas fa-sync"></i> Refresh</button>
+            <button class="button" data-page-target="bulk"><i class="fas fa-layer-group"></i> Bulk Ops</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-grid two">
+            <div class="field">
+              <label for="agentsSiemFilter">SIEM Type</label>
+              <select id="agentsSiemFilter" class="select">
+                <option value="">All</option>
+                <option value="none">None (bare)</option>
+                <option value="wazuh">Wazuh</option>
+                <option value="ossec">OSSEC</option>
+                <option value="ossim">OSSIM</option>
+                <option value="utmstack">UTMstack</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="agentsStatusFilter">Status</label>
+              <select id="agentsStatusFilter" class="select">
+                <option value="">All</option>
+                <option value="running">Running</option>
+                <option value="stopped">Stopped</option>
+                <option value="error">Error</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="agentsGroupFilter">Group</label>
+              <select id="agentsGroupFilter" class="select">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="agentsLimit">Limit</label>
+              <input id="agentsLimit" class="input" type="number" value="50" min="1" max="1000">
+            </div>
+            <div class="field">
+              <label for="agentsOffset">Offset</label>
+              <input id="agentsOffset" class="input" type="number" value="0" min="0">
+            </div>
+            <div class="field">
+              <label for="agentsSearch">Search (client-side)</label>
+              <input id="agentsSearch" class="input" type="text" placeholder="container name, ip, group">
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" id="applyAgentsFilters">Apply Filters</button>
+            </div>
+          </div>
+          <div class="muted">Container operations (start/stop/delete) require root privileges on the API host.</div>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 12px;">
+            <div>
+              <h3 class="page-title" style="font-size: 18px;">Group Actions</h3>
+              <p class="page-subtitle">Apply group changes to selected containers.</p>
+            </div>
+          </div>
+          <div class="form-grid two">
+            <div class="field">
+              <label for="agentsGroupAssign">Target Group</label>
+              <select id="agentsGroupAssign" class="select">
+                <option value="">Select a group</option>
+              </select>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" id="assignGroupBtn">Assign Selected Containers</button>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button" id="removeGroupBtn">Remove Containers from Group</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="status-row">
+            <span class="muted">Selected containers: <strong id="selectedAgentsCount">0</strong></span>
+            <button class="button ghost" id="clearAgentSelection">Clear Selection</button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th><input type="checkbox" id="agentsSelectAll"></th>
+                  <th>Name</th>
+                  <th>Seq ID</th>
+                  <th>SIEM</th>
+                  <th>Container</th>
+                  <th>SIEM Agent Service</th>
+                  <th>Manager Connectivity</th>
+                  <th>IP</th>
+          <th>Group</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="agentsTableBody"></tbody>
+            </table>
+          </div>
+          <div class="status-row" style="margin-top: 10px;">
+            <span class="muted" id="agentsPaginationInfo">Showing 0 of 0 containers</span>
+            <div class="actions">
+              <button class="button" id="agentsPrev">Prev</button>
+              <button class="button" id="agentsNext">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-groups" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Groups</h1>
+            <p class="page-subtitle">Create groups and manage container assignments.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshGroups"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Create Group</h3>
+            <form id="groupCreateForm" class="form-grid">
+              <div class="field">
+                <label for="groupName">Group Name</label>
+                <input id="groupName" class="input" type="text" placeholder="production">
+              </div>
+              <div class="field">
+                <label for="groupDescription">Description</label>
+                <input id="groupDescription" class="input" type="text" placeholder="Optional description">
+              </div>
+              <button class="button primary" type="submit">Create Group</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Group Result</h3>
+            <pre id="groupResult">No group created yet.</pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Groups List</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Containers</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="groupsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-deploy" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Deploy Containers</h1>
+            <p class="page-subtitle">Create containers and install SIEM agents at scale.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <form id="deployForm" class="form-grid two">
+            <div class="field">
+              <label for="deployCount">Container Count</label>
+              <input id="deployCount" class="input" type="number" min="1" max="1000" value="10">
+            </div>
+            <div class="field">
+              <label for="deploySiemType">SIEM Type</label>
+              <select id="deploySiemType" class="select">
+                <option value="none">None (bare container)</option>
+                <option value="wazuh">Wazuh</option>
+                <option value="ossec">OSSEC</option>
+                <option value="ossim">OSSIM</option>
+                <option value="utmstack">UTMstack</option>
+              </select>
+            </div>
+            <div class="field" id="deploySiemIpField">
+              <label for="deploySiemIp">SIEM Manager IP/Hostname</label>
+              <input id="deploySiemIp" class="input" type="text" placeholder="192.168.1.100">
+            </div>
+            <div class="field" id="deploySiemVersionField">
+              <label for="deploySiemVersion">SIEM Version</label>
+              <input id="deploySiemVersion" class="input" type="text" value="4.14.2">
+            </div>
+            <div class="field" id="deploySiemAuthKeyField" style="display:none">
+              <label for="deploySiemAuthKey">Installer Auth Key</label>
+              <input id="deploySiemAuthKey" class="input" type="text" placeholder="UTMstack authentication key">
+            </div>
+            <div class="field">
+              <label for="deployOsType">OS Type</label>
+              <select id="deployOsType" class="select">
+                <option value="ubuntu_22_04">Ubuntu 22.04</option>
+                <option value="ubuntu_20_04">Ubuntu 20.04</option>
+                <option value="debian_11">Debian 11</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="deployAgentGroup">Container Group</label>
+              <input id="deployAgentGroup" class="input" type="text" value="default">
+            </div>
+            <div class="field">
+              <label>
+                <input id="deployAutoCreateGroup" type="checkbox" checked>
+                Auto-create group if missing
+              </label>
+            </div>
+            <div class="field">
+              <label for="deployAgentBase">Container Base Name</label>
+              <input id="deployAgentBase" class="input" type="text" value="container">
+            </div>
+            <div class="field">
+              <label for="deployMemory">Memory Limit</label>
+              <input id="deployMemory" class="input" type="text" value="512MB">
+            </div>
+            <div class="field">
+              <label for="deployCpuShares">CPU Shares</label>
+              <input id="deployCpuShares" class="input" type="number" value="1024">
+            </div>
+            <div class="field">
+              <label for="deployTemplateId">Config Template ID</label>
+              <input id="deployTemplateId" class="input" type="text" placeholder="optional template id">
+            </div>
+            <div class="field">
+              <label for="deployParallelMode">Parallel Mode</label>
+              <select id="deployParallelMode" class="select">
+                <option value="multiprocessing">Multiprocessing</option>
+                <option value="threading">Threading</option>
+                <option value="sequential">Sequential</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>
+                <input id="deployAutostart" type="checkbox" checked>
+                Autostart containers after creation
+              </label>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" type="submit"><i class="fas fa-rocket"></i> Deploy</button>
+            </div>
+          </form>
+          <div class="muted">Deploy operations require root privileges on the API host.</div>
+        </div>
+
+        <div class="card">
+          <h3>Deployment Result</h3>
+          <pre id="deployResult">No deployment executed yet.</pre>
+        </div>
+      </section>
+
+      <section id="page-bulk" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Bulk Operations</h1>
+            <p class="page-subtitle">Start, stop, or delete multiple containers at once.</p>
+          </div>
+        </div>
+
+        <div class="card form-grid two">
+          <div class="field">
+            <label for="bulkOperation">Operation</label>
+            <select id="bulkOperation" class="select">
+              <option value="start">Start</option>
+              <option value="stop">Stop</option>
+              <option value="delete">Delete</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="bulkGroupSelect">Target Group</label>
+            <select id="bulkGroupSelect" class="select">
+              <option value="">None</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>
+              <input id="bulkForce" type="checkbox">
+              Force operation
+            </label>
+          </div>
+          <div class="field">
+            <label>
+              <input id="bulkParallel" type="checkbox" checked>
+              Execute in parallel
+            </label>
+          </div>
+          <div class="field">
+            <label for="bulkMaxWorkers">Max Workers</label>
+            <input id="bulkMaxWorkers" class="input" type="number" min="1" max="32" placeholder="optional">
+          </div>
+          <div class="field" style="align-self: end;">
+            <button class="button danger" id="bulkRun"><i class="fas fa-bolt"></i> Run Operation</button>
+          </div>
+          <div class="field" style="align-self: end;">
+            <button class="button primary" id="bulkRunGroup"><i class="fas fa-people-group"></i> Run for Group</button>
+          </div>
+          <div class="field" style="align-self: end;">
+            <button class="button ghost" id="bulkClear"><i class="fas fa-eraser"></i> Clear Selection</button>
+          </div>
+          <div class="muted">Bulk operations require root privileges on the API host.</div>
+        </div>
+
+        <div class="card">
+          <h3>Select Containers</h3>
+          <div class="actions" style="margin-bottom: 10px;">
+            <button class="button" id="bulkSelectAll">Select All</button>
+            <button class="button" id="bulkSelectRunning">Select Running</button>
+          </div>
+          <div class="selection-list" id="bulkAgentList"></div>
+        </div>
+
+        <div class="card">
+          <h3>Bulk Result</h3>
+          <pre id="bulkResult">No bulk operation executed yet.</pre>
+        </div>
+      </section>
+
+      <section id="page-simulations" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Simulations</h1>
+            <p class="page-subtitle">Launch and monitor attack simulations.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshSimulations"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <form id="simulationForm" class="form-grid two">
+            <div class="field">
+              <label for="simulationProfile">Profile</label>
+              <select id="simulationProfile" class="select"></select>
+            </div>
+            <div class="field">
+              <label for="simulationDuration">Duration (seconds)</label>
+              <input id="simulationDuration" class="input" type="number" min="1" value="300">
+            </div>
+            <div class="field">
+              <label for="simulationEps">EPS Target</label>
+              <input id="simulationEps" class="input" type="number" min="1" value="100">
+            </div>
+            <div class="field">
+              <label for="simulationIntensity">Intensity</label>
+              <select id="simulationIntensity" class="select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>
+                <input id="simulationBurst" type="checkbox">
+                Burst mode
+              </label>
+            </div>
+            <div class="field">
+              <label for="simulationCustomParams">Custom Parameters (JSON)</label>
+              <textarea id="simulationCustomParams" class="textarea" placeholder='{"key": "value"}'></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Container Selector</h3>
+          <div class="actions" style="margin-bottom: 10px;">
+            <button class="button" id="simSelectAll">Select All</button>
+            <button class="button" id="simSelectRunning">Select Running</button>
+            <button class="button ghost" id="simClearSelection">Clear</button>
+          </div>
+          <div class="selection-list" id="simulationAgentList"></div>
+          <div class="form-grid two" style="margin-top: 12px;">
+            <div class="field">
+              <label for="simFilterSiem">Filter by SIEM</label>
+              <select id="simFilterSiem" class="select">
+                <option value="">Any</option>
+                <option value="wazuh">Wazuh</option>
+                <option value="ossec">OSSEC</option>
+                <option value="ossim">OSSIM</option>
+                <option value="utmstack">UTMstack</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="simFilterGroup">Filter by Container Group</label>
+              <select id="simFilterGroup" class="select">
+                <option value="">Any</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="simFilterStatus">Filter by Status</label>
+              <select id="simFilterStatus" class="select">
+                <option value="">Any</option>
+                <option value="running">Running</option>
+                <option value="stopped">Stopped</option>
+                <option value="error">Error</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="simFilterTags">Tags (comma-separated)</label>
+              <input id="simFilterTags" class="input" type="text" placeholder="prod,edge">
+            </div>
+            <div class="field">
+              <label for="simFilterCount">Random Count</label>
+              <input id="simFilterCount" class="input" type="number" min="1" placeholder="optional">
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" id="startSimulation"><i class="fas fa-play"></i> Start Simulation</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Simulation Result</h3>
+          <pre id="simulationResult">No simulation started yet.</pre>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 12px;">
+            <div>
+              <h3 class="page-title" style="font-size: 18px;">Load Simulations (Custom Logs)</h3>
+              <p class="page-subtitle">Generate JSON logs at a configured EPS using the container selections above.</p>
+            </div>
+          </div>
+          <form id="loadSimulationForm" class="form-grid two">
+            <div class="field">
+              <label for="loadEps">EPS</label>
+              <input id="loadEps" class="input" type="number" min="1" value="100">
+            </div>
+            <div class="field">
+              <label for="loadDuration">Duration (seconds)</label>
+              <input id="loadDuration" class="input" type="number" min="1" value="300">
+            </div>
+            <div class="field">
+              <label for="loadFilePath">Log File Path</label>
+              <input id="loadFilePath" class="input" type="text" value="/var/log/custom-eps.json">
+            </div>
+            <div class="field">
+              <label for="loadSrcIp">Source IP</label>
+              <input id="loadSrcIp" class="input" type="text" value="192.168.1.100">
+            </div>
+            <div class="field">
+              <label for="loadDestIp">Destination IP</label>
+              <input id="loadDestIp" class="input" type="text" value="10.0.0.1">
+            </div>
+            <div class="field">
+              <label for="loadSeqStart">Sequence Start</label>
+              <input id="loadSeqStart" class="input" type="number" min="1" value="1">
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="loadMessage">Message</label>
+              <input id="loadMessage" class="input" type="text" value="Custom EPS log event">
+            </div>
+            <div class="field">
+              <label for="loadStartTime">Start Time (optional)</label>
+              <input id="loadStartTime" class="input" type="text" placeholder="2026-01-27T12:00:00Z">
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="loadExtraFields">Extra Fields (JSON)</label>
+              <textarea id="loadExtraFields" class="textarea" placeholder='{"severity":"info","app":"simulator"}'></textarea>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" type="submit"><i class="fas fa-database"></i> Load Simulation</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Load Simulation Result</h3>
+          <pre id="loadSimulationResult">No custom simulation loaded yet.</pre>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 12px;">
+            <div>
+              <h3 class="page-title" style="font-size: 18px;">Syslog Simulations</h3>
+              <p class="page-subtitle">Send RFC3164 syslogs to a target IP/port at a configured EPS.</p>
+            </div>
+          </div>
+          <form id="syslogSimulationForm" class="form-grid two">
+            <div class="field">
+              <label for="syslogTargetIp">Target IP/Hostname</label>
+              <input id="syslogTargetIp" class="input" type="text" value="172.17.0.1">
+            </div>
+            <div class="field">
+              <label for="syslogTargetPort">Target Port</label>
+              <input id="syslogTargetPort" class="input" type="number" min="1" max="65535" value="514">
+            </div>
+            <div class="field">
+              <label for="syslogProtocol">Protocol</label>
+              <select id="syslogProtocol" class="select">
+                <option value="tcp" selected>TCP</option>
+                <option value="udp">UDP</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="syslogEps">EPS</label>
+              <input id="syslogEps" class="input" type="number" min="1" value="100">
+            </div>
+            <div class="field">
+              <label for="syslogDuration">Duration (seconds)</label>
+              <input id="syslogDuration" class="input" type="number" min="1" value="300">
+            </div>
+            <div class="field">
+              <label for="syslogDeviceCount">Device Count</label>
+              <input id="syslogDeviceCount" class="input" type="number" min="1" value="4">
+            </div>
+            <div class="field">
+              <label for="syslogDeviceType">Device Type</label>
+              <select id="syslogDeviceType" class="select">
+                <option value="mixed" selected>Mixed</option>
+                <option value="router">Router</option>
+                <option value="switch">Switch</option>
+                <option value="firewall">Firewall</option>
+                <option value="ids">IDS</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="syslogDevicePrefix">Device Name Prefix</label>
+              <input id="syslogDevicePrefix" class="input" type="text" value="device">
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" type="submit"><i class="fas fa-broadcast-tower"></i> Start Syslog</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Syslog Simulation Result</h3>
+          <pre id="syslogSimulationResult">No syslog simulation started yet.</pre>
+        </div>
+
+        <div class="card">
+          <h3>Simulations</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Profile</th>
+                  <th>Status</th>
+                  <th>Targets</th>
+                  <th>Duration</th>
+                  <th>EPS</th>
+                  <th>Events</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="simulationsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-logs" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Log Upload</h1>
+            <p class="page-subtitle">Inject log content into containers.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <form id="logUploadForm" class="form-grid two">
+            <div class="field">
+              <label for="logAgentSelect">Container (dropdown)</label>
+              <select id="logAgentSelect" class="select"></select>
+            </div>
+            <div class="field">
+              <label for="logAgentManual">Container ID (manual)</label>
+              <input id="logAgentManual" class="input" type="text" placeholder="container-0001">
+            </div>
+            <div class="field">
+              <label for="logModeSelect">Upload Mode</label>
+              <select id="logModeSelect" class="select">
+                <option value="once" selected>Send once</option>
+                <option value="schedule">Send intermittently</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="logTargetScope">Target Scope</label>
+              <select id="logTargetScope" class="select">
+                <option value="agent" selected>Container</option>
+                <option value="group">Group</option>
+              </select>
+            </div>
+            <div class="field log-group-field" style="display: none;">
+              <label for="logGroupSelect">Group</label>
+              <select id="logGroupSelect" class="select">
+                <option value="">Select group</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="logPath">Destination Path</label>
+              <input id="logPath" class="input" type="text" value="/var/log/auth.log">
+            </div>
+            <div class="field">
+              <label for="logType">Log Type</label>
+              <select id="logType" class="select">
+                <option value="auth">auth</option>
+                <option value="web">web</option>
+                <option value="application">application</option>
+                <option value="system">system</option>
+                <option value="security">security</option>
+                <option value="custom" selected>custom</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>
+                <input id="logAppend" type="checkbox" checked>
+                Append to existing file
+              </label>
+            </div>
+            <div class="field log-schedule-field" style="display: none;">
+              <label for="logInterval">Interval (seconds)</label>
+              <input id="logInterval" class="input" type="number" min="5" value="120">
+            </div>
+            <div class="field log-schedule-field" style="display: none;">
+              <label for="logDuration">Duration (seconds)</label>
+              <input id="logDuration" class="input" type="number" min="10" placeholder="e.g. 1800">
+            </div>
+            <div class="field log-schedule-field" style="display: none;">
+              <label>
+                <input id="logIndefinite" type="checkbox">
+                Run indefinitely
+              </label>
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="logContent">Log Content</label>
+              <textarea id="logContent" class="textarea" placeholder="Paste log lines here..."></textarea>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button success" type="submit"><i class="fas fa-upload"></i> Upload Logs</button>
+            </div>
+            <div class="field log-schedule-field" style="align-self: end; display: none;">
+              <button class="button primary" type="button" id="startLogSchedule"><i class="fas fa-play"></i> Start Schedule</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Upload Result</h3>
+          <pre id="logResult">No logs uploaded yet.</pre>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom: 12px;">
+            <div>
+              <h3 class="page-title" style="font-size: 18px;">Active Log Schedules</h3>
+              <p class="page-subtitle">Manage intermittent log uploads.</p>
+            </div>
+            <div class="actions">
+              <button class="button" id="refreshLogSchedules"><i class="fas fa-sync"></i> Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Schedule ID</th>
+                  <th>Container</th>
+                  <th>Status</th>
+                  <th>Interval</th>
+                  <th>Duration</th>
+                  <th>Runs</th>
+                  <th>Last Run</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="logSchedulesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-configs" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Configuration Templates</h1>
+            <p class="page-subtitle">Import templates and export them for reuse.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshConfigs"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Import Template</h3>
+            <form id="configImportForm" class="form-grid">
+              <div class="field">
+                <label for="configName">Name</label>
+                <input id="configName" class="input" type="text" required>
+              </div>
+              <div class="field">
+                <label for="configSiemType">SIEM Type</label>
+                <select id="configSiemType" class="select">
+                  <option value="wazuh">wazuh</option>
+                  <option value="ossec">ossec</option>
+                  <option value="ossim">ossim</option>
+                  <option value="utmstack">utmstack</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="configDescription">Description</label>
+                <input id="configDescription" class="input" type="text" placeholder="Optional">
+              </div>
+              <div class="field">
+                <label for="configVersion">Version</label>
+                <input id="configVersion" class="input" type="text" placeholder="Optional">
+              </div>
+              <div class="field">
+                <label for="configTags">Tags (comma-separated)</label>
+                <input id="configTags" class="input" type="text" placeholder="prod,high-security">
+              </div>
+              <div class="field">
+                <label for="configContent">Content</label>
+                <textarea id="configContent" class="textarea" required></textarea>
+              </div>
+              <button class="button primary" type="submit"><i class="fas fa-save"></i> Import</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Import Result</h3>
+            <pre id="configImportResult">No template imported yet.</pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Templates</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>SIEM</th>
+                  <th>Description</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="configsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-reports" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Reports</h1>
+            <p class="page-subtitle">Generate and retrieve reports from the platform.</p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Generate Report</h3>
+            <form id="reportGenerateForm" class="form-grid">
+              <div class="field">
+                <label for="reportStart">Start Time</label>
+                <input id="reportStart" class="input" type="datetime-local" required>
+              </div>
+              <div class="field">
+                <label for="reportEnd">End Time</label>
+                <input id="reportEnd" class="input" type="datetime-local" required>
+              </div>
+              <div class="field">
+                <label for="reportMetrics">Metrics (comma-separated)</label>
+                <input id="reportMetrics" class="input" type="text" value="all">
+              </div>
+              <div class="field">
+                <label for="reportFormat">Format</label>
+                <select id="reportFormat" class="select">
+                  <option value="json">json</option>
+                  <option value="csv">csv</option>
+                  <option value="pdf">pdf</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>
+                  <input id="reportFindings" type="checkbox" checked>
+                  Include findings
+                </label>
+              </div>
+              <button class="button primary" type="submit"><i class="fas fa-file-export"></i> Generate</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Generate Result</h3>
+            <pre id="reportGenerateResult">No report generated yet.</pre>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Fetch Report by ID</h3>
+            <form id="reportLookupForm" class="form-grid">
+              <div class="field">
+                <label for="reportIdLookup">Report ID</label>
+                <input id="reportIdLookup" class="input" type="text" placeholder="report-id">
+              </div>
+              <button class="button" type="submit"><i class="fas fa-search"></i> Fetch</button>
+            </form>
+            <div class="muted">Reports are stored in-memory unless persisted by the backend.</div>
+          </div>
+          <div class="card">
+            <h3>Report Output</h3>
+            <pre id="reportLookupResult">No report fetched yet.</pre>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Generated Reports (Local History)</h3>
+          <div id="reportsList" class="kv-list"></div>
+        </div>
+      </section>
+
+      <section id="page-activity" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Activity Logs</h1>
+            <p class="page-subtitle">Audit trail for container deployment and simulation actions.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshActivity"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="card form-grid two">
+          <div class="field">
+            <label for="activityAction">Action Filter</label>
+            <input id="activityAction" class="input" type="text" placeholder="container_deployment_started">
+          </div>
+          <div class="field">
+            <label for="activityLimit">Limit</label>
+            <input id="activityLimit" class="input" type="number" min="1" max="1000" value="100">
+          </div>
+          <div class="field">
+            <label for="activityOffset">Offset</label>
+            <input id="activityOffset" class="input" type="number" min="0" value="0">
+          </div>
+          <div class="field" style="align-self: end;">
+            <button class="button primary" id="applyActivityFilters">Apply</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="activityTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-siem" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">SIEM Stats</h1>
+            <p class="page-subtitle">Connectivity and counts per SIEM type.</p>
+          </div>
+          <div class="actions">
+            <button class="button" id="refreshSiemStats"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid stats-grid">
+          <div class="card">
+            <div class="stat-label">Wazuh</div>
+            <div class="stat-value" id="siemWazuhTotal">0</div>
+            <div class="stat-meta" id="siemWazuhMeta">Connected: 0 · Rate: 0%</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">OSSEC</div>
+            <div class="stat-value" id="siemOssecTotal">0</div>
+            <div class="stat-meta" id="siemOssecMeta">Connected: 0 · Rate: 0%</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">OSSIM</div>
+            <div class="stat-value" id="siemOssimTotal">0</div>
+            <div class="stat-meta" id="siemOssimMeta">Connected: 0 · Rate: 0%</div>
+          </div>
+          <div class="card">
+            <div class="stat-label">UTMstack</div>
+            <div class="stat-value" id="siemUtmstackTotal">0</div>
+            <div class="stat-meta" id="siemUtmstackMeta">Connected: 0 · Rate: 0%</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-api" class="page">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">API Explorer</h1>
+            <p class="page-subtitle">Inspect the root metadata and send ad-hoc API requests.</p>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h3>Root Endpoint</h3>
+            <pre id="rootInfoOutput">No root data loaded.</pre>
+          </div>
+          <div class="card">
+            <h3>Common Endpoints</h3>
+            <div class="kv-list">
+              <div class="kv-row"><span>GET</span><span>/system/info</span></div>
+              <div class="kv-row"><span>GET</span><span>/system/health</span></div>
+              <div class="kv-row"><span>GET</span><span>/agents</span></div>
+              <div class="kv-row"><span>POST</span><span>/agents/deploy</span></div>
+              <div class="kv-row"><span>GET</span><span>/simulations</span></div>
+              <div class="kv-row"><span>POST</span><span>/simulations/start</span></div>
+              <div class="kv-row"><span>GET</span><span>/configs</span></div>
+              <div class="kv-row"><span>POST</span><span>/reports/generate</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Send Request</h3>
+          <div class="form-grid two">
+            <div class="field">
+              <label for="apiMethod">Method</label>
+              <select id="apiMethod" class="select">
+                <option>GET</option>
+                <option>POST</option>
+                <option>DELETE</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="apiPath">Path</label>
+              <input id="apiPath" class="input" type="text" placeholder="/agents">
+            </div>
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="apiBody">Body (JSON)</label>
+              <textarea id="apiBody" class="textarea" placeholder='{"example": true}'></textarea>
+            </div>
+            <div class="field" style="align-self: end;">
+              <button class="button primary" id="apiSend"><i class="fas fa-paper-plane"></i> Send</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Response</h3>
+          <pre id="apiResponseOutput">No request sent.</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="consoleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="consoleTitle">Console</h3>
+        <button class="icon-btn" id="consoleClose"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="consoleTerminal"></div>
+        <div class="console-status" id="consoleStatus">Disconnected.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="button ghost" id="consoleDisconnect">Disconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <div class="modal-overlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Details</h3>
+        <button class="icon-btn" id="modalClose"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    Loading data...
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+  <script>
+    const state = {
+      apiBase: "",
+      rootInfo: null,
+      systemInfo: null,
+      systemHealth: null,
+      agents: [],
+      agentsTotal: 0,
+      agentsStats: null,
+      simulations: [],
+      configs: [],
+      activity: [],
+      siemStats: {},
+      reports: [],
+      groups: [],
+      selections: {
+        agents: new Set(),
+        bulk: new Set(),
+        simulation: new Set()
+      },
+      console: {
+        term: null,
+        fit: null,
+        socket: null,
+        dataDisposable: null,
+        agentId: null
+      }
+    };
+
+    const dom = {
+      apiBaseInput: document.getElementById("apiBaseInput"),
+      apiStatusText: document.getElementById("apiStatusText"),
+      apiDot: document.getElementById("apiDot"),
+      apiLatency: document.getElementById("apiLatency"),
+      lastRefresh: document.getElementById("lastRefresh"),
+      rootBadge: document.getElementById("rootBadge"),
+      healthBadge: document.getElementById("healthBadge")
+    };
+
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return "";
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function showToast(message, type = "info") {
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<i class="fas fa-circle-info"></i>${escapeHtml(message)}`;
+      document.getElementById("toastContainer").appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    function setLoading(active) {
+      document.getElementById("loadingOverlay").classList.toggle("active", active);
+    }
+
+    function setApiBase(value) {
+      const base = value.replace(/\/$/, "");
+      state.apiBase = base;
+      localStorage.setItem("habenyApiBase", base);
+      dom.apiBaseInput.value = base;
+      renderReportsList();
+    }
+
+    function loadApiBase() {
+      return localStorage.getItem("habenyApiBase") || "http://localhost:9000";
+    }
+
+    async function apiRequest(path, options = {}) {
+      const url = `${state.apiBase}${path.startsWith("/") ? "" : "/"}${path}`;
+      const config = {
+        method: options.method || "GET",
+        headers: { "Content-Type": "application/json" }
+      };
+      if (options.body) {
+        config.body = JSON.stringify(options.body);
+      }
+      const start = performance.now();
+      const response = await fetch(url, config);
+      const latency = Math.round(performance.now() - start);
+      dom.apiLatency.textContent = `${latency}ms`;
+      const text = await response.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          data = { raw: text };
+        }
+      }
+      if (!response.ok) {
+        throw new Error(data?.detail || data?.error || response.statusText);
+      }
+      return data;
+    }
+
+    function switchPage(page) {
+      document.querySelectorAll(".page").forEach(section => {
+        section.classList.toggle("active", section.id === `page-${page}`);
+      });
+      document.querySelectorAll(".nav-item").forEach(item => {
+        item.classList.toggle("active", item.dataset.page === page);
+      });
+    }
+
+    function updateStatusBadge() {
+      if (!state.systemHealth) {
+        dom.healthBadge.textContent = "Health: Unknown";
+        dom.apiStatusText.textContent = "Offline";
+        dom.apiDot.style.background = "var(--danger)";
+        return;
+      }
+      dom.apiStatusText.textContent = state.systemHealth.status || "Unknown";
+      dom.healthBadge.textContent = `Health: ${state.systemHealth.status}`;
+      dom.apiDot.style.background = state.systemHealth.status === "healthy" ? "var(--success)" : "var(--warning)";
+    }
+
+    function formatDate(value) {
+      if (!value) return "N/A";
+      const date = new Date(value);
+      return date.toLocaleString();
+    }
+
+    function updateLastRefresh() {
+      dom.lastRefresh.textContent = new Date().toLocaleTimeString();
+    }
+
+    function renderRootInfo() {
+      const output = document.getElementById("rootInfoOutput");
+      if (!state.rootInfo) {
+        output.textContent = "No root data loaded.";
+        return;
+      }
+      output.textContent = JSON.stringify(state.rootInfo, null, 2);
+    }
+
+    function renderSystemInfo() {
+      const platform = document.getElementById("systemPlatform");
+      const stats = document.getElementById("systemStats");
+      const containers = document.getElementById("systemContainers");
+      const features = document.getElementById("systemFeatures");
+      const templates = document.getElementById("systemTemplates");
+      platform.innerHTML = "";
+      stats.innerHTML = "";
+      containers.innerHTML = "";
+      features.innerHTML = "";
+      templates.innerHTML = "";
+
+      if (!state.systemInfo) return;
+      const data = state.systemInfo.data || state.systemInfo;
+      const platformData = data.platform || {};
+      const systemData = data.system || {};
+      const containerData = data.containers || {};
+      const featureData = data.supported_features || {};
+
+      const platformRows = [
+        ["Name", platformData.name],
+        ["Version", platformData.version],
+        ["LXC Version", platformData.lxc_version],
+        ["Default Config Path", platformData.default_config_path]
+      ];
+
+      const systemRows = [
+        ["Architecture", systemData.arch],
+        ["Root User", systemData.is_root ? "Yes" : "No"],
+        ["CPU Count", systemData.cpu_count],
+        ["Thread Workers", systemData.worker_config?.thread_workers],
+        ["Process Workers", systemData.worker_config?.process_workers]
+      ];
+
+      const containerRows = [
+        ["Total Containers", containerData.total],
+        ["Running", containerData.by_state?.RUNNING ?? 0],
+        ["Stopped", containerData.by_state?.STOPPED ?? 0],
+        ["Frozen", containerData.by_state?.FROZEN ?? 0]
+      ];
+
+      const featureRows = [
+        ["SIEM Types", (featureData.siem_types || []).join(", ")],
+        ["OS Types", (featureData.os_types || []).join(", ")],
+        ["Simulation Profiles", (featureData.simulation_profiles || []).join(", ")],
+        ["Parallel Modes", (featureData.parallel_modes || []).join(", ")]
+      ];
+
+      platformRows.forEach(([k, v]) => platform.appendChild(kvRow(k, v)));
+      systemRows.forEach(([k, v]) => stats.appendChild(kvRow(k, v)));
+      containerRows.forEach(([k, v]) => containers.appendChild(kvRow(k, v)));
+      featureRows.forEach(([k, v]) => features.appendChild(kvRow(k, v)));
+
+      const templateList = (data.templates || []).map(t => kvRow("Template", t));
+      templateList.forEach(row => templates.appendChild(row));
+
+      dom.rootBadge.textContent = `Root: ${systemData.is_root ? "Yes" : "No"}`;
+    }
+
+    function kvRow(label, value) {
+      const row = document.createElement("div");
+      row.className = "kv-row";
+      row.innerHTML = `<span>${escapeHtml(label)}</span><span>${escapeHtml(value ?? "N/A")}</span>`;
+      return row;
+    }
+
+    function renderHealth() {
+      const summary = document.getElementById("healthSummary");
+      const details = document.getElementById("healthDetails");
+      details.innerHTML = "";
+      if (!state.systemHealth) {
+        summary.textContent = "No health data loaded.";
+        return;
+      }
+      summary.textContent = `Status: ${state.systemHealth.status}`;
+      const rows = [
+        ["Version", state.systemHealth.version],
+        ["Uptime (s)", Math.round(state.systemHealth.uptime_seconds || 0)],
+        ["Containers", state.systemHealth.containers_count],
+        ["Running Containers", state.systemHealth.system_info?.running_containers],
+        ["Active Simulations", state.systemHealth.system_info?.active_simulations]
+      ];
+      rows.forEach(([k, v]) => details.appendChild(kvRow(k, v)));
+    }
+
+    function renderAgentStats() {
+      const bySiem = document.getElementById("agentStatsBySiem");
+      const byStatus = document.getElementById("agentStatsByStatus");
+      bySiem.innerHTML = "";
+      byStatus.innerHTML = "";
+      if (!state.agentsStats) return;
+      Object.entries(state.agentsStats.data?.by_siem_type || {}).forEach(([k, v]) => {
+        bySiem.appendChild(kvRow(k, v));
+      });
+      Object.entries(state.agentsStats.data?.by_status || {}).forEach(([k, v]) => {
+        byStatus.appendChild(kvRow(k, v));
+      });
+    }
+
+    function renderOverviewStats() {
+      const byStatus = state.agentsStats?.data?.by_status || {};
+      const bySiem = state.agentsStats?.data?.by_siem_type || {};
+      const total = state.agentsTotal || state.agents.length;
+      const running = byStatus.running ?? state.agents.filter(a => a.lifecycle_status === "running").length;
+      const stopped = byStatus.stopped ?? state.agents.filter(a => a.lifecycle_status === "stopped").length;
+      const error = byStatus.error ?? state.agents.filter(a => a.lifecycle_status === "error").length;
+      const activeSimulations = state.simulations.filter(s => s.status === "running").length;
+      const totalSimulations = state.simulations.length;
+      document.getElementById("statTotalAgents").textContent = total;
+      document.getElementById("statRunningAgents").textContent = running;
+      document.getElementById("statStoppedAgents").textContent = stopped;
+      document.getElementById("statErrorAgents").textContent = error;
+      document.getElementById("statActiveSimulations").textContent = activeSimulations;
+      document.getElementById("statTotalSimulations").textContent = `Total simulations: ${totalSimulations}`;
+      document.getElementById("statContainerCount").textContent = state.systemHealth?.containers_count ?? 0;
+      document.getElementById("statRunningContainers").textContent = `Running: ${state.systemHealth?.system_info?.running_containers ?? 0}`;
+      document.getElementById("statAgentsBySiem").textContent =
+        `Wazuh: ${bySiem.wazuh || 0} · OSSEC: ${bySiem.ossec || 0} · OSSIM: ${bySiem.ossim || 0} · UTMstack: ${bySiem.utmstack || 0}`;
+    }
+
+    function renderRecentActivity() {
+      const container = document.getElementById("recentActivity");
+      container.innerHTML = "";
+      const recent = (state.activity || []).slice(0, 5);
+      if (recent.length === 0) {
+        container.innerHTML = "<div class='muted'>No activity logs available.</div>";
+        return;
+      }
+      recent.forEach(log => {
+        const row = document.createElement("div");
+        row.className = "kv-row";
+        row.innerHTML = `<span>${escapeHtml(log.action)}</span><span>${escapeHtml(log.status)} · ${escapeHtml(formatDate(log.timestamp))}</span>`;
+        container.appendChild(row);
+      });
+    }
+
+    function renderAgentsTable() {
+      const tbody = document.getElementById("agentsTableBody");
+      tbody.innerHTML = "";
+      const searchValue = document.getElementById("agentsSearch").value.toLowerCase();
+      const filtered = state.agents.filter(agent => {
+        if (!searchValue) return true;
+        const haystack = [
+          agent.agent_name,
+          agent.agent_id,
+          agent.agent_group,
+          ...(agent.ip_addresses || [])
+        ].join(" ").toLowerCase();
+        return haystack.includes(searchValue);
+      });
+
+      filtered.forEach(agent => {
+        const status = agent.lifecycle_status || "stopped";
+        const serviceStatus = agent.siem_agent_status || "unknown";
+        const serviceRunning = agent.siem_agent_running === true;
+        const managerStatus = agent.manager_status || "unknown";
+        const managerRunning = agent.manager_reachable === true;
+        const managerLabel = agent.manager_host ? `${agent.manager_host}:${agent.manager_port || ""}` : "N/A";
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td><input type="checkbox" class="agent-select" data-agent-id="${escapeHtml(agent.agent_id)}" ${state.selections.agents.has(agent.agent_id) ? "checked" : ""}></td>
+          <td>${escapeHtml(agent.agent_name || agent.agent_id)}</td>
+          <td>${escapeHtml(agent.agent_seq_id ?? "N/A")}</td>
+          <td>${escapeHtml(agent.siem_type || "unknown")}</td>
+          <td><span class="pill ${status}">${escapeHtml(status)}</span></td>
+          <td>
+            <span class="pill ${serviceRunning ? "running" : "stopped"}">
+              ${escapeHtml(serviceStatus)}
+            </span>
+            <div class="muted">${escapeHtml(agent.siem_agent_last_check || "No check yet")}</div>
+          </td>
+          <td>
+            <span class="pill ${managerRunning ? "running" : "stopped"}">
+              ${escapeHtml(managerStatus)}
+            </span>
+            <div class="muted">${escapeHtml(managerLabel)}</div>
+          </td>
+          <td>${escapeHtml(agent.ip_addresses?.[0] || "N/A")}</td>
+          <td><span class="pill">${escapeHtml(agent.agent_group || "unassigned")}</span></td>
+          <td>
+            <div class="actions">
+              <button class="button ${status === "running" ? "danger" : "success"}" data-action="${status === "running" ? "stop" : "start"}" data-agent-id="${escapeHtml(agent.agent_id)}">
+                ${status === "running" ? "Stop" : "Start"}
+              </button>
+              <button class="button" data-action="details" data-agent-id="${escapeHtml(agent.agent_id)}">Details</button>
+              <button class="button" data-action="console" data-agent-id="${escapeHtml(agent.agent_id)}">Console</button>
+              <button class="button" data-action="delete" data-agent-id="${escapeHtml(agent.agent_id)}">Delete</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      document.getElementById("selectedAgentsCount").textContent = state.selections.agents.size;
+    }
+
+    function renderBulkAgentList() {
+      const container = document.getElementById("bulkAgentList");
+      container.innerHTML = "";
+      state.agents.forEach(agent => {
+        const item = document.createElement("label");
+        item.className = "selection-item";
+        item.innerHTML = `
+          <input type="checkbox" data-agent-id="${escapeHtml(agent.agent_id)}" ${state.selections.bulk.has(agent.agent_id) ? "checked" : ""}>
+          <span>${escapeHtml(agent.agent_name || agent.agent_id)} · ${escapeHtml(agent.lifecycle_status || "stopped")}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function renderSimulationAgentList() {
+      const container = document.getElementById("simulationAgentList");
+      container.innerHTML = "";
+      state.agents.forEach(agent => {
+        const item = document.createElement("label");
+        item.className = "selection-item";
+        item.innerHTML = `
+          <input type="checkbox" data-agent-id="${escapeHtml(agent.agent_id)}" ${state.selections.simulation.has(agent.agent_id) ? "checked" : ""}>
+          <span>${escapeHtml(agent.agent_name || agent.agent_id)} · ${escapeHtml(agent.lifecycle_status || "stopped")}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function renderLogAgentOptions() {
+      const select = document.getElementById("logAgentSelect");
+      select.innerHTML = "";
+      state.agents.forEach(agent => {
+        const option = document.createElement("option");
+        option.value = agent.agent_id;
+        option.textContent = agent.agent_name || agent.agent_id;
+        select.appendChild(option);
+      });
+    }
+
+    function renderSimulationsTable() {
+      const tbody = document.getElementById("simulationsTableBody");
+      tbody.innerHTML = "";
+      state.simulations.forEach(sim => {
+        const status = sim.status || "unknown";
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(sim.simulation_id)}</td>
+          <td>${escapeHtml(sim.profile_id)}</td>
+          <td><span class="pill ${escapeHtml(status)}">${escapeHtml(status)}</span></td>
+          <td>${sim.target_agents?.length || 0}</td>
+          <td>${escapeHtml(sim.duration)}s</td>
+          <td>${escapeHtml(sim.eps_target)}</td>
+          <td>${escapeHtml(sim.events_generated || 0)}</td>
+          <td>
+            ${status === "running" ? `<button class="button danger" data-sim-action="stop" data-sim-id="${escapeHtml(sim.simulation_id)}">Stop</button>` : "-"}
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderConfigsTable() {
+      const tbody = document.getElementById("configsTableBody");
+      tbody.innerHTML = "";
+      state.configs.forEach(cfg => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(cfg.template_id)}</td>
+          <td>${escapeHtml(cfg.name)}</td>
+          <td>${escapeHtml(cfg.siem_type)}</td>
+          <td>${escapeHtml(cfg.description || "")}</td>
+          <td>${escapeHtml(formatDate(cfg.created_at))}</td>
+          <td>
+            <button class="button" data-config-action="export" data-config-id="${escapeHtml(cfg.template_id)}">Export</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderActivityTable() {
+      const tbody = document.getElementById("activityTableBody");
+      tbody.innerHTML = "";
+      state.activity.forEach(log => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(formatDate(log.timestamp))}</td>
+          <td>${escapeHtml(log.action)}</td>
+          <td>${escapeHtml(log.status)}</td>
+          <td><pre>${escapeHtml(JSON.stringify(log.details || {}, null, 2))}</pre></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function renderSiemStats() {
+      const wazuh = state.siemStats.wazuh || {};
+      const ossec = state.siemStats.ossec || {};
+      const ossim = state.siemStats.ossim || {};
+      const utmstack = state.siemStats.utmstack || {};
+      document.getElementById("siemWazuhTotal").textContent = wazuh.total_agents || 0;
+      document.getElementById("siemWazuhMeta").textContent = `Connected: ${wazuh.connected_agents || 0} · Rate: ${wazuh.connection_rate || 0}%`;
+      document.getElementById("siemOssecTotal").textContent = ossec.total_agents || 0;
+      document.getElementById("siemOssecMeta").textContent = `Connected: ${ossec.connected_agents || 0} · Rate: ${ossec.connection_rate || 0}%`;
+      document.getElementById("siemOssimTotal").textContent = ossim.total_agents || 0;
+      document.getElementById("siemOssimMeta").textContent = `Connected: ${ossim.connected_agents || 0} · Rate: ${ossim.connection_rate || 0}%`;
+      document.getElementById("siemUtmstackTotal").textContent = utmstack.total_agents || 0;
+      document.getElementById("siemUtmstackMeta").textContent = `Connected: ${utmstack.connected_agents || 0} · Rate: ${utmstack.connection_rate || 0}%`;
+    }
+
+    function renderReportsList() {
+      const list = document.getElementById("reportsList");
+      list.innerHTML = "";
+      if (!state.reports.length) {
+        list.innerHTML = "<div class='muted'>No reports stored in local history.</div>";
+        return;
+      }
+      state.reports.forEach(reportId => {
+        const row = document.createElement("div");
+        row.className = "kv-row";
+        row.innerHTML = `
+          <span>${escapeHtml(reportId)}</span>
+          <span>
+            <button class="button" data-report-action="fetch" data-report-id="${escapeHtml(reportId)}">View</button>
+            <a class="button ghost" href="${state.apiBase}/reports/${escapeHtml(reportId)}/download" target="_blank">Download</a>
+          </span>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function renderGroupsTable() {
+      const tbody = document.getElementById("groupsTableBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      state.groups.forEach(group => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(group.name)}</td>
+          <td>${escapeHtml(group.description || "")}</td>
+          <td>${escapeHtml(group.agent_count ?? 0)}</td>
+          <td>${escapeHtml(formatDate(group.created_at))}</td>
+          <td>
+            <button class="button" data-group-view="${escapeHtml(group.name)}">View Containers</button>
+            <button class="button" data-group-rename="${escapeHtml(group.name)}">Rename</button>
+            <button class="button danger" data-group-delete="${escapeHtml(group.name)}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function populateGroupSelects() {
+      const selects = [
+        "agentsGroupFilter",
+        "agentsGroupAssign",
+        "bulkGroupSelect",
+        "simFilterGroup",
+        "logGroupSelect"
+      ];
+      selects.forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = "";
+        let defaultLabel = "All";
+        if (id === "bulkGroupSelect") {
+          defaultLabel = "None";
+        } else if (["agentsGroupAssign", "logGroupSelect"].includes(id)) {
+          defaultLabel = "Select a group";
+        }
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
+        defaultOption.textContent = defaultLabel;
+        select.appendChild(defaultOption);
+        state.groups.forEach(group => {
+          const option = document.createElement("option");
+          option.value = group.name;
+          option.textContent = group.name;
+          select.appendChild(option);
+        });
+        select.value = currentValue;
+      });
+    }
+
+    function openModal(title, bodyHtml, footerButtons = []) {
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalBody").innerHTML = bodyHtml;
+      const footer = document.getElementById("modalFooter");
+      footer.innerHTML = "";
+      footerButtons.forEach(btn => {
+        const button = document.createElement("button");
+        button.className = `button ${btn.className || ""}`.trim();
+        button.textContent = btn.label;
+        button.addEventListener("click", btn.onClick);
+        footer.appendChild(button);
+      });
+      document.getElementById("modalOverlay").classList.add("active");
+    }
+
+    function closeModal() {
+      document.getElementById("modalOverlay").classList.remove("active");
+    }
+
+    function buildWsUrl(path) {
+      let base = state.apiBase;
+      if (base.startsWith("https://")) {
+        base = "wss://" + base.slice(8);
+      } else if (base.startsWith("http://")) {
+        base = "ws://" + base.slice(7);
+      } else if (!base.startsWith("ws://") && !base.startsWith("wss://")) {
+        base = "ws://" + base;
+      }
+      return `${base}${path}`;
+    }
+
+    function ensureTerminal() {
+      if (state.console.term) return;
+      state.console.term = new Terminal({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+        theme: {
+          background: "#0f172a",
+          foreground: "#e2e8f0"
+        }
+      });
+      state.console.fit = new FitAddon.FitAddon();
+      state.console.term.loadAddon(state.console.fit);
+      state.console.term.open(document.getElementById("consoleTerminal"));
+      state.console.fit.fit();
+      window.addEventListener("resize", () => {
+        if (document.getElementById("consoleModal").classList.contains("active")) {
+          sendConsoleResize();
+        }
+      });
+    }
+
+    function sendConsoleResize() {
+      if (!state.console.term || !state.console.fit || !state.console.socket) return;
+      state.console.fit.fit();
+      const payload = JSON.stringify({
+        type: "resize",
+        cols: state.console.term.cols,
+        rows: state.console.term.rows
+      });
+      if (state.console.socket.readyState === WebSocket.OPEN) {
+        state.console.socket.send(payload);
+      }
+    }
+
+    function openConsole(agentId) {
+      ensureTerminal();
+      const modal = document.getElementById("consoleModal");
+      const status = document.getElementById("consoleStatus");
+      document.getElementById("consoleTitle").textContent = `Console - ${agentId}`;
+      modal.classList.add("active");
+      status.textContent = "Connecting...";
+      state.console.term.reset();
+      state.console.term.writeln(`Connecting to ${agentId}...`);
+      if (state.console.socket) {
+        state.console.socket.close();
+      }
+      const wsUrl = buildWsUrl(`/ws/console/${encodeURIComponent(agentId)}`);
+      const socket = new WebSocket(wsUrl);
+      state.console.socket = socket;
+      state.console.agentId = agentId;
+
+      if (state.console.dataDisposable) {
+        state.console.dataDisposable.dispose();
+      }
+      state.console.dataDisposable = state.console.term.onData(data => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(data);
+        }
+      });
+
+      socket.onopen = () => {
+        status.textContent = "Connected.";
+        sendConsoleResize();
+      };
+      socket.onmessage = (event) => {
+        if (event.data.startsWith("ERROR:")) {
+          status.textContent = event.data.replace("ERROR:", "").trim();
+          showToast(event.data, "error");
+        }
+        state.console.term.write(event.data);
+      };
+      socket.onerror = () => {
+        status.textContent = "Connection error. Check API root privileges and container state.";
+        showToast("Console connection failed (check API root privileges).", "error");
+      };
+      socket.onclose = () => {
+        status.textContent = "Disconnected.";
+        state.console.term.writeln("\r\n[Disconnected]");
+      };
+    }
+
+    function closeConsole() {
+      const modal = document.getElementById("consoleModal");
+      modal.classList.remove("active");
+      if (state.console.socket) {
+        state.console.socket.close();
+        state.console.socket = null;
+      }
+    }
+
+    function loadReportsFromStorage() {
+      try {
+        const saved = JSON.parse(localStorage.getItem("habenyReports") || "[]");
+        return Array.isArray(saved) ? saved : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function saveReportsToStorage() {
+      localStorage.setItem("habenyReports", JSON.stringify(state.reports));
+    }
+
+    async function loadRoot() {
+      try {
+        const data = await apiRequest("/");
+        state.rootInfo = data;
+        renderRootInfo();
+      } catch (err) {
+        showToast(`Root endpoint failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadHealth() {
+      try {
+        const data = await apiRequest("/system/health");
+        state.systemHealth = data;
+        updateStatusBadge();
+        renderHealth();
+      } catch (err) {
+        state.systemHealth = null;
+        updateStatusBadge();
+      }
+    }
+
+    async function loadSystemInfo() {
+      try {
+        const data = await apiRequest("/system/info");
+        if (data?.success) {
+          state.systemInfo = data;
+          renderSystemInfo();
+          const profiles = data.data?.supported_features?.simulation_profiles || [];
+          updateSimulationProfiles(profiles);
+        } else {
+          state.systemInfo = data;
+          renderSystemInfo();
+        }
+      } catch (err) {
+        showToast(`System info failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadAgents() {
+      const siem = document.getElementById("agentsSiemFilter").value;
+      const status = document.getElementById("agentsStatusFilter").value;
+      const group = document.getElementById("agentsGroupFilter").value;
+      const limit = Number(document.getElementById("agentsLimit").value || 50);
+      const offset = Number(document.getElementById("agentsOffset").value || 0);
+      const params = new URLSearchParams();
+      if (siem) params.set("siem_type", siem);
+      if (status) params.set("status", status);
+      if (group) params.set("agent_group", group);
+      params.set("limit", limit);
+      params.set("offset", offset);
+      try {
+        const data = await apiRequest(`/agents?${params.toString()}`);
+        if (data?.success) {
+          state.agents = data.data?.agents || [];
+          state.agentsTotal = data.data?.total || 0;
+          renderAgentsTable();
+          renderBulkAgentList();
+          renderSimulationAgentList();
+          renderLogAgentOptions();
+          document.getElementById("agentsPaginationInfo").textContent = `Showing ${state.agents.length} of ${state.agentsTotal} containers`;
+        } else {
+          showToast("Failed to load containers", "error");
+        }
+      } catch (err) {
+        showToast(`Containers fetch failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadAgentsStats() {
+      try {
+        const data = await apiRequest("/agents/stats");
+        if (data?.success) {
+          state.agentsStats = data;
+          renderAgentStats();
+        }
+      } catch (err) {
+        showToast(`Container stats failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadSimulations() {
+      try {
+        const data = await apiRequest("/simulations");
+        if (data?.success) {
+          state.simulations = data.data?.simulations || [];
+          renderSimulationsTable();
+          updateSimulationProfiles(data.data?.available_profiles || []);
+        }
+      } catch (err) {
+        showToast(`Simulations fetch failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadConfigs() {
+      try {
+        const data = await apiRequest("/configs");
+        if (data?.success) {
+          state.configs = data.data?.templates || [];
+          renderConfigsTable();
+        }
+      } catch (err) {
+        showToast(`Configs fetch failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadGroups() {
+      try {
+        const data = await apiRequest("/groups");
+        if (data?.success) {
+          state.groups = data.data?.groups || [];
+          renderGroupsTable();
+          populateGroupSelects();
+        }
+      } catch (err) {
+        showToast(`Groups fetch failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadActivity() {
+      const action = document.getElementById("activityAction").value;
+      const limit = document.getElementById("activityLimit").value || 100;
+      const offset = document.getElementById("activityOffset").value || 0;
+      const params = new URLSearchParams();
+      if (action) params.set("action", action);
+      params.set("limit", limit);
+      params.set("offset", offset);
+      try {
+        const data = await apiRequest(`/activity/logs?${params.toString()}`);
+        if (data?.success) {
+          state.activity = data.data?.logs || [];
+          renderActivityTable();
+          renderRecentActivity();
+        }
+      } catch (err) {
+        showToast(`Activity logs failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadSiemStats() {
+      const types = ["wazuh", "ossec", "ossim", "utmstack"];
+      await Promise.all(types.map(async type => {
+        try {
+          const data = await apiRequest(`/siem/${type}/stats`);
+          if (data?.success) {
+            state.siemStats[type] = data.data;
+          }
+        } catch (err) {
+          state.siemStats[type] = {};
+        }
+      }));
+      renderSiemStats();
+    }
+
+    async function refreshAll() {
+      setLoading(true);
+      await loadRoot();
+      await loadHealth();
+      await loadSystemInfo();
+      await loadAgentsStats();
+      await loadAgents();
+      await loadSimulations();
+      await loadConfigs();
+      await loadGroups();
+      await loadActivity();
+      await loadSiemStats();
+      await loadLogSchedules();
+      renderOverviewStats();
+      updateLastRefresh();
+      setLoading(false);
+    }
+
+    async function handleDeploy(event) {
+      event.preventDefault();
+      const siemType = document.getElementById("deploySiemType").value;
+      const payload = {
+        count: Number(document.getElementById("deployCount").value),
+        siem_type: siemType,
+        os_type: document.getElementById("deployOsType").value,
+        agent_group: document.getElementById("deployAgentGroup").value,
+        agent_base_name: document.getElementById("deployAgentBase").value,
+        memory_limit: document.getElementById("deployMemory").value,
+        cpu_shares: Number(document.getElementById("deployCpuShares").value),
+        config_template_id: document.getElementById("deployTemplateId").value || null,
+        autostart: document.getElementById("deployAutostart").checked,
+        parallel_mode: document.getElementById("deployParallelMode").value,
+        auto_create_group: document.getElementById("deployAutoCreateGroup").checked
+      };
+      if (siemType !== "none") {
+        payload.siem_ip = document.getElementById("deploySiemIp").value;
+        if (siemType !== "utmstack") {
+          payload.siem_version = document.getElementById("deploySiemVersion").value;
+        }
+        if (siemType === "utmstack") {
+          payload.siem_auth_key = document.getElementById("deploySiemAuthKey").value;
+        }
+      }
+      try {
+        const data = await apiRequest("/agents/deploy", { method: "POST", body: payload });
+        document.getElementById("deployResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Deployment request completed", "success");
+        await loadAgents();
+        await loadAgentsStats();
+        renderOverviewStats();
+      } catch (err) {
+        document.getElementById("deployResult").textContent = err.message;
+        showToast(`Deployment failed: ${err.message}`, "error");
+      }
+    }
+
+
+    async function handleBulkOperation() {
+      const operation = document.getElementById("bulkOperation").value;
+      const agentIds = Array.from(state.selections.bulk);
+      if (!agentIds.length) {
+        showToast("Select at least one container", "error");
+        return;
+      }
+      const payload = {
+        container_names: agentIds,
+        operation,
+        force: document.getElementById("bulkForce").checked,
+        parallel: document.getElementById("bulkParallel").checked
+      };
+      const maxWorkers = document.getElementById("bulkMaxWorkers").value;
+      if (maxWorkers) payload.max_workers = Number(maxWorkers);
+      try {
+        const data = await apiRequest(`/agents/bulk/${operation}`, { method: "POST", body: payload });
+        document.getElementById("bulkResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Bulk operation completed", "success");
+        await loadAgents();
+      } catch (err) {
+        document.getElementById("bulkResult").textContent = err.message;
+        showToast(`Bulk operation failed: ${err.message}`, "error");
+      }
+    }
+
+    function buildSimulationSelector() {
+      const selector = {};
+      const selectedIds = Array.from(state.selections.simulation);
+      if (selectedIds.length) selector.agent_ids = selectedIds;
+      const siem = document.getElementById("simFilterSiem").value;
+      if (siem) selector.siem_type = siem;
+      const group = document.getElementById("simFilterGroup").value.trim();
+      if (group) selector.agent_group = group;
+      const status = document.getElementById("simFilterStatus").value;
+      if (status) selector.status = status;
+      const tags = document.getElementById("simFilterTags").value.trim();
+      if (tags) selector.tags = tags.split(",").map(t => t.trim()).filter(Boolean);
+      const count = document.getElementById("simFilterCount").value;
+      if (count) selector.count = Number(count);
+      return selector;
+    }
+
+    async function handleStartSimulation() {
+      const selector = buildSimulationSelector();
+      if (!Object.keys(selector).length) {
+        showToast("Add at least one selection criterion", "error");
+        return;
+      }
+      let customParams = {};
+      const customInput = document.getElementById("simulationCustomParams").value.trim();
+      if (customInput) {
+        try {
+          customParams = JSON.parse(customInput);
+        } catch (err) {
+          showToast("Custom parameters must be valid JSON", "error");
+          return;
+        }
+      }
+      const payload = {
+        profile_id: document.getElementById("simulationProfile").value,
+        agent_selector: selector,
+        duration: Number(document.getElementById("simulationDuration").value),
+        eps_target: Number(document.getElementById("simulationEps").value),
+        intensity: document.getElementById("simulationIntensity").value,
+        burst_mode: document.getElementById("simulationBurst").checked,
+        custom_parameters: customParams
+      };
+      try {
+        const data = await apiRequest("/simulations/start", { method: "POST", body: payload });
+        document.getElementById("simulationResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Simulation started", "success");
+        await loadSimulations();
+        renderOverviewStats();
+      } catch (err) {
+        document.getElementById("simulationResult").textContent = err.message;
+        showToast(`Simulation failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleLoadSimulation(event) {
+      event.preventDefault();
+      const selector = buildSimulationSelector();
+      if (!Object.keys(selector).length) {
+        showToast("Select containers or set filters first", "error");
+        return;
+      }
+
+      const extraFieldsText = document.getElementById("loadExtraFields").value.trim();
+      let extraFields = {};
+      if (extraFieldsText) {
+        try {
+          extraFields = JSON.parse(extraFieldsText);
+        } catch (err) {
+          showToast("Extra fields must be valid JSON", "error");
+          return;
+        }
+      }
+
+      const payload = {
+        agent_selector: selector,
+        eps: Number(document.getElementById("loadEps").value || 100),
+        duration: Number(document.getElementById("loadDuration").value || 300),
+        file_path: document.getElementById("loadFilePath").value.trim(),
+        message: document.getElementById("loadMessage").value.trim(),
+        src_ip: document.getElementById("loadSrcIp").value.trim(),
+        dest_ip: document.getElementById("loadDestIp").value.trim(),
+        seq_start: Number(document.getElementById("loadSeqStart").value || 1),
+        start_time: document.getElementById("loadStartTime").value.trim() || null,
+        extra_fields: extraFields
+      };
+
+      if (!payload.file_path) {
+        showToast("Log file path is required", "error");
+        return;
+      }
+      if (!payload.message) {
+        showToast("Message is required", "error");
+        return;
+      }
+
+      try {
+        const data = await apiRequest("/simulations/load", { method: "POST", body: payload });
+        document.getElementById("loadSimulationResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Custom simulation loaded", "success");
+        await loadSimulations();
+        renderOverviewStats();
+      } catch (err) {
+        document.getElementById("loadSimulationResult").textContent = err.message;
+        showToast(`Load simulation failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleSyslogSimulation(event) {
+      event.preventDefault();
+      const payload = {
+        target_ip: document.getElementById("syslogTargetIp").value.trim(),
+        target_port: Number(document.getElementById("syslogTargetPort").value || 514),
+        protocol: document.getElementById("syslogProtocol").value,
+        eps: Number(document.getElementById("syslogEps").value || 100),
+        duration: Number(document.getElementById("syslogDuration").value || 300),
+        device_count: Number(document.getElementById("syslogDeviceCount").value || 4),
+        device_type: document.getElementById("syslogDeviceType").value,
+        device_name_prefix: document.getElementById("syslogDevicePrefix").value.trim() || "device"
+      };
+
+      if (!payload.target_ip) {
+        showToast("Target IP/hostname is required", "error");
+        return;
+      }
+
+      try {
+        const data = await apiRequest("/simulations/syslog/start", { method: "POST", body: payload });
+        document.getElementById("syslogSimulationResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Syslog simulation started", "success");
+        await loadSimulations();
+        renderOverviewStats();
+      } catch (err) {
+        document.getElementById("syslogSimulationResult").textContent = err.message;
+        showToast(`Syslog simulation failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleStopSimulation(simId) {
+      try {
+        const data = await apiRequest(`/simulations/${simId}/stop`, { method: "POST" });
+        showToast("Simulation stopped", "success");
+        document.getElementById("simulationResult").textContent = JSON.stringify(data, null, 2);
+        await loadSimulations();
+        renderOverviewStats();
+      } catch (err) {
+        showToast(`Stop failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleLogUpload(event) {
+      event.preventDefault();
+      const targetScope = document.getElementById("logTargetScope").value;
+      const selectedAgent = document.getElementById("logAgentSelect").value;
+      const manualAgent = document.getElementById("logAgentManual").value.trim();
+      const agentId = manualAgent || selectedAgent;
+      const groupName = document.getElementById("logGroupSelect").value;
+      if (targetScope === "agent" && !agentId) {
+        showToast("Select a container", "error");
+        return;
+      }
+      if (targetScope === "group" && !groupName) {
+        showToast("Select a group", "error");
+        return;
+      }
+      if (document.getElementById("logModeSelect").value === "schedule") {
+        showToast("Switch to 'Send once' to upload immediately.", "info");
+        return;
+      }
+      const payload = {
+        content: document.getElementById("logContent").value,
+        destination_path: document.getElementById("logPath").value,
+        log_type: document.getElementById("logType").value,
+        append: document.getElementById("logAppend").checked
+      };
+      try {
+        const endpoint = targetScope === "group"
+          ? `/groups/${groupName}/logs/upload`
+          : `/agents/${agentId}/logs/upload`;
+        const data = await apiRequest(endpoint, { method: "POST", body: payload });
+        document.getElementById("logResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Logs uploaded", "success");
+      } catch (err) {
+        document.getElementById("logResult").textContent = err.message;
+        showToast(`Log upload failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleLogScheduleStart() {
+      const targetScope = document.getElementById("logTargetScope").value;
+      const selectedAgent = document.getElementById("logAgentSelect").value;
+      const manualAgent = document.getElementById("logAgentManual").value.trim();
+      const agentId = manualAgent || selectedAgent;
+      const groupName = document.getElementById("logGroupSelect").value;
+      if (targetScope === "agent" && !agentId) {
+        showToast("Select a container", "error");
+        return;
+      }
+      if (targetScope === "group" && !groupName) {
+        showToast("Select a group", "error");
+        return;
+      }
+      const indefinite = document.getElementById("logIndefinite").checked;
+      const duration = document.getElementById("logDuration").value;
+      if (!indefinite && !duration) {
+        showToast("Set a duration or choose indefinite.", "error");
+        return;
+      }
+      const payload = {
+        content: document.getElementById("logContent").value,
+        destination_path: document.getElementById("logPath").value,
+        log_type: document.getElementById("logType").value,
+        append: document.getElementById("logAppend").checked,
+        interval_seconds: Number(document.getElementById("logInterval").value || 120),
+        duration_seconds: duration ? Number(duration) : null,
+        indefinite: indefinite
+      };
+      try {
+        const endpoint = targetScope === "group"
+          ? `/groups/${groupName}/logs/schedule`
+          : `/agents/${agentId}/logs/schedule`;
+        const data = await apiRequest(endpoint, { method: "POST", body: payload });
+        document.getElementById("logResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Log schedule created", "success");
+        await loadLogSchedules();
+      } catch (err) {
+        document.getElementById("logResult").textContent = err.message;
+        showToast(`Schedule failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleGroupCreate(event) {
+      event.preventDefault();
+      const payload = {
+        name: document.getElementById("groupName").value.trim(),
+        description: document.getElementById("groupDescription").value.trim() || null
+      };
+      if (!payload.name) {
+        showToast("Group name is required", "error");
+        return;
+      }
+      try {
+        const data = await apiRequest("/groups", { method: "POST", body: payload });
+        document.getElementById("groupResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Group created", "success");
+        await loadGroups();
+      } catch (err) {
+        document.getElementById("groupResult").textContent = err.message;
+        showToast(`Group creation failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleGroupRename(groupName) {
+      const group = state.groups.find(item => item.name === groupName);
+      const description = group?.description || "";
+      const bodyHtml = `
+        <div class="form-grid">
+          <div class="field">
+            <label>New group name</label>
+            <input id="renameGroupName" class="input" type="text" value="${escapeHtml(groupName)}">
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <input id="renameGroupDescription" class="input" type="text" value="${escapeHtml(description)}">
+          </div>
+        </div>
+      `;
+      openModal(`Rename Group: ${groupName}`, bodyHtml, [
+        { label: "Cancel", onClick: closeModal },
+        {
+          label: "Rename",
+          className: "primary",
+          onClick: async () => {
+            const newName = document.getElementById("renameGroupName").value.trim();
+            const newDescription = document.getElementById("renameGroupDescription").value.trim();
+            if (!newName) {
+              showToast("New group name is required", "error");
+              return;
+            }
+            try {
+              const data = await apiRequest(`/groups/${encodeURIComponent(groupName)}/rename`, {
+                method: "POST",
+                body: { new_name: newName, description: newDescription || null }
+              });
+              document.getElementById("groupResult").textContent = JSON.stringify(data, null, 2);
+              showToast("Group renamed", "success");
+              closeModal();
+              await loadGroups();
+              await loadAgents();
+            } catch (err) {
+              showToast(`Rename failed: ${err.message}`, "error");
+            }
+          }
+        }
+      ]);
+    }
+
+    async function handleGroupDelete(groupName) {
+      if (!confirm(`Delete group '${groupName}'? Containers will be unassigned.`)) {
+        return;
+      }
+      try {
+        const data = await apiRequest(`/groups/${encodeURIComponent(groupName)}`, { method: "DELETE" });
+        document.getElementById("groupResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Group deleted", "success");
+        await loadGroups();
+        await loadAgents();
+      } catch (err) {
+        showToast(`Delete failed: ${err.message}`, "error");
+      }
+    }
+
+    async function assignSelectedToGroup() {
+      const groupName = document.getElementById("agentsGroupAssign").value;
+      if (!groupName) {
+        showToast("Select a group", "error");
+        return;
+      }
+      if (!state.selections.agents.size) {
+        showToast("Select containers first", "error");
+        return;
+      }
+      const payload = { agent_ids: Array.from(state.selections.agents) };
+      try {
+        const data = await apiRequest(`/groups/${groupName}/assign`, { method: "POST", body: payload });
+        showToast("Containers assigned to group", "success");
+        await loadAgents();
+        await loadGroups();
+        document.getElementById("groupResult").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        showToast(`Assign failed: ${err.message}`, "error");
+      }
+    }
+
+    async function removeSelectedFromGroup() {
+      const groupName = document.getElementById("agentsGroupAssign").value;
+      if (!groupName) {
+        showToast("Select a group", "error");
+        return;
+      }
+      if (!state.selections.agents.size) {
+        showToast("Select containers first", "error");
+        return;
+      }
+      const payload = { agent_ids: Array.from(state.selections.agents) };
+      try {
+        const data = await apiRequest(`/groups/${groupName}/remove`, { method: "POST", body: payload });
+        showToast("Containers removed from group", "success");
+        await loadAgents();
+        await loadGroups();
+        document.getElementById("groupResult").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        showToast(`Remove failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleBulkGroupOperation() {
+      const groupName = document.getElementById("bulkGroupSelect").value;
+      const operation = document.getElementById("bulkOperation").value;
+      if (!groupName) {
+        showToast("Select a group", "error");
+        return;
+      }
+      try {
+        const data = await apiRequest(`/groups/${groupName}/bulk/${operation}`, { method: "POST" });
+        document.getElementById("bulkResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Group bulk operation completed", "success");
+        await loadAgents();
+      } catch (err) {
+        document.getElementById("bulkResult").textContent = err.message;
+        showToast(`Group bulk failed: ${err.message}`, "error");
+      }
+    }
+
+    async function loadLogSchedules() {
+      try {
+        const data = await apiRequest("/agents/logs/schedules");
+        const schedules = data.data?.schedules || [];
+        const tbody = document.getElementById("logSchedulesTableBody");
+        tbody.innerHTML = "";
+        schedules.forEach(schedule => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${escapeHtml(schedule.schedule_id)}</td>
+            <td>${escapeHtml(schedule.agent_id)}</td>
+            <td>${escapeHtml(schedule.status)}</td>
+            <td>${escapeHtml(schedule.interval_seconds)}s</td>
+            <td>${schedule.indefinite ? "indefinite" : (schedule.duration_seconds ? `${schedule.duration_seconds}s` : "N/A")}</td>
+            <td>${escapeHtml(schedule.runs ?? 0)}</td>
+            <td>${escapeHtml(schedule.last_run || "N/A")}</td>
+            <td>
+              <button class="button danger" data-schedule-stop="${escapeHtml(schedule.schedule_id)}">Stop</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (err) {
+        showToast(`Failed to load schedules: ${err.message}`, "error");
+      }
+    }
+
+    async function handleConfigImport(event) {
+      event.preventDefault();
+      const payload = {
+        name: document.getElementById("configName").value,
+        siem_type: document.getElementById("configSiemType").value,
+        content: document.getElementById("configContent").value,
+        description: document.getElementById("configDescription").value || null,
+        version: document.getElementById("configVersion").value || null,
+        tags: document.getElementById("configTags").value.split(",").map(t => t.trim()).filter(Boolean)
+      };
+      try {
+        const data = await apiRequest("/configs/import", { method: "POST", body: payload });
+        document.getElementById("configImportResult").textContent = JSON.stringify(data, null, 2);
+        showToast("Template imported", "success");
+        await loadConfigs();
+      } catch (err) {
+        document.getElementById("configImportResult").textContent = err.message;
+        showToast(`Import failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleConfigExport(templateId) {
+      try {
+        const data = await apiRequest(`/configs/export/${templateId}`);
+        openModal("Config Export", `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`, [
+          { label: "Close", onClick: closeModal }
+        ]);
+      } catch (err) {
+        showToast(`Export failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleReportGenerate(event) {
+      event.preventDefault();
+      const start = document.getElementById("reportStart").value;
+      const end = document.getElementById("reportEnd").value;
+      if (!start || !end) {
+        showToast("Start and end time are required", "error");
+        return;
+      }
+      const metrics = document.getElementById("reportMetrics").value
+        .split(",")
+        .map(m => m.trim())
+        .filter(Boolean);
+      const payload = {
+        start_time: new Date(start).toISOString(),
+        end_time: new Date(end).toISOString(),
+        metrics: metrics.length ? metrics : ["all"],
+        include_findings: document.getElementById("reportFindings").checked,
+        format: document.getElementById("reportFormat").value
+      };
+      try {
+        const data = await apiRequest("/reports/generate", { method: "POST", body: payload });
+        document.getElementById("reportGenerateResult").textContent = JSON.stringify(data, null, 2);
+        const reportId = data.data?.report_id;
+        const downloadUrl = data.data?.download_url;
+        if (reportId && !state.reports.includes(reportId)) {
+          state.reports.unshift(reportId);
+          saveReportsToStorage();
+          renderReportsList();
+        }
+        if (downloadUrl && payload.format !== "json") {
+          const absoluteUrl = `${state.apiBase}${downloadUrl}`;
+          window.open(absoluteUrl, "_blank", "noopener");
+        }
+        showToast("Report generated", "success");
+      } catch (err) {
+        document.getElementById("reportGenerateResult").textContent = err.message;
+        showToast(`Report failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleReportLookup(event) {
+      event.preventDefault();
+      const reportId = document.getElementById("reportIdLookup").value.trim();
+      if (!reportId) {
+        showToast("Provide a report ID", "error");
+        return;
+      }
+      try {
+        const data = await apiRequest(`/reports/${reportId}`);
+        document.getElementById("reportLookupResult").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("reportLookupResult").textContent = err.message;
+        showToast(`Report lookup failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleAgentAction(action, agentId) {
+      try {
+        if (action === "start") {
+          await apiRequest(`/agents/${agentId}/start`, { method: "POST" });
+          showToast("Container started", "success");
+        } else if (action === "stop") {
+          await apiRequest(`/agents/${agentId}/stop`, { method: "POST" });
+          showToast("Container stopped", "success");
+        } else if (action === "delete") {
+          await apiRequest(`/agents/${agentId}`, { method: "DELETE" });
+          showToast("Container deleted", "success");
+        } else if (action === "details") {
+          const data = await apiRequest(`/agents/${agentId}`);
+          openModal("Container Details", `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`, [
+            { label: "Close", onClick: closeModal }
+          ]);
+          return;
+        }
+        await loadAgents();
+        await loadAgentsStats();
+        renderOverviewStats();
+      } catch (err) {
+        showToast(`Container action failed: ${err.message}`, "error");
+      }
+    }
+
+    async function handleApiExplorer() {
+      const method = document.getElementById("apiMethod").value;
+      const path = document.getElementById("apiPath").value.trim();
+      const bodyText = document.getElementById("apiBody").value.trim();
+      let body = null;
+      if (bodyText) {
+        try {
+          body = JSON.parse(bodyText);
+        } catch (err) {
+          showToast("API body must be valid JSON", "error");
+          return;
+        }
+      }
+      try {
+        const data = await apiRequest(path, { method, body });
+        document.getElementById("apiResponseOutput").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("apiResponseOutput").textContent = err.message;
+        showToast(`API request failed: ${err.message}`, "error");
+      }
+    }
+
+    function updateSimulationProfiles(profiles) {
+      const select = document.getElementById("simulationProfile");
+      if (!profiles || !profiles.length) {
+        profiles = ["auth_bruteforce", "web_attacks", "malware_beacon", "lateral_movement", "data_exfiltration", "privilege_escalation"];
+      }
+      select.innerHTML = "";
+      profiles.forEach(profile => {
+        const option = document.createElement("option");
+        option.value = profile;
+        option.textContent = profile;
+        select.appendChild(option);
+      });
+    }
+
+    function attachEventListeners() {
+      document.getElementById("saveApiBase").addEventListener("click", () => {
+        setApiBase(dom.apiBaseInput.value.trim());
+        showToast("API base updated", "success");
+      });
+      document.getElementById("refreshAll").addEventListener("click", refreshAll);
+      document.querySelectorAll(".nav-item").forEach(item => {
+        item.addEventListener("click", () => switchPage(item.dataset.page));
+      });
+      document.querySelectorAll("[data-page-target]").forEach(btn => {
+        btn.addEventListener("click", () => switchPage(btn.dataset.pageTarget));
+      });
+      document.getElementById("refreshSystem").addEventListener("click", loadSystemInfo);
+      document.getElementById("refreshAgentsBtn").addEventListener("click", loadAgents);
+      document.getElementById("applyAgentsFilters").addEventListener("click", loadAgents);
+      document.getElementById("agentsSearch").addEventListener("input", renderAgentsTable);
+      document.getElementById("agentsPrev").addEventListener("click", () => {
+        const offsetEl = document.getElementById("agentsOffset");
+        const limit = Number(document.getElementById("agentsLimit").value || 50);
+        offsetEl.value = Math.max(0, Number(offsetEl.value) - limit);
+        loadAgents();
+      });
+      document.getElementById("agentsNext").addEventListener("click", () => {
+        const offsetEl = document.getElementById("agentsOffset");
+        const limit = Number(document.getElementById("agentsLimit").value || 50);
+        offsetEl.value = Number(offsetEl.value) + limit;
+        loadAgents();
+      });
+      document.getElementById("agentsSelectAll").addEventListener("change", (event) => {
+        state.selections.agents.clear();
+        if (event.target.checked) {
+          state.agents.forEach(agent => state.selections.agents.add(agent.agent_id));
+        }
+        renderAgentsTable();
+      });
+      document.getElementById("clearAgentSelection").addEventListener("click", () => {
+        state.selections.agents.clear();
+        renderAgentsTable();
+      });
+      document.getElementById("assignGroupBtn").addEventListener("click", assignSelectedToGroup);
+      document.getElementById("removeGroupBtn").addEventListener("click", removeSelectedFromGroup);
+      document.getElementById("agentsTableBody").addEventListener("change", (event) => {
+        if (!event.target.classList.contains("agent-select")) return;
+        const id = event.target.dataset.agentId;
+        if (event.target.checked) {
+          state.selections.agents.add(id);
+        } else {
+          state.selections.agents.delete(id);
+        }
+        document.getElementById("selectedAgentsCount").textContent = state.selections.agents.size;
+      });
+      document.getElementById("agentsTableBody").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) return;
+        const action = button.dataset.action;
+        const agentId = button.dataset.agentId;
+        if (action === "console") {
+          openConsole(agentId);
+          return;
+        }
+        if (action === "delete" && !confirm(`Delete container ${agentId}?`)) return;
+        handleAgentAction(action, agentId);
+      });
+
+      document.getElementById("deployForm").addEventListener("submit", handleDeploy);
+      document.getElementById("deploySiemType").addEventListener("change", function () {
+        const v = this.value;
+        const isNone = v === "none";
+        const isUtmstack = v === "utmstack";
+        document.getElementById("deploySiemIpField").style.display = isNone ? "none" : "";
+        document.getElementById("deploySiemVersionField").style.display = (isNone || isUtmstack) ? "none" : "";
+        document.getElementById("deploySiemAuthKeyField").style.display = isUtmstack ? "" : "none";
+      });
+      document.getElementById("deploySiemType").dispatchEvent(new Event("change"));
+      document.getElementById("bulkRun").addEventListener("click", handleBulkOperation);
+      document.getElementById("bulkRunGroup").addEventListener("click", handleBulkGroupOperation);
+      document.getElementById("bulkClear").addEventListener("click", () => {
+        state.selections.bulk.clear();
+        renderBulkAgentList();
+      });
+      document.getElementById("bulkSelectAll").addEventListener("click", () => {
+        state.selections.bulk.clear();
+        state.agents.forEach(agent => state.selections.bulk.add(agent.agent_id));
+        renderBulkAgentList();
+      });
+      document.getElementById("bulkSelectRunning").addEventListener("click", () => {
+        state.selections.bulk.clear();
+        state.agents.filter(agent => agent.lifecycle_status === "running")
+          .forEach(agent => state.selections.bulk.add(agent.agent_id));
+        renderBulkAgentList();
+      });
+      document.getElementById("bulkAgentList").addEventListener("change", (event) => {
+        const checkbox = event.target;
+        if (!checkbox.dataset.agentId) return;
+        if (checkbox.checked) {
+          state.selections.bulk.add(checkbox.dataset.agentId);
+        } else {
+          state.selections.bulk.delete(checkbox.dataset.agentId);
+        }
+      });
+
+      document.getElementById("refreshSimulations").addEventListener("click", loadSimulations);
+      document.getElementById("startSimulation").addEventListener("click", handleStartSimulation);
+      document.getElementById("simSelectAll").addEventListener("click", () => {
+        state.selections.simulation.clear();
+        state.agents.forEach(agent => state.selections.simulation.add(agent.agent_id));
+        renderSimulationAgentList();
+      });
+      document.getElementById("simSelectRunning").addEventListener("click", () => {
+        state.selections.simulation.clear();
+        state.agents.filter(agent => agent.lifecycle_status === "running")
+          .forEach(agent => state.selections.simulation.add(agent.agent_id));
+        renderSimulationAgentList();
+      });
+      document.getElementById("simClearSelection").addEventListener("click", () => {
+        state.selections.simulation.clear();
+        renderSimulationAgentList();
+      });
+      document.getElementById("simulationAgentList").addEventListener("change", (event) => {
+        const checkbox = event.target;
+        if (!checkbox.dataset.agentId) return;
+        if (checkbox.checked) {
+          state.selections.simulation.add(checkbox.dataset.agentId);
+        } else {
+          state.selections.simulation.delete(checkbox.dataset.agentId);
+        }
+      });
+      document.getElementById("simulationsTableBody").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-sim-action]");
+        if (!button) return;
+        handleStopSimulation(button.dataset.simId);
+      });
+
+      document.getElementById("logUploadForm").addEventListener("submit", handleLogUpload);
+      document.getElementById("startLogSchedule").addEventListener("click", handleLogScheduleStart);
+      document.getElementById("refreshLogSchedules").addEventListener("click", loadLogSchedules);
+      document.getElementById("logModeSelect").addEventListener("change", () => {
+        const mode = document.getElementById("logModeSelect").value;
+        document.querySelectorAll(".log-schedule-field").forEach(field => {
+          field.style.display = mode === "schedule" ? "" : "none";
+        });
+      });
+      document.getElementById("logTargetScope").addEventListener("change", () => {
+        const scope = document.getElementById("logTargetScope").value;
+        document.querySelectorAll(".log-group-field").forEach(field => {
+          field.style.display = scope === "group" ? "" : "none";
+        });
+        document.getElementById("logAgentSelect").disabled = scope === "group";
+        document.getElementById("logAgentManual").disabled = scope === "group";
+      });
+      document.getElementById("logSchedulesTableBody").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-schedule-stop]");
+        if (!button) return;
+        const scheduleId = button.getAttribute("data-schedule-stop");
+        try {
+          const data = await apiRequest(`/agents/logs/schedules/${scheduleId}/stop`, { method: "POST" });
+          document.getElementById("logResult").textContent = JSON.stringify(data, null, 2);
+          showToast("Schedule stopped", "success");
+          await loadLogSchedules();
+        } catch (err) {
+          showToast(`Stop failed: ${err.message}`, "error");
+        }
+      });
+      document.getElementById("configImportForm").addEventListener("submit", handleConfigImport);
+      document.getElementById("refreshConfigs").addEventListener("click", loadConfigs);
+      document.getElementById("groupCreateForm").addEventListener("submit", handleGroupCreate);
+      document.getElementById("refreshGroups").addEventListener("click", loadGroups);
+      document.getElementById("groupsTableBody").addEventListener("click", async (event) => {
+        const viewButton = event.target.closest("[data-group-view]");
+        if (viewButton) {
+          const groupName = viewButton.getAttribute("data-group-view");
+          try {
+            const data = await apiRequest(`/agents?agent_group=${encodeURIComponent(groupName)}&limit=1000&offset=0`);
+            const agents = data.data?.agents || [];
+            const rows = agents.map(agent => `
+              <tr>
+                <td>${escapeHtml(agent.agent_name || agent.agent_id)}</td>
+                <td>${escapeHtml(agent.agent_seq_id ?? "N/A")}</td>
+                <td>${escapeHtml(agent.lifecycle_status || "unknown")}</td>
+                <td>${escapeHtml(agent.siem_type || "unknown")}</td>
+                <td>${escapeHtml(agent.ip_addresses?.[0] || "N/A")}</td>
+              </tr>
+            `).join("");
+            const table = `
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Seq ID</th>
+                      <th>Status</th>
+                      <th>SIEM</th>
+                      <th>IP</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rows || "<tr><td colspan='5'>No containers in group</td></tr>"}</tbody>
+                </table>
+              </div>
+            `;
+            openModal(`Group: ${groupName}`, table, [{ label: "Close", onClick: closeModal }]);
+          } catch (err) {
+            showToast(`Failed to load group containers: ${err.message}`, "error");
+          }
+          return;
+        }
+
+        const renameButton = event.target.closest("[data-group-rename]");
+        if (renameButton) {
+          const groupName = renameButton.getAttribute("data-group-rename");
+          await handleGroupRename(groupName);
+          return;
+        }
+
+        const deleteButton = event.target.closest("[data-group-delete]");
+        if (deleteButton) {
+          const groupName = deleteButton.getAttribute("data-group-delete");
+          await handleGroupDelete(groupName);
+        }
+      });
+      document.getElementById("configsTableBody").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-config-action]");
+        if (!button) return;
+        handleConfigExport(button.dataset.configId);
+      });
+
+      document.getElementById("reportGenerateForm").addEventListener("submit", handleReportGenerate);
+      document.getElementById("reportLookupForm").addEventListener("submit", handleReportLookup);
+      document.getElementById("reportsList").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-report-action]");
+        if (!button) return;
+        document.getElementById("reportIdLookup").value = button.dataset.reportId;
+        handleReportLookup(new Event("submit"));
+      });
+      document.getElementById("loadSimulationForm").addEventListener("submit", handleLoadSimulation);
+      document.getElementById("syslogSimulationForm").addEventListener("submit", handleSyslogSimulation);
+
+      document.getElementById("refreshActivity").addEventListener("click", loadActivity);
+      document.getElementById("applyActivityFilters").addEventListener("click", loadActivity);
+      document.getElementById("refreshSiemStats").addEventListener("click", loadSiemStats);
+      document.getElementById("apiSend").addEventListener("click", handleApiExplorer);
+      document.getElementById("modalClose").addEventListener("click", closeModal);
+      document.getElementById("modalOverlay").addEventListener("click", (event) => {
+        if (event.target.id === "modalOverlay") closeModal();
+      });
+      document.getElementById("consoleClose").addEventListener("click", closeConsole);
+      document.getElementById("consoleDisconnect").addEventListener("click", closeConsole);
+      document.getElementById("consoleModal").addEventListener("click", (event) => {
+        if (event.target.id === "consoleModal") closeConsole();
+      });
+
+      loadLogSchedules();
+    }
+
+    function initialize() {
+      setApiBase(loadApiBase());
+      state.reports = loadReportsFromStorage();
+      renderReportsList();
+      attachEventListeners();
+      refreshAll();
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
