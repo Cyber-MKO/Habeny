@@ -1343,17 +1343,40 @@ else
 fi
 """
 
+        apt_block = ""
+        if download_block:
+            apt_block = """
+ensure_dns() {
+  GW_DNS=$(ip route | awk '/default/ {print $3; exit}')
+  {
+    if [ -n "$GW_DNS" ]; then echo "nameserver $GW_DNS"; fi
+    echo "nameserver 1.1.1.1"
+    echo "nameserver 8.8.8.8"
+    echo "options timeout:1 attempts:3"
+  } > /etc/resolv.conf
+}
+wait_for_dns() {
+  local attempts=20
+  while [ $attempts -gt 0 ]; do
+    if getent ahostsv4 archive.ubuntu.com >/dev/null 2>&1; then return 0; fi
+    sleep 2; attempts=$((attempts-1))
+  done
+  return 1
+}
+ensure_dns
+wait_for_dns || ensure_dns
+apt-get update -y
+apt-get install -y curl wget
+"""
+
         elastic_script = f"""#!/bin/bash
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 FLEET_URL="{fleet_url}"
 ENROLLMENT_TOKEN="{enrollment_token}"
-
-apt-get update -y
-apt-get install -y curl wget
-{download_block}
-ELASTIC_AGENT_FLAVOR=servers dpkg -i "{container_deb}"
+{apt_block}{download_block}
+ELASTIC_AGENT_FLAVOR=servers dpkg -i "{container_deb}" || apt-get install -f -y
 rm -f "{container_deb}"
 
 systemctl enable elastic-agent
