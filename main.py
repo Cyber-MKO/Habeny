@@ -629,6 +629,12 @@ async def console_session(websocket: WebSocket, container_name: str):
     env = os.environ.copy()
     env["TERM"] = "xterm-256color"
 
+    def set_controlling_tty():
+        # Runs in the child after setsid(): make the PTY slave (fd 0) the
+        # controlling terminal so the shell binds to the websocket PTY
+        # instead of the terminal the API server was started from.
+        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
     try:
         process = subprocess.Popen(
             ["lxc-attach", "-n", container_name, "--", "/bin/bash", "-l"],
@@ -636,7 +642,9 @@ async def console_session(websocket: WebSocket, container_name: str):
             stdout=slave_fd,
             stderr=slave_fd,
             env=env,
-            close_fds=True
+            close_fds=True,
+            start_new_session=True,
+            preexec_fn=set_controlling_tty
         )
         os.close(slave_fd)
     except Exception as e:
