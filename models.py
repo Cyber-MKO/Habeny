@@ -168,7 +168,7 @@ class AgentDeploymentRequest(BaseModel):
     def validate_base_name(cls, v):
         return _validate_alphanumeric_name(v)
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_naming(cls, values):
         """Validate that generated container names won't exceed limits"""
         base_name = values.get('agent_base_name', '')
@@ -301,7 +301,7 @@ class AgentSelector(BaseModel):
     count: Optional[int] = Field(None, ge=1, le=1000, description="Random subset count")
     status: Optional[AgentLifecycleStatus] = Field(None, description="Filter by lifecycle status")
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_selector(cls, values):
         """Ensure at least one selection criterion is provided"""
         if not any([

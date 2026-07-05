@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.encoders import jsonable_encoder
@@ -122,6 +122,9 @@ REPORTS_DIR = DATA_DIR / "reports"
 LOGS_DIR = DATA_DIR / "logs"
 AGENTS_DIR = DATA_DIR / "agents"
 DB_PATH = DATA_DIR / "platform.db"
+
+# Built React frontend (created by `npm run build` in frontend/)
+STATIC_DIR = Path(__file__).parent / "static"
 
 # Ensure directories exist
 for dir_path in [DATA_DIR, CONFIGS_DIR, REPORTS_DIR, LOGS_DIR, AGENTS_DIR]:
@@ -428,8 +431,11 @@ def read_activity_logs_from_files(action: Optional[str] = None) -> List[Dict[str
 # ===== ROOT & SYSTEM INFO =====
 
 @app.get("/", response_model=APIResponse)
-async def root():
-    """Root endpoint with comprehensive API information"""
+async def root(request: Request):
+    """Root endpoint: web UI for browsers, API information for JSON clients"""
+    index_html = STATIC_DIR / "index.html"
+    if index_html.is_file() and "text/html" in request.headers.get("accept", ""):
+        return FileResponse(str(index_html))
     return APIResponse(
         success=True,
         message="Multi-SIEM Container Emulation Platform API",
@@ -3395,11 +3401,19 @@ async def get_siem_stats(siem_type: str):
 
 # ===== STATIC FILE SERVING (React frontend) =====
 
-STATIC_DIR = Path(__file__).parent / "static"
-
 if STATIC_DIR.is_dir():
     from fastapi.staticfiles import StaticFiles
     from starlette.responses import FileResponse as StarletteFileResponse
+
+    # The built SPA calls the API under /api/* (see frontend/src/api.js);
+    # strip the prefix the same way the vite dev proxy does.
+    @app.middleware("http")
+    async def rewrite_api_prefix(request: Request, call_next):
+        path = request.scope.get("path", "")
+        if path == "/api" or path.startswith("/api/"):
+            request.scope["path"] = path[len("/api"):] or "/"
+            request.scope["raw_path"] = request.scope["path"].encode()
+        return await call_next(request)
 
     # Serve built assets (JS, CSS, images)
     app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
