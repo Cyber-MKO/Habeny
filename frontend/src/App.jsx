@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { useMetricsSocket } from "./ws";
 import { useStore } from "./store";
+import { Modal } from "./components/UI";
 
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -66,6 +68,46 @@ function Icon({ d }) {
   );
 }
 
+const SIEM_TYPES = ["Wazuh", "OSSEC", "OSSIM", "UTMstack", "Elastic"];
+
+const CAPABILITIES = [
+  { title: "Fleet", body: "Deploy, group, and bulk-manage containerized SIEM agents from one console." },
+  { title: "Testing", body: "Replay attacks and log traffic against live agents to see how each SIEM reacts." },
+  { title: "Insights", body: "Benchmark ingestion latency and compare detection performance across platforms." },
+];
+
+function AboutModal({ onClose }) {
+  return (
+    <Modal title="About Habeny" onClose={onClose}>
+      <p className="about-lead">
+        Habeny spins up disposable SIEM agents in containers so you can throw real attack and log
+        traffic at them and measure what happens — before any of it touches production.
+      </p>
+
+      <div className="section-title">Supported SIEM platforms</div>
+      <div className="about-tags">
+        {SIEM_TYPES.map((s) => <span key={s} className="tag">{s}</span>)}
+      </div>
+
+      <div className="section-title">What you can do here</div>
+      <div className="about-features">
+        {CAPABILITIES.map((c) => (
+          <div className="about-feature" key={c.title}>
+            <h4>{c.title}</h4>
+            <p>{c.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="about-meta">
+        <span><strong>Version</strong> 2.0.0</span>
+        <span><strong>Runtime</strong> LXC containers</span>
+        <span><strong>Telemetry</strong> Live over WebSocket</span>
+      </div>
+    </Modal>
+  );
+}
+
 function Toasts() {
   const { toasts, dismissToast } = useStore();
   if (!toasts.length) return null;
@@ -86,16 +128,16 @@ export default function App() {
   const { connected } = useMetricsSocket();
   const location = useLocation();
   const title = TITLES[location.pathname] || "Habeny";
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">H</div>
-          <div>
-            <h1>Habeny</h1>
-            <p>Multi-SIEM Container Platform</p>
+          <div className="brand-wordmark">
+            habeny<span className="brand-cursor" aria-hidden="true" />
           </div>
+          <p>Multi-SIEM Container Platform</p>
         </div>
         <nav className="sidebar-nav">
           {NAV.map((group) => (
@@ -110,10 +152,10 @@ export default function App() {
             </div>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <span>Habeny</span>
+        <button type="button" className="sidebar-footer" onClick={() => setAboutOpen(true)}>
+          <span>About Habeny</span>
           <span>v2.0.0</span>
-        </div>
+        </button>
       </aside>
 
       <div className="main-area">
@@ -146,6 +188,8 @@ export default function App() {
           </Routes>
         </div>
       </div>
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
       <Toasts />
     </div>
