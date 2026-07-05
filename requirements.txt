@@ -1,11 +1,11 @@
+# NOTE: the `lxc` Python binding is NOT a pip package.
+# Install it from apt alongside LXC itself: sudo apt install python3-lxc
 fastapi==0.104.1
 uvicorn==0.24.0
-python-lxc==1.0.0
 pydantic==2.5.0
 python-multipart==0.0.6
 pyyaml==6.0.1
 aiofiles==23.2.1
-concurrent-futures==3.0.0
 websockets==16.0
 reportlab==4.4.9
 matplotlib==3.10.8

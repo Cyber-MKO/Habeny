@@ -19,30 +19,37 @@ to stress-test and validate your SIEM infrastructure.
 
 - **Ubuntu 22.04+** host
 - **Root access** (LXC requires root)
-- **LXC** installed: `sudo apt install lxc lxc-utils`
+- **LXC** and its Python bindings: `sudo apt install lxc lxc-utils python3-lxc`
+  (the `lxc` Python module is not available via pip — it must come from apt)
 - **Python 3.10+** with pip
-- **Node.js 18+** (for frontend development only)
+- **Node.js 18+** (to build or develop the frontend)
 
 ## Quick Start
 
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
+# Install LXC and the Python bindings
+sudo apt install lxc lxc-utils python3-lxc
+
+# Install Python dependencies as root, since the server runs with sudo
+sudo pip3 install -r requirements.txt
 
 # Initialize the database and start the API server
 sudo python3 main.py
 ```
 
-The API starts on `http://0.0.0.0:9000`.
+The API starts on `http://0.0.0.0:9000`. To use the web UI, build the
+frontend first (see below) — the server then serves it at
+`http://localhost:9000`.
 
 ## Frontend
 
-The React frontend is pre-built into `static/`. To rebuild after changes:
+The React frontend lives in `frontend/` and builds into `static/`
+(not committed to git), which the API server picks up automatically:
 
 ```bash
 cd frontend
 npm install
-npm run build      # outputs to ../static/
+npm run build      # outputs to ../static/, served by the API on :9000
 ```
 
 For development with hot reload:
