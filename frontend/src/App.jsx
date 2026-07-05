@@ -38,6 +38,15 @@ const NAV = [
   { to: "/activity", label: "Activity", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
 ];
 
+function SignalMeter({ connected, compact }) {
+  return (
+    <div className={`signal-meter${connected ? " on" : " off"}`}>
+      <span className="signal-bars"><span /><span /><span /><span /></span>
+      {!compact && (connected ? "Live" : "Disconnected")}
+    </div>
+  );
+}
+
 function Icon({ d }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -72,7 +81,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <h1>Habeny</h1>
-          <p>Multi-SIEM Container Platform</p>
+          <p>SIEM Fleet Ops</p>
         </div>
         <nav className="sidebar-nav">
           {NAV.map((n) => (
@@ -82,16 +91,16 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-footer">v2.0.0</div>
+        <div className="sidebar-footer">
+          <span>habeny v2.0.0</span>
+          <SignalMeter connected={connected} compact />
+        </div>
       </aside>
 
       <div className="main-area">
         <header className="header">
           <span className="header-title">{title}</span>
-          <div className="ws-badge">
-            <span className={`ws-dot${connected ? " on" : ""}`} />
-            {connected ? "Live" : "Disconnected"}
-          </div>
+          <SignalMeter connected={connected} />
         </header>
 
         <div className="content">

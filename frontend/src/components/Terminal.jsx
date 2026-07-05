@@ -12,12 +12,12 @@ export default function Terminal({ containerName, onClose }) {
     const term = new XTerm({
       cursorBlink: true,
       fontSize: 13,
-      fontFamily: '"SF Mono", "Fira Code", "Cascadia Code", monospace',
+      fontFamily: '"IBM Plex Mono", "Cascadia Code", "SF Mono", monospace',
       theme: {
-        background: "#0f172a",
-        foreground: "#e2e8f0",
-        cursor: "#3b82f6",
-        selectionBackground: "#334155",
+        background: "#0a0c0f",
+        foreground: "#e8ecef",
+        cursor: "#e8a33d",
+        selectionBackground: "#2b313a",
       },
     });
     const fitAddon = new FitAddon();

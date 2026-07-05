@@ -179,6 +179,14 @@ def resize_pty(fd: int, cols: int, rows: int) -> None:
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
 
+def _detach_and_claim_tty() -> None:
+    """Run in the child before exec: start a new session and make the
+    inherited pty slave (stdin) its controlling terminal, instead of
+    inheriting the API server's own controlling terminal."""
+    os.setsid()
+    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+
 def read_agent_metadata(agent_name: str) -> Dict[str, Any]:
     """Load persisted container metadata from the database if available."""
     data = get_agent_by_name(DB_PATH, agent_name)
@@ -636,7 +644,8 @@ async def console_session(websocket: WebSocket, container_name: str):
             stdout=slave_fd,
             stderr=slave_fd,
             env=env,
-            close_fds=True
+            close_fds=True,
+            preexec_fn=_detach_and_claim_tty,
         )
         os.close(slave_fd)
     except Exception as e:
