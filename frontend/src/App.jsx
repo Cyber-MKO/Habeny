@@ -91,11 +91,10 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">H</div>
-          <div>
-            <h1>Habeny</h1>
-            <p>Multi-SIEM Container Platform</p>
+          <div className="brand-wordmark">
+            habeny<span className="brand-cursor" aria-hidden="true" />
           </div>
+          <p>Multi-SIEM Container Platform</p>
         </div>
         <nav className="sidebar-nav">
           {NAV.map((group) => (
