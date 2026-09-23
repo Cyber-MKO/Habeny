@@ -66,10 +66,11 @@ npm run build      # outputs to ../static/
 │   ├── middleware.py        # /api prefix stripping, latency tracking
 │   ├── routes/              # One APIRouter per domain (agents, groups, ...)
 │   ├── services/            # Deployment, simulations, reporting, logs, ...
-│   ├── core/                # Shared helpers (root check, LXC info)
-│   └── installers/, simulation/, models/   # Scaffolds for moving utils.py/models.py
+│   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
+│   ├── installers/          # One module per SIEM agent + batch dispatcher, package cache
+│   ├── simulation/          # Attack simulation engine
+│   └── models/              # Scaffold for moving models.py
 ├── models.py                # Pydantic request/response models
-├── utils.py                 # SIEM installers, container helpers, simulation engine
 ├── db.py                    # SQLite database layer
 ├── benchmarks.py            # Benchmark engine
 ├── requirements.txt         # Python dependencies

@@ -1,9 +1,7 @@
 """
 Shared test fixtures.
 
-These work against the *current* root-level modules (db.py, models.py, utils.py)
-and will continue to work as code migrates into app/ because the root files
-become re-export shims.
+These work against the root-level db.py/models.py and the app/ package.
 """
 import sqlite3
 import pytest

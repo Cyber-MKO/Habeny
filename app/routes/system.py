@@ -11,11 +11,12 @@ from fastapi import APIRouter, HTTPException
 
 from app.config import MAX_WORKERS
 from app.core.common import get_lxc_default_config_path, get_lxc_version
+from app.core.container import get_system_arch
+from app.core.shell import run_command
 from app.services.agent_info import get_containers_by_state
 from app.services.simulation import list_simulation_profiles
 from app.state import simulations_db
 from models import APIResponse, HealthCheckResponse
-from utils import get_system_arch, run_command
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

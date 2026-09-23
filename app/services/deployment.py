@@ -12,21 +12,17 @@ from typing import Dict, List, Optional
 import lxc
 
 from app.config import DB_PATH
+from app.core.container import parse_memory_limit, setup_agent_health_check
+from app.core.network import configure_container_macvlan, get_host_interface
+from app.installers.elastic import install_elastic_agent
+from app.installers.ossec import install_ossec_agent
+from app.installers.ossim import install_ossim_agent
+from app.installers.utmstack import install_utmstack_agent
+from app.installers.wazuh import install_wazuh_agent
 from app.services.agent_info import write_agent_metadata
 from app.state import MAX_TRACKED_DEPLOYMENTS, deployment_progress, deployment_progress_lock
 from db import record_metric
 from models import utc_now
-from utils import (
-    configure_container_macvlan,
-    get_host_interface,
-    install_elastic_agent,
-    install_ossec_agent,
-    install_ossim_agent,
-    install_utmstack_agent,
-    install_wazuh_agent,
-    parse_memory_limit,
-    setup_agent_health_check,
-)
 
 logger = logging.getLogger(__name__)
 

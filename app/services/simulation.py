@@ -13,11 +13,11 @@ from typing import List
 import lxc
 from fastapi.encoders import jsonable_encoder
 
+from app.core.shell import execute_in_container, execute_in_container_shell
 from app.services.activity import log_activity
 from app.services.logs import escape_bash_single_quotes, escape_json_string
 from app.state import simulations_db
 from models import AgentSelector, CustomLogSimulationRequest, SyslogSimulationRequest, utc_now
-from utils import execute_in_container, execute_in_container_shell
 
 logger = logging.getLogger(__name__)
 

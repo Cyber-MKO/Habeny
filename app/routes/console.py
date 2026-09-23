@@ -13,7 +13,7 @@ import termios
 import lxc
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from utils import validate_container_name
+from app.core.container import validate_container_name
 
 router = APIRouter()
 

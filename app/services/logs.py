@@ -8,11 +8,11 @@ from typing import Any, Dict, Optional
 
 import lxc
 
+from app.core.shell import execute_in_container
 from app.services.activity import log_activity
 from app.services.agent_info import detect_siem_type, read_agent_metadata
 from app.state import scheduled_log_tasks
 from models import LogUploadRequest, utc_now
-from utils import execute_in_container
 
 logger = logging.getLogger(__name__)
 

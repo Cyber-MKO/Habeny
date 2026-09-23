@@ -1,13 +1,13 @@
 """
-Tests for shell command execution (currently in utils.py, will move to app/core/shell.py).
+Tests for shell command execution (app/core/shell.py).
 
 These tests mock subprocess so they run without root or LXC.
 """
 import pytest
 
-utils = pytest.importorskip("utils", reason="utils.py requires python-lxc")
+module = pytest.importorskip("app.core.shell", reason="requires python-lxc")
 
-run_command = utils.run_command
+run_command = module.run_command
 
 
 def test_run_command_captures_stdout():

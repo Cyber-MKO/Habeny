@@ -8,10 +8,10 @@ import asyncio
 import json
 import logging
 import os
-import time
 import sqlite3
+import time
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -338,12 +338,13 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
             # Deploy containers for this phase
             deploy_start = time.time()
             try:
+                from concurrent.futures import ProcessPoolExecutor, as_completed
+                from multiprocessing import cpu_count
+
                 from app.config import DB_PATH as MAIN_DB
                 from app.services.agent_info import write_agent_metadata
                 from app.services.deployment import deploy_single_siem_agent
                 from db import get_or_create_agent_seq_id
-                from concurrent.futures import ProcessPoolExecutor, as_completed
-                from multiprocessing import cpu_count
 
                 agent_names = [f"{base_name}-p{i}-{j:04d}" for j in range(1, agents_count + 1)]
                 deployment_config = {
