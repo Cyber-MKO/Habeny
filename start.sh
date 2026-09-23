@@ -10,13 +10,13 @@ FRONTEND="$ROOT/frontend"
 STATIC_INDEX="$ROOT/static/index.html"
 
 if ! command -v npm >/dev/null 2>&1; then
-    echo "error: npm not found. Install Node.js 18+ to run the frontend." >&2
+    echo "error: npm not found. Install Node.js 22 to run the frontend." >&2
     exit 1
 fi
 
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-if [ "$NODE_MAJOR" -lt 18 ]; then
-    echo "error: Node.js 18+ is required to run the frontend (found $(node -v 2>/dev/null || echo none))." >&2
+# Vite needs Node.js 20.19+ or 22.12+
+if ! node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 20 && b >= 19) || (a === 22 && b >= 12) || a >= 23 ? 0 : 1)' 2>/dev/null; then
+    echo "error: Node.js 20.19+ or 22.12+ is required to run the frontend (found $(node -v 2>/dev/null || echo none))." >&2
     echo "       Install a current version, e.g.:" >&2
     echo "         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -" >&2
     echo "         sudo apt install -y nodejs" >&2
