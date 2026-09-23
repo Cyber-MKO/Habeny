@@ -3,9 +3,11 @@ Wazuh agent installer.
 """
 import asyncio
 import logging
+import shlex
 from typing import Any, Dict, Optional
 
 from app.core.shell import PerformanceTimer, execute_in_container_shell
+from app.core.validation import validate_container_name, validate_group, validate_host, validate_version
 from app.installers.cache import AGENT_CACHE_DIR, copy_to_container, ensure_cached
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,10 @@ logger = logging.getLogger(__name__)
 def install_wazuh_agent(container_name: str, wazuh_manager: str, agent_group: str,
                        version: str = "4.14.2", config_template_id: Optional[str] = None) -> Dict[str, Any]:
     """Install Wazuh agent in a container using a direct .deb download (cached)."""
+    validate_container_name(container_name)
+    validate_host(wazuh_manager)
+    validate_group(agent_group)
+    validate_version(version)
     logger.info(f"Installing Wazuh agent {version} in container '{container_name}'")
 
     # The Wazuh .deb URL includes a patch suffix (-1); try the exact version first
@@ -54,9 +60,9 @@ fi
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
-export WAZUH_MANAGER='{wazuh_manager}'
-export WAZUH_AGENT_GROUP='{agent_group}'
-export WAZUH_AGENT_NAME='{container_name}'
+export WAZUH_MANAGER={shlex.quote(wazuh_manager)}
+export WAZUH_AGENT_GROUP={shlex.quote(agent_group)}
+export WAZUH_AGENT_NAME={shlex.quote(container_name)}
 {download_block}
 dpkg -i "{container_deb}" || apt-get install -f -y
 rm -f "{container_deb}"

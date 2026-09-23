@@ -2,9 +2,11 @@
 UTMstack agent installer.
 """
 import logging
+import shlex
 from typing import Any, Dict, Optional
 
 from app.core.shell import PerformanceTimer, execute_in_container, execute_in_container_shell
+from app.core.validation import validate_container_name, validate_host, validate_token
 from app.installers.cache import AGENT_CACHE_DIR, copy_to_container, ensure_cached
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,9 @@ def install_utmstack_agent(container_name: str, utmstack_server: str,
                            auth_key: str,
                            config_template_id: Optional[str] = None) -> Dict[str, Any]:
     """Install UTMstack agent in a container."""
+    validate_container_name(container_name)
+    validate_host(utmstack_server)
+    validate_token(auth_key)
     logger.info(f"Installing UTMstack agent in container '{container_name}'")
 
     binary_name = f"utmstack_agent_service_{utmstack_server}"
@@ -57,8 +62,8 @@ chmod 755 {container_bin}
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-MANAGER_IP="{utmstack_server}"
-AUTH_KEY="{auth_key}"
+MANAGER_IP={shlex.quote(utmstack_server)}
+AUTH_KEY={shlex.quote(auth_key)}
 
 # The install command downloads dependencies internally via wget
 apt-get update -y >/dev/null 2>&1 || true

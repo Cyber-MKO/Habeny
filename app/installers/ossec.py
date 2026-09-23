@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from app.core.shell import PerformanceTimer, execute_in_container_shell
+from app.core.validation import validate_container_name, validate_host
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,8 @@ logger = logging.getLogger(__name__)
 def install_ossec_agent(container_name: str, ossec_server: str,
                        config_template_id: Optional[str] = None) -> Dict[str, Any]:
     """Install OSSEC agent in a container using the Atomicorp installer."""
+    validate_container_name(container_name)
+    validate_host(ossec_server)
     logger.info(f"Installing OSSEC agent in container '{container_name}'")
 
     with PerformanceTimer(f"OSSEC installation on {container_name}"):

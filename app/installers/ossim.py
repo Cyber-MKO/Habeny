@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from app.core.shell import PerformanceTimer, execute_in_container_shell
+from app.core.validation import validate_container_name, validate_host
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ def install_ossim_agent(container_name: str, ossim_server: str,
     Returns:
         Dict with success status and output
     """
+    validate_container_name(container_name)
+    validate_host(ossim_server)
     logger.info(f"Installing OSSIM agent in container '{container_name}'")
 
     with PerformanceTimer(f"OSSIM installation on {container_name}"):
