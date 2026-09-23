@@ -16,6 +16,12 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Packages that must move together (peer dependencies), including major versions;
+      # split up they fail to install
+      react:
+        patterns: [react, react-dom, "@types/react", "@types/react-dom"]
+      vite:
+        patterns: [vite, "@vitejs/*"]
       npm-minor-and-patch:
         update-types: [minor, patch]
 

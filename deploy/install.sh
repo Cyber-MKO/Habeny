@@ -43,6 +43,13 @@ python3 -m venv "$INSTALL_DIR/.venv"
 "$INSTALL_DIR/.venv/bin/pip" install -q --upgrade pip
 "$INSTALL_DIR/.venv/bin/pip" install -q -r "$INSTALL_DIR/requirements.txt"
 
+# Vite needs Node.js 20.19+ or 22.12+
+node_ok() { node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 20 && b >= 19) || (a === 22 && b >= 12) || a >= 23 ? 0 : 1)' 2>/dev/null; }
+if command -v npm >/dev/null 2>&1 && ! node_ok; then
+    echo "error: Node.js $(node -v) is too old to build the frontend (needs 20.19+ or 22.12+). Install Node.js 22:" >&2
+    echo "         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs" >&2
+    exit 1
+fi
 if command -v npm >/dev/null 2>&1; then
     echo "==> Frontend build"
     npm --prefix "$INSTALL_DIR/frontend" ci --silent

@@ -23,7 +23,7 @@ to stress-test and validate your SIEM infrastructure.
 - **Root access** (LXC requires root)
 - **LXC** and its Python bindings: `sudo apt install lxc lxc-utils python3-lxc`
 - **Python 3.10+** with pip
-- **Node.js 18+** (to build and run the frontend)
+- **Node.js 20.19+ or 22.12+** (to build and run the frontend; 22 LTS recommended)
 
 ## Production install
 
