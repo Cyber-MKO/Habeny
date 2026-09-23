@@ -5,28 +5,44 @@ from fastapi import FastAPI
 
 
 def register_routes(app: FastAPI) -> None:
-    """Import and include every router.  Called by create_app()."""
+    """Include every router. Called by create_app().
+
+    Order matters where paths overlap: e.g. POST /agents/bulk/{operation} must be
+    registered before POST /agents/{agent_id}/start, and the SPA catch-all last.
+    """
     from app.routes import (
-        system,
+        activity,
         agents,
+        benchmarks,
+        configs,
+        console,
+        groups,
+        logs,
+        managers,
+        metrics,
+        reports,
+        siem,
+        simulations,
+        static,
+        syslog_configs,
+        system,
+    )
+
+    for module in (
+        system,
+        metrics,
+        console,
+        agents,
+        logs,
         groups,
         simulations,
         configs,
         reports,
-        logs,
         activity,
+        managers,
+        benchmarks,
+        syslog_configs,
         siem,
-        console,
-    )
-
-    app.include_router(system.router)
-    app.include_router(agents.router)
-    app.include_router(groups.router)
-    app.include_router(simulations.router)
-    app.include_router(configs.router)
-    app.include_router(reports.router)
-    app.include_router(logs.router)
-    app.include_router(activity.router)
-    app.include_router(siem.router)
-    # console uses @app.websocket directly — registered separately
-    console.register(app)
+    ):
+        app.include_router(module.router)
+    static.register(app)

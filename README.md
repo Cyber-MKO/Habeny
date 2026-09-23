@@ -57,11 +57,21 @@ npm run build      # outputs to ../static/
 
 ```
 .
-├── main.py                  # FastAPI app, all API routes
+├── main.py                  # Entry point: logging setup + create_app()
+├── start.sh                 # Quick start: builds frontend, runs API
+├── app/                     # FastAPI application
+│   ├── __init__.py          # create_app(): storage init, middleware, routers
+│   ├── config.py            # Paths and tunables
+│   ├── state.py             # In-memory state shared by routes/services
+│   ├── middleware.py        # /api prefix stripping, latency tracking
+│   ├── routes/              # One APIRouter per domain (agents, groups, ...)
+│   ├── services/            # Deployment, simulations, reporting, logs, ...
+│   ├── core/                # Shared helpers (root check, LXC info)
+│   └── installers/, simulation/, models/   # Scaffolds for moving utils.py/models.py
 ├── models.py                # Pydantic request/response models
 ├── utils.py                 # SIEM installers, container helpers, simulation engine
 ├── db.py                    # SQLite database layer
-├── start.sh                 # Quick start: builds frontend, runs API
+├── benchmarks.py            # Benchmark engine
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
 ├── index.legacy.html        # Legacy single-file frontend
@@ -76,19 +86,10 @@ npm run build      # outputs to ../static/
 │   │   └── components/      # Reusable UI components
 │   └── .eslintrc.cjs        # JavaScript linter config
 │
-├── app/                     # Modular package scaffold (migration target)
-│   ├── core/                # Shell, container, resource helpers
-│   ├── installers/          # Per-SIEM installer modules
-│   ├── routes/              # FastAPI router modules
-│   ├── services/            # Business logic layer
-│   └── simulation/          # Attack simulation engine
-│
 ├── tests/                   # Test suite
 │   ├── test_db.py           # Database layer tests
 │   ├── test_models.py       # Model validation tests
 │   └── test_core_shell.py   # Shell command tests
-│
-└── PLAN.md                  # Modularization roadmap
 ```
 
 ## API Endpoints

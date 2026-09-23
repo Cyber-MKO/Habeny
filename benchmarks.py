@@ -338,7 +338,10 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
             # Deploy containers for this phase
             deploy_start = time.time()
             try:
-                from main import deploy_single_siem_agent, get_or_create_agent_seq_id, write_agent_metadata, DB_PATH as MAIN_DB
+                from app.config import DB_PATH as MAIN_DB
+                from app.services.agent_info import write_agent_metadata
+                from app.services.deployment import deploy_single_siem_agent
+                from db import get_or_create_agent_seq_id
                 from concurrent.futures import ProcessPoolExecutor, as_completed
                 from multiprocessing import cpu_count
 
