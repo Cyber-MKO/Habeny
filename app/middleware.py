@@ -14,8 +14,10 @@ class StripApiPrefixMiddleware:
     """The built frontend calls the API under /api (the Vite dev proxy strips it
     the same way), so accept /api/... when the UI is served from this server.
 
-    A browser opening "/" gets the UI rather than the API root (GET / stays the
-    API root for /api/ and for non-HTML clients)."""
+    A browser page load (GET asking for HTML) outside /api always gets the UI, so
+    reloading or bookmarking a page whose path is also an API path (/agents,
+    /groups, ...) works. The UI itself only calls the API under /api, and non-HTML
+    clients still reach the API without the prefix."""
 
     def __init__(self, app):
         self.app = app
@@ -25,9 +27,18 @@ class StripApiPrefixMiddleware:
             path = scope.get("path", "")
             if path == "/api" or path.startswith("/api/"):
                 scope = dict(scope, path=path[4:] or "/", raw_path=None)
-            elif path == "/" and scope["type"] == "http" and _wants_html(scope) and (STATIC_DIR / "index.html").is_file():
+            elif _is_page_load(scope, path):
                 scope = dict(scope, path="/index.html", raw_path=None)
         await self.app(scope, receive, send)
+
+
+def _is_page_load(scope, path: str) -> bool:
+    if scope["type"] != "http" or scope.get("method") != "GET" or not _wants_html(scope):
+        return False
+    if path.startswith("/assets/") or not (STATIC_DIR / "index.html").is_file():
+        return False
+    static_file = (STATIC_DIR / path.lstrip("/")).resolve()
+    return not (static_file.is_relative_to(STATIC_DIR.resolve()) and static_file.is_file())
 
 
 def _wants_html(scope) -> bool:
