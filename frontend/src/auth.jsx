@@ -30,8 +30,8 @@ export function AuthProvider({ children }) {
     setState({ status: "ready", setupRequired: false, user: res.data.user, error: null });
   }, []);
 
-  const setup = useCallback(async (username, password) => {
-    const res = await api.setupAdmin({ username, password });
+  const setup = useCallback(async (username, password, setupToken) => {
+    const res = await api.setupAdmin({ username, password, setup_token: setupToken });
     setState({ status: "ready", setupRequired: false, user: res.data.user, error: null });
   }, []);
 

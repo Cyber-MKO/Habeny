@@ -29,6 +29,9 @@ def _initialize_storage() -> None:
 
     migrate_legacy_agent_metadata()
 
+    from app.services.setup_token import ensure_setup_token
+    ensure_setup_token()
+
     # Secrets stored before encryption existed
     from app.db import encrypt_plaintext_manager_secrets
     from app.services.benchmarks import scrub_stored_benchmark_secrets

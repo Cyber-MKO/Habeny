@@ -23,7 +23,9 @@ def admin_created(app):
     """Complete first-run setup once for the test session."""
     client = TestClient(app)
     if client.get("/auth/status").json()["data"]["setup_required"]:
-        assert client.post("/auth/setup", json=ADMIN).status_code == 200
+        from app.services.setup_token import TOKEN_FILE
+        resp = client.post("/auth/setup", json={**ADMIN, "setup_token": TOKEN_FILE.read_text().strip()})
+        assert resp.status_code == 200, resp.text
     return ADMIN
 
 

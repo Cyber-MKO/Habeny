@@ -112,7 +112,7 @@ The dev server (`./start.sh --dev`, port 3000) is plain HTTP for development onl
 ## Authentication
 
 The web UI and the API require signing in. On first start there are no accounts:
-open the UI and it asks you to **create the admin account**. After that, the
+open the UI and it asks you to **create the admin account** (with the setup token, see below). After that, the
 sign-in page is shown to anyone without a valid session.
 
 - **Account** (sidebar → Settings, or click your username): change your password.
@@ -124,8 +124,10 @@ sign-in page is shown to anyone without a valid session.
 - Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
 - After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
 - Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.
-- Until the admin account exists, anyone who can reach the server can create it,
-  so complete setup right after the first start.
+- First-run setup needs a one-time **setup token**, so nobody else who can reach the
+  server can claim the admin account. It is printed to the log and saved to a file only
+  root and the service can read:
+  `sudo cat /var/lib/lxc-siem-platform/setup-token` or `journalctl -u habeny | grep "setup token"`.
 
 **Stored secrets:** SIEM auth keys and enrollment tokens in manager profiles are encrypted
 in the database and never sent back to the browser (only the last 4 characters are shown).

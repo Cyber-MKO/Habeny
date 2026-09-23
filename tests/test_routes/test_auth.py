@@ -22,7 +22,7 @@ def test_status_reports_signed_out(app, admin_created):
 
 
 def test_setup_cannot_run_twice(app, admin_created):
-    resp = TestClient(app).post("/auth/setup", json={"username": "intruder", "password": "another-password"})
+    resp = TestClient(app).post("/auth/setup", json={"username": "intruder", "password": "another-password", "setup_token": "x"})
     assert resp.status_code == 409
 
 
@@ -107,3 +107,22 @@ def test_no_cross_origin_access_by_default(client):
     assert "access-control-allow-origin" not in {k.lower() for k in resp.headers}
     pre = client.options("/groups", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
     assert "access-control-allow-origin" not in {k.lower() for k in pre.headers}
+
+
+def test_setup_requires_the_one_time_token(app, admin_created, monkeypatch, tmp_path):
+    import app.routes.auth as auth_routes
+    import app.services.setup_token as st
+
+    monkeypatch.setattr(st, "TOKEN_FILE", tmp_path / "setup-token")
+    monkeypatch.setattr(st, "count_users", lambda db: 0)
+    token = st.ensure_setup_token()
+    assert (tmp_path / "setup-token").stat().st_mode & 0o077 == 0
+    assert st.ensure_setup_token() == token  # stable across restarts until used
+
+    monkeypatch.setattr(auth_routes, "count_users", lambda db: 0)  # pretend no account exists yet
+    c = TestClient(app)
+    body = {"username": "claimer", "password": "a-long-enough-pass"}
+    assert c.post("/auth/setup", json=body).status_code == 422  # token missing
+    assert c.post("/auth/setup", json={**body, "setup_token": "guess"}).status_code == 403
+    # the right token gets past the check (then 409: an account already exists in this test DB)
+    assert c.post("/auth/setup", json={**body, "setup_token": token}).status_code == 409

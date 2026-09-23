@@ -17,6 +17,7 @@ from app.services.auth import (
     session_user,
     start_session,
 )
+from app.services.setup_token import check_setup_token, remove_setup_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
@@ -61,10 +62,23 @@ async def auth_status(request: Request):
 
 @router.post("/setup", response_model=APIResponse)
 async def setup_admin(body: SetupRequest, request: Request, response: Response):
-    """Create the first (admin) account. Only allowed while no account exists."""
+    """Create the first (admin) account. Only allowed while no account exists, and only
+    with the one-time setup token from the server's log / data directory."""
+    if count_users(DB_PATH) > 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Setup has already been completed")
+    client = request.client.host if request.client else "unknown"
+    wait = login_limiter.retry_after(client)
+    if wait:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="Too many failed attempts. Try again later.", headers={"Retry-After": str(wait)})
+    if not check_setup_token(body.setup_token):
+        login_limiter.record_failure(client)
+        log_activity("auth_setup_token_rejected", {"client": client}, status="error")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid setup token")
     user = create_first_user(DB_PATH, body.username, hash_password(body.password))
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Setup has already been completed")
+    remove_setup_token()
     _set_session_cookie(request, response, start_session(user["id"]))
     update_user_last_login(DB_PATH, user["id"])
     log_activity("auth_setup_completed", {"username": user["username"]})

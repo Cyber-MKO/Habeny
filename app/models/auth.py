@@ -13,6 +13,7 @@ class LoginRequest(BaseModel):
 
 class SetupRequest(BaseModel):
     """First-run creation of the admin account."""
+    setup_token: str = Field(..., min_length=1, max_length=128)
     username: str = Field(..., min_length=3, max_length=32, pattern=USERNAME_PATTERN)
     password: str = Field(..., min_length=8, max_length=256)
 
