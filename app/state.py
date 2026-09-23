@@ -4,7 +4,11 @@ Process-wide in-memory state shared between routes and services.
 Only ever mutate these in place — other modules hold references to the same objects.
 """
 import threading
+import time
 from typing import Any, Dict
+
+# For /system/health uptime
+PROCESS_STARTED_AT = time.monotonic()
 
 simulations_db = {}
 reports_db = {}

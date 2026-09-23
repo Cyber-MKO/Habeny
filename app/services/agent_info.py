@@ -4,6 +4,8 @@ Agent introspection — persisted container metadata, live container state and S
 import json
 import logging
 import os
+import threading
+import time
 from typing import Any, Dict, Optional
 
 import lxc
@@ -83,17 +85,39 @@ def migrate_legacy_agent_metadata() -> None:
             logger.warning(f"Failed to migrate {legacy_file}: {e}")
 
 
+# Scanning every container's state costs a round-trip per running container, and
+# several endpoints (system info, health, live metrics) need the same numbers.
+# Share one scan for a couple of seconds; concurrent callers wait for it instead
+# of each starting their own.
+CONTAINER_SCAN_TTL = 2.0
+_scan_lock = threading.Lock()
+_scan_cache: Dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def container_state_summary() -> Dict[str, Any]:
+    """Names, total, counts by state, and `running` (anything not STOPPED, like lxc's
+    Container.running) from a single pass over all containers. Blocking: call it via
+    asyncio.to_thread from async code."""
+    with _scan_lock:
+        cached = _scan_cache["value"]
+        if cached is not None and time.monotonic() - _scan_cache["at"] < CONTAINER_SCAN_TTL:
+            return cached
+        names = lxc.list_containers()
+        by_state = {"RUNNING": 0, "STOPPED": 0, "FROZEN": 0, "OTHER": 0}
+        running = 0
+        for name in names:
+            state = lxc.Container(name).state
+            by_state[state if state in by_state else "OTHER"] += 1
+            if state and state != "STOPPED":
+                running += 1
+        summary = {"names": list(names), "total": len(names), "by_state": by_state, "running": running}
+        _scan_cache.update(at=time.monotonic(), value=summary)
+        return summary
+
+
 def get_containers_by_state() -> Dict[str, int]:
     """Get container counts by state"""
-    state_counts = {"RUNNING": 0, "STOPPED": 0, "FROZEN": 0, "OTHER": 0}
-    for name in lxc.list_containers():
-        container = lxc.Container(name)
-        state = container.state
-        if state in state_counts:
-            state_counts[state] += 1
-        else:
-            state_counts["OTHER"] += 1
-    return state_counts
+    return dict(container_state_summary()["by_state"])
 
 
 def get_agent_info(container, detailed: bool = False) -> dict:
