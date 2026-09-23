@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag matching app/version.py to publish a release:
+#   git tag v2.1.0 && git push origin v2.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # create the GitHub release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match app/version.py
+        run: |
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/version.py)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match app/version.py ($version)"; exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest -q
+        env:
+          HABENY_LXC_BACKEND: direct
+          PYTHONPATH: tests/stubs
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: frontend
+      - name: Build release artifacts
+        run: deploy/build-release.sh dist
+      - name: Publish
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Habeny ${GITHUB_REF_NAME#v}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
