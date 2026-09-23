@@ -6,9 +6,8 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-import lxc
-
 from app.core.container import build_write_file_script
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
 from app.core.validation import validate_container_path
 from app.models import LogUploadRequest, utc_now

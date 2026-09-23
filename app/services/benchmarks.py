@@ -250,7 +250,7 @@ def collect_system_metrics() -> dict:
 def collect_container_metrics() -> dict:
     """Collect container-level aggregate metrics."""
     try:
-        import lxc
+        from app.core.lxc_backend import lxc
         containers = lxc.list_containers()
         running = sum(1 for n in containers if lxc.Container(n).running)
         return {

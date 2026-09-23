@@ -4,9 +4,6 @@ Multi-SIEM Container Emulation Platform — application package.
 import logging
 from multiprocessing import cpu_count
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 logger = logging.getLogger(__name__)
 
 
@@ -42,8 +39,11 @@ def _initialize_storage() -> None:
                     f"{scrubbed} benchmark config(s) scrubbed")
 
 
-def create_app() -> FastAPI:
+def create_app():
     """Application factory. Initializes storage, middleware and all routes."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
     from app.config import MAX_WORKERS
     from app.middleware import StripApiPrefixMiddleware, track_request_latency
     from app.routes import register_routes

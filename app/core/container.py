@@ -11,8 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-import lxc
-
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container_shell, run_command
 from app.core.validation import validate_container_path
 

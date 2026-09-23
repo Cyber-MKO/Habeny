@@ -4,10 +4,12 @@ Shell command execution and container-attach wrappers.
 import logging
 import os
 import subprocess
-import tempfile
 import time
+import uuid
 from functools import wraps
 from typing import Any, Dict, List
+
+from app.core.lxc_backend import attach_run
 
 logger = logging.getLogger(__name__)
 
@@ -116,160 +118,68 @@ def run_command(cmd: List[str], capture_output: bool = True, input_text: str = N
         }
 
 
+def _attach_result(result: Dict[str, Any], timeout_msg: str) -> Dict[str, Any]:
+    if result.get("timed_out"):
+        return {"success": False, "stdout": result["stdout"].strip(), "stderr": timeout_msg, "returncode": -1}
+    return {
+        "success": result["returncode"] == 0,
+        "stdout": result["stdout"].strip(),
+        "stderr": result["stderr"].strip(),
+        "returncode": result["returncode"],
+    }
+
+
 @retry(max_attempts=3, delay=2.0)
 def execute_in_container(container_name: str, command: str, env: Dict[str, str] = None,
                          timeout: int = 300) -> Dict[str, Any]:
     """
     Execute command in container using lxc-attach
-    
+
     Args:
         container_name: Name of the container
         command: Command to execute
         env: Optional environment variables
         timeout: Command timeout in seconds
-    
+
     Returns:
         Dict with success, stdout, stderr, returncode
     """
     try:
-        # Build command
-        cmd = ["lxc-attach", "-n", container_name]
-
-        # Add environment variables before --
-        if env:
-            for key, value in env.items():
-                cmd.extend(["-v", f"{key}={value}"])
-
-        # Add the actual command after --
-        cmd.extend(["--", "bash", "-c", command])
-
-        # Execute
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip(),
-            "returncode": result.returncode
-        }
-
-    except subprocess.TimeoutExpired as e:
-        return {
-            "success": False,
-            "stdout": e.stdout.decode() if e.stdout else "",
-            "stderr": f"Command timeout after {timeout}s",
-            "returncode": -1
-        }
+        result = attach_run(container_name, ["bash", "-c", command], env=env, timeout=timeout)
+        return _attach_result(result, f"Command timeout after {timeout}s")
     except Exception as e:
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": str(e),
-            "returncode": 1
-        }
+        return {"success": False, "stdout": "", "stderr": str(e), "returncode": 1}
 
 
 def execute_in_container_shell(container_name: str, command: str, env: Dict[str, str] = None,
                                timeout: int = 300) -> Dict[str, Any]:
     """
     Execute shell script in container with better error handling
-    
+
     Args:
         container_name: Name of the container
         command: Shell script to execute
         env: Optional environment variables
         timeout: Script timeout in seconds
-    
+
     Returns:
         Dict with success, stdout, stderr, returncode
     """
     try:
-        # Create a temporary script
-        script_content = f"""#!/bin/bash
-set -o pipefail
-{command}
-"""
-
-        # Create temp file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
-            f.write(script_content)
-            script_path = f.name
-
-        os.chmod(script_path, 0o755)
-
-        # Prepare environment variables
-        env_args = []
-        if env:
-            for key, value in env.items():
-                env_args.extend(["-v", f"{key}={value}"])
-
-        # Copy script to container
-        container_script_path = f"/tmp/script_{os.path.basename(script_path)}"
-
-        with open(script_path, 'r') as f:
-            script_data = f.read()
-
-        copy_cmd = ["lxc-attach", "-n", container_name, "--", "bash", "-c",
-                   f"cat > {container_script_path} && chmod +x {container_script_path}"]
-
-        copy_result = subprocess.run(
-            copy_cmd,
-            input=script_data,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-
-        if copy_result.returncode != 0:
-            os.unlink(script_path)
+        script = f"#!/bin/bash\nset -o pipefail\n{command}\n"
+        # Unique path inside the container; copy, run, clean up
+        container_script_path = f"/tmp/script_{uuid.uuid4().hex}.sh"
+        copy = attach_run(container_name, ["bash", "-c", 'cat > "$1" && chmod +x "$1"', "copy", container_script_path],
+                          input_bytes=script.encode(), timeout=30)
+        if copy["returncode"] != 0:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Failed to copy script to container: {copy_result.stderr}",
-                "returncode": copy_result.returncode
+                "stderr": f"Failed to copy script to container: {copy['stderr'].strip()}",
+                "returncode": copy["returncode"],
             }
-
-        # Execute the script in container (env args before --)
-        exec_cmd = ["lxc-attach", "-n", container_name] + env_args + ["--", "bash", container_script_path]
-
-        result = subprocess.run(
-            exec_cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-
-        # Clean up
-        os.unlink(script_path)
-        subprocess.run(
-            ["lxc-attach", "-n", container_name, "--", "rm", "-f", container_script_path],
-            capture_output=True,
-            timeout=10
-        )
-
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip(),
-            "returncode": result.returncode
-        }
-
-    except subprocess.TimeoutExpired as e:
-        return {
-            "success": False,
-            "stdout": e.stdout.decode() if e.stdout else "",
-            "stderr": f"Script timeout after {timeout}s",
-            "returncode": -1
-        }
+        result = attach_run(container_name, ["bash", container_script_path], env=env, timeout=timeout)
+        attach_run(container_name, ["rm", "-f", container_script_path], timeout=10)
+        return _attach_result(result, f"Script timeout after {timeout}s")
     except Exception as e:
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": str(e),
-            "returncode": 1
-        }
+        return {"success": False, "stdout": "", "stderr": str(e), "returncode": 1}

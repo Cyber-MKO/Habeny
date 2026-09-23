@@ -1,0 +1,23 @@
+[Unit]
+Description=Habeny LXC helper (privileged, container operations only)
+Documentation=file://@INSTALL_DIR@/README.md
+After=network-online.target lxc.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The only root part of Habeny: performs a fixed, validated set of LXC operations
+# for the habeny user over a Unix socket. Uses the system Python with python3-lxc.
+User=root
+Group=habeny
+WorkingDirectory=@INSTALL_DIR@
+Environment=HABENY_HELPER_USER=habeny
+Environment=HABENY_HELPER_SOCKET=/run/habeny/helper.sock
+ExecStart=/usr/bin/python3 -m app.helper.server
+RuntimeDirectory=habeny
+RuntimeDirectoryMode=0750
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -4,9 +4,8 @@ HTTP middleware: /api prefix stripping and API latency tracking.
 import time
 
 from app.config import DB_PATH, STATIC_DIR
-from app.tls import hsts_enabled
 from app.db import record_metric
-
+from app.tls import hsts_enabled
 
 HSTS = hsts_enabled()
 

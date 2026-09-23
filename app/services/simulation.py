@@ -10,9 +10,9 @@ import time
 from datetime import datetime
 from typing import List
 
-import lxc
 from fastapi.encoders import jsonable_encoder
 
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container, execute_in_container_shell
 from app.models import AgentSelector, CustomLogSimulationRequest, SyslogSimulationRequest, utc_now
 from app.services.activity import log_activity

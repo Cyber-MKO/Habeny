@@ -3,10 +3,10 @@ Container group management, including group-wide bulk ops and log uploads.
 """
 import logging
 
-import lxc
 from fastapi import APIRouter, HTTPException
 
 from app.config import DB_PATH
+from app.core.lxc_backend import lxc
 from app.db import (
     assign_agents_to_group,
     create_group,

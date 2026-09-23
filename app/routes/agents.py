@@ -9,11 +9,11 @@ import uuid
 from multiprocessing import cpu_count
 from typing import Optional
 
-import lxc
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from app.config import DB_PATH
 from app.core.common import check_root
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
 from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now

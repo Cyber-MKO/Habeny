@@ -3,15 +3,13 @@ Agent introspection — persisted container metadata, live container state and S
 """
 import json
 import logging
-import os
 import threading
 import time
 from typing import Any, Dict, Optional
 
-import lxc
-
 from app.config import AGENTS_DIR, DB_PATH
 from app.core.container import get_container_stats
+from app.core.lxc_backend import lxc, read_container_config
 from app.core.shell import execute_in_container
 from app.db import get_agent_by_name, get_agent_siem_types, get_or_create_agent_seq_id, mark_agent_deleted, upsert_agent
 from app.models import utc_now
@@ -174,20 +172,11 @@ def get_agent_info(container, detailed: bool = False) -> dict:
     # Try to extract SIEM metadata from container config
     # In production, store this in database
     try:
-        config_file = container.config_file_name
-        if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
-                config_content = f.read().lower()
-                if "wazuh" in config_content:
-                    info["siem_type"] = "wazuh"
-                elif "ossec" in config_content:
-                    info["siem_type"] = "ossec"
-                elif "ossim" in config_content:
-                    info["siem_type"] = "ossim"
-                elif "utmstack" in config_content:
-                    info["siem_type"] = "utmstack"
-                elif "elastic" in config_content:
-                    info["siem_type"] = "elastic"
+        config_content = (read_container_config(container.name) or "").lower()
+        for siem_type in ("wazuh", "ossec", "ossim", "utmstack", "elastic"):
+            if siem_type in config_content:
+                info["siem_type"] = siem_type
+                break
     except Exception:
         pass
 

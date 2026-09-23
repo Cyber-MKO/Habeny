@@ -25,13 +25,38 @@ to stress-test and validate your SIEM infrastructure.
 - **Python 3.10+** with pip
 - **Node.js 18+** (to build and run the frontend)
 
+## Production install
+
+Habeny runs as two services so the web app never runs as root:
+
+- **habeny** — the web app, as the unprivileged `habeny` user, sandboxed by systemd
+  (read-only system, no capabilities; it can only write its data directory).
+- **habeny-helper** — a small root service that performs container operations for it
+  over a Unix socket (`/run/habeny/helper.sock`, only `habeny`/root may connect). It
+  accepts a fixed list of LXC operations and validates every argument: e.g. it will
+  set only the network keys the app uses, never hooks or mounts, and create only the
+  offered OS images.
+
+```bash
+git clone <repo> /opt/habeny && cd /opt/habeny
+sudo ./deploy/install.sh          # packages, user, venv, frontend, systemd units
+systemctl status habeny habeny-helper
+```
+
+Optional settings (TLS certificate, reverse-proxy mode, port) go in `/etc/default/habeny`.
+Upgrading from a root install: `install.sh` hands the existing data directory to `habeny`.
+
+Note: containers are still privileged LXC containers, so root inside a container is
+powerful; the helper keeps web-app bugs from being root on the host, but the console
+and agent installs run as root *inside* containers by design.
+
 ## Quick Start
 
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Build the frontend (if needed) and start the API server
+# Development: build the frontend (if needed) and run everything as root
 sudo ./start.sh
 ```
 
@@ -131,6 +156,7 @@ npm run build      # outputs to ../static/
 ```
 .
 ├── main.py                  # Entry point: logging setup + create_app()
+├── deploy/                  # install.sh + systemd units (web app + root helper)
 ├── start.sh                 # Quick start: builds frontend, runs API
 ├── app/                     # FastAPI application
 │   ├── __init__.py          # create_app(): storage init, middleware, routers
@@ -138,6 +164,7 @@ npm run build      # outputs to ../static/
 │   ├── state.py             # In-memory state shared by routes/services
 │   ├── middleware.py        # /api prefix stripping, latency tracking
 │   ├── db.py                # SQLite database layer
+│   ├── helper/              # Privileged LXC helper (root) + client used by the web app
 │   ├── routes/              # One APIRouter per domain (agents, groups, ...)
 │   ├── services/            # Deployment, simulations, reporting, logs, benchmarks, ...
 │   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
