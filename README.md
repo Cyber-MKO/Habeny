@@ -307,7 +307,20 @@ cd frontend && npx eslint src/
 ```bash
 pip install -r requirements-dev.txt
 python3 -m pytest tests/ -v
+
+# Without LXC (e.g. on a laptop): use the in-memory python-lxc stand-in
+HABENY_LXC_BACKEND=direct PYTHONPATH=tests/stubs python3 -m pytest tests/
 ```
+
+CI (`.github/workflows/ci.yml`) runs the tests on Python 3.10 and 3.12, the ruff
+correctness rules, a frontend build, and `pip-audit` / `npm audit` on every push and pull
+request and weekly. Dependabot (`.github/dependabot.yml`) proposes dependency updates.
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md). It also summarizes how Habeny is
+secured. The brief for an independent security review is in
+[docs/security-review-scope.md](docs/security-review-scope.md).
 
 ## License
 
