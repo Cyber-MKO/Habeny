@@ -21,7 +21,7 @@ to stress-test and validate your SIEM infrastructure.
 - **Root access** (LXC requires root)
 - **LXC** installed: `sudo apt install lxc lxc-utils`
 - **Python 3.10+** with pip
-- **Node.js 18+** (for frontend development only)
+- **Node.js 18+** (to build and run the frontend)
 
 ## Quick Start
 
@@ -29,27 +29,28 @@ to stress-test and validate your SIEM infrastructure.
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Initialize the database and start the API server
-sudo python3 main.py
+# Build the frontend (if needed) and start the API server
+sudo ./start.sh
 ```
 
-The API starts on `http://0.0.0.0:9000`.
+Open `http://<host>:9000` — the API and the web UI are both served from there.
+`start.sh` installs the frontend's npm dependencies on first run and rebuilds
+`static/` whenever the sources in `frontend/` have changed.
 
 ## Frontend
 
-The React frontend is pre-built into `static/`. To rebuild after changes:
+For development with hot reload, run the API and the Vite dev server together:
+
+```bash
+sudo ./start.sh --dev   # UI on http://<host>:3000, proxies API to :9000
+```
+
+To build the frontend manually:
 
 ```bash
 cd frontend
 npm install
 npm run build      # outputs to ../static/
-```
-
-For development with hot reload:
-
-```bash
-cd frontend
-npm run dev        # runs on http://localhost:3000, proxies API to :9000
 ```
 
 ## Project Structure
@@ -60,6 +61,7 @@ npm run dev        # runs on http://localhost:3000, proxies API to :9000
 ├── models.py                # Pydantic request/response models
 ├── utils.py                 # SIEM installers, container helpers, simulation engine
 ├── db.py                    # SQLite database layer
+├── start.sh                 # Quick start: builds frontend, runs API
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
 ├── index.legacy.html        # Legacy single-file frontend
