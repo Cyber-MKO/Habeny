@@ -28,8 +28,10 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 import logging
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import cpu_count
+from concurrent.futures import ProcessPoolExecutor, as_completed, wait, FIRST_COMPLETED
+from multiprocessing import cpu_count, Manager
+import queue
+import threading
 from pathlib import Path
 
 from models import *
@@ -91,6 +93,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class StripApiPrefixMiddleware:
+    """The built frontend calls the API under /api (the Vite dev proxy strips it
+    the same way), so accept /api/... when the UI is served from this server."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == "/api" or path.startswith("/api/"):
+                scope = dict(scope, path=path[4:] or "/", raw_path=None)
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(StripApiPrefixMiddleware)
+
 # API latency tracking middleware
 @app.middleware("http")
 async def track_request_latency(request, call_next):
@@ -114,6 +134,11 @@ report_files = {}
 activity_logs = []
 config_templates = {}
 scheduled_log_tasks = {}
+
+# Live deployment progress, keyed by deployment_id (see /agents/deploy/progress/{id})
+deployment_progress: Dict[str, Dict[str, Any]] = {}
+deployment_progress_lock = threading.Lock()
+MAX_TRACKED_DEPLOYMENTS = 20
 
 # Data directories
 DATA_DIR = Path("/var/lib/lxc-siem-platform")
@@ -709,6 +734,130 @@ async def console_session(websocket: WebSocket, container_name: str):
 
 # ===== CONTAINER DEPLOYMENT =====
 
+def _progress_start(deployment_id: str, count: int, siem_type: str):
+    with deployment_progress_lock:
+        deployment_progress[deployment_id] = {
+            "deployment_id": deployment_id,
+            "status": "running",
+            "started_at": utc_now().isoformat(),
+            "finished_at": None,
+            "total": count,
+            "completed": 0,
+            "successful": 0,
+            "failed": 0,
+            "siem_type": siem_type,
+            "containers": {},
+            "events": [],
+        }
+        # Drop the oldest finished deployments so memory stays bounded
+        finished = [k for k, v in deployment_progress.items() if v["status"] != "running"]
+        for k in finished[:max(0, len(deployment_progress) - MAX_TRACKED_DEPLOYMENTS)]:
+            deployment_progress.pop(k, None)
+
+
+def _progress_event(deployment_id: str, message: str, level: str = "info",
+                    container: Optional[str] = None, status: Optional[str] = None,
+                    error: Optional[str] = None):
+    """Append an activity line and, if given, update the container's current step/status."""
+    with deployment_progress_lock:
+        job = deployment_progress.get(deployment_id)
+        if not job:
+            return
+        now = utc_now().isoformat()
+        job["events"].append({"timestamp": now, "level": level, "container": container, "message": message})
+        if container:
+            c = job["containers"].setdefault(container, {"name": container, "status": "pending", "step": "Queued"})
+            c["step"] = message
+            c["updated_at"] = now
+            if status:
+                c["status"] = status
+            if error:
+                c["error"] = error
+            if status in ("success", "failed"):
+                job["completed"] += 1
+                job["successful" if status == "success" else "failed"] += 1
+
+
+def _progress_finish(deployment_id: str, status: str, message: str, level: str = "info"):
+    _progress_event(deployment_id, message, level=level)
+    with deployment_progress_lock:
+        job = deployment_progress.get(deployment_id)
+        if job:
+            job["status"] = status
+            job["finished_at"] = utc_now().isoformat()
+
+
+def _report_step(progress_queue, agent_name: str, message: str):
+    """Send a step update from a deployment worker process back to the API process."""
+    if progress_queue is None:
+        return
+    try:
+        progress_queue.put_nowait((agent_name, message))
+    except Exception:
+        pass
+
+
+def _run_deployment_workers(deployment_id: str, agent_names: List[str], deployment_dict: dict,
+                            agent_seq_ids: Dict[str, int]):
+    """Deploy containers in worker processes, streaming their step updates into
+    deployment_progress. Blocking; run it off the event loop."""
+    results = []
+    warnings = []
+    with Manager() as mp_manager:
+        progress_queue = mp_manager.Queue()
+
+        def drain():
+            while True:
+                try:
+                    name, message = progress_queue.get_nowait()
+                except queue.Empty:
+                    return
+                _progress_event(deployment_id, message, container=name, status="running")
+
+        with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
+            future_to_name = {
+                executor.submit(deploy_single_siem_agent, name, deployment_dict, agent_seq_ids[name], progress_queue): name
+                for name in agent_names
+            }
+            pending = set(future_to_name)
+            while pending:
+                done, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+                drain()
+                for future in done:
+                    agent_name = future_to_name[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        logger.error(f"Exception deploying {agent_name}: {e}")
+                        result = {"agent_name": agent_name, "success": False, "error": str(e)}
+                    results.append(result)
+                    if result["success"]:
+                        _progress_event(
+                            deployment_id,
+                            f"Deployed in {result.get('deploy_time_seconds', 0)}s"
+                            + (f" ({result['ip_address']})" if result.get("ip_address") else ""),
+                            level="success", container=agent_name, status="success",
+                        )
+                    else:
+                        error = result.get("error") or (result.get("agent_installation") or {}).get("message") or "Unknown error"
+                        warnings.append(f"Failed to deploy container {agent_name}: {error}")
+                        _progress_event(deployment_id, f"Failed: {error}", level="error",
+                                        container=agent_name, status="failed", error=error)
+    return results, warnings
+
+
+@app.get("/agents/deploy/progress/{deployment_id}", response_model=APIResponse)
+async def get_deployment_progress(deployment_id: str):
+    """Live progress (per-container steps and an activity feed) of a deployment"""
+    with deployment_progress_lock:
+        job = deployment_progress.get(deployment_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Deployment not found")
+        data = json.loads(json.dumps(job, default=str))
+    data["containers"] = list(data["containers"].values())
+    return APIResponse(success=True, message=f"Deployment {data['status']}", data=data)
+
+
 @app.post("/agents/deploy", response_model=APIResponse)
 async def deploy_agents(
     deployment: AgentDeploymentRequest,
@@ -720,6 +869,9 @@ async def deploy_agents(
 
     Supports Wazuh, OSSEC, OSSIM, and UTMstack with configurable parameters
     """
+    deployment_id = deployment.deployment_id or str(uuid.uuid4())
+    _progress_start(deployment_id, deployment.count, str(getattr(deployment.siem_type, "value", deployment.siem_type)))
+    _progress_event(deployment_id, f"Deployment request received ({deployment.count} container{'s' if deployment.count != 1 else ''})")
     try:
         start_time = time.time()
 
@@ -729,6 +881,7 @@ async def deploy_agents(
             mgr = get_manager(DB_PATH, deployment.manager_profile_id)
             if not mgr:
                 raise HTTPException(status_code=404, detail=f"Manager profile '{deployment.manager_profile_id}' not found")
+            _progress_event(deployment_id, f"Loaded manager profile '{mgr.get('name', deployment.manager_profile_id)}'")
             profile_fields = ["siem_type", "siem_ip", "siem_version", "siem_auth_key",
                             "os_type", "agent_group", "memory_limit", "cpu_shares", "config_template_id"]
             for field in profile_fields:
@@ -750,6 +903,7 @@ async def deploy_agents(
                 if deployment.auto_create_group:
                     create_group(DB_PATH, deployment.agent_group, "Auto-created during deployment")
                     log_activity("group_auto_created", {"group": deployment.agent_group})
+                    _progress_event(deployment_id, f"Created group '{deployment.agent_group}'")
                 else:
                     raise HTTPException(status_code=400, detail="Container group not found")
 
@@ -785,6 +939,7 @@ async def deploy_agents(
 
         agent_seq_ids = {}
         for name in agent_names:
+            _progress_event(deployment_id, "Queued", container=name, status="pending")
             seq_id = get_or_create_agent_seq_id(DB_PATH, name)
             agent_seq_ids[name] = seq_id
             write_agent_metadata(
@@ -801,32 +956,13 @@ async def deploy_agents(
                 }
             )
         
-        # Deploy in parallel using multiprocessing
-        results = []
-        warnings = []
-        
-        with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-            future_to_name = {
-                executor.submit(deploy_single_siem_agent, name, deployment_dict, agent_seq_ids[name]): name
-                for name in agent_names
-            }
-            
-            for future in as_completed(future_to_name):
-                try:
-                    result = future.result(timeout=600)
-                    results.append(result)
-                    if not result["success"]:
-                        warnings.append(f"Failed to deploy container {result['agent_name']}: {result.get('error')}")
-                except Exception as e:
-                    agent_name = future_to_name[future]
-                    logger.error(f"Exception deploying {agent_name}: {e}")
-                    results.append({
-                        "agent_name": agent_name,
-                        "success": False,
-                        "error": str(e)
-                    })
-                    warnings.append(f"Exception deploying {agent_name}: {str(e)}")
-        
+        # Deploy in parallel using multiprocessing, off the event loop so the
+        # API (and progress polling) stays responsive during long deployments
+        _progress_event(deployment_id, f"Launching {min(cpu_count(), len(agent_names))} deployment workers")
+        results, warnings = await asyncio.to_thread(
+            _run_deployment_workers, deployment_id, agent_names, deployment_dict, agent_seq_ids
+        )
+
         elapsed_time = time.time() - start_time
         successful = [r for r in results if r["success"]]
         failed = [r for r in results if not r["success"]]
@@ -842,11 +978,18 @@ async def deploy_agents(
             },
             status="success" if len(failed) == 0 else "partial"
         )
+        _progress_finish(
+            deployment_id,
+            "completed" if not failed else ("failed" if not successful else "partial"),
+            f"Deployed {len(successful)}/{deployment.count} containers in {elapsed_time:.1f}s",
+            level="success" if not failed else "error",
+        )
         
         return APIResponse(
             success=len(failed) == 0,
             message=f"Deployed {len(successful)}/{deployment.count} containers in {elapsed_time:.2f}s",
             data={
+                "deployment_id": deployment_id,
                 "total_requested": deployment.count,
                 "successful": len(successful),
                 "failed": len(failed),
@@ -865,18 +1008,22 @@ async def deploy_agents(
             error=f"{len(failed)} containers failed" if failed else None
         )
         
-    except HTTPException:
+    except HTTPException as e:
+        _progress_finish(deployment_id, "failed", f"Deployment rejected: {e.detail}", level="error")
         raise
     except Exception as e:
         logger.error(f"Container deployment failed: {e}")
         log_activity("container_deployment_failed", {"error": str(e)}, status="error")
+        _progress_finish(deployment_id, "failed", f"Deployment failed: {e}", level="error")
         return APIResponse(success=False, message="Container deployment failed", error=str(e))
 
-def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int] = None) -> dict:
+def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int] = None,
+                             progress_queue=None) -> dict:
     """Deploy a single container with a SIEM agent"""
     deploy_start = time.time()
     try:
         logger.info(f"[{os.getpid()}] Deploying container: {agent_name}")
+        _report_step(progress_queue, agent_name, "Checking for existing container")
         
         # Check if container exists
         if agent_name in lxc.list_containers():
@@ -900,6 +1047,8 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         
         # Map OS type to LXC parameters
         os_config = get_os_config(deployment_config["os_type"])
+        _report_step(progress_queue, agent_name,
+                     f"Creating container from {os_config['distro']} {os_config['release']} image")
         
         success = container.create(
             "download",
@@ -928,6 +1077,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
             }
         
         # Apply resource limits
+        _report_step(progress_queue, agent_name, "Applying resource limits")
         if deployment_config.get("memory_limit"):
             container.set_cgroup_item("memory.max", parse_memory_limit(deployment_config["memory_limit"]))
         
@@ -953,6 +1103,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         container.save_config()
         
         # Start container
+        _report_step(progress_queue, agent_name, "Starting container")
         if not container.start():
             container.destroy()
             write_agent_metadata(
@@ -970,11 +1121,14 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
                 "error": "Container start failed"
             }
         
+        _report_step(progress_queue, agent_name, "Waiting for network")
         container.wait("RUNNING", 10)
         time.sleep(2)  # Wait for network
 
         # Install SIEM agent based on type
         install_result = None
+        if siem_type != "none":
+            _report_step(progress_queue, agent_name, f"Installing {siem_type} agent")
 
         if siem_type == "none":
             install_result = {"success": True, "stdout": "Bare container (no SIEM agent)"}
@@ -1052,6 +1206,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
                 "ip_addresses": ips
             }
         )
+        _report_step(progress_queue, agent_name, "Setting up health check")
         try:
             health_setup = setup_agent_health_check(agent_name)
             if not health_setup.get("success", False):

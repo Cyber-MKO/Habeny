@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, JsonBlock } from "../components/UI";
+import { PageHeader, JsonBlock, Pill, Spinner } from "../components/UI";
 
 const DEFAULTS = {
   count: 2, siem_type: "none", siem_ip: "", siem_version: "4.14.2", siem_auth_key: "",
@@ -11,12 +11,118 @@ const DEFAULTS = {
   manager_profile_id: "",
 };
 
+const POLL_MS = 1000;
+
+// crypto.randomUUID is unavailable on plain-http (non-localhost) origins
+const newDeploymentId = () =>
+  `dep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+const localEvent = (message, level = "info") => ({ timestamp: new Date().toISOString(), level, container: null, message });
+
+const CONTAINER_LABEL = { pending: "queued", running: "deploying" };
+
+function formatElapsed(fromIso, toIso) {
+  const secs = Math.max(0, Math.round(((toIso ? new Date(toIso) : new Date()) - new Date(fromIso)) / 1000));
+  return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+function DeployActivity({ progress, active }) {
+  const logRef = useRef(null);
+  const [, tick] = useState(0);
+
+  // Keep the elapsed timer moving between polls
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+
+  // Follow the newest activity line
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [progress.events.length]);
+
+  const { total, completed, successful, failed, containers, events } = progress;
+  const pct = total ? Math.round((completed / total) * 100) : 0;
+  const inFlight = containers.filter((c) => c.status === "running").length;
+
+  return (
+    <div className="section deploy-activity" style={{ marginTop: 20 }}>
+      <div className="section-title">Deployment Activity</div>
+      <div className="card">
+        <div className="deploy-activity-head">
+          <Pill status={progress.status === "running" ? "deploying" : progress.status} />
+          <span>{completed}/{total} finished</span>
+          {inFlight > 0 && <span className="text-dim">{inFlight} in progress</span>}
+          <span className="text-green">{successful} succeeded</span>
+          {failed > 0 && <span className="text-red">{failed} failed</span>}
+          <span className="text-dim" style={{ marginLeft: "auto" }}>
+            {active && <Spinner />} {formatElapsed(progress.started_at, progress.finished_at)}
+          </span>
+        </div>
+        <div className="deploy-progress-bar">
+          <div className={`deploy-progress-fill${failed ? " has-failures" : ""}`} style={{ width: `${pct}%` }} />
+        </div>
+
+        <div className="deploy-log" ref={logRef}>
+          {events.map((ev, i) => (
+            <div key={i} className={`deploy-log-line level-${ev.level}`}>
+              <span className="deploy-log-time">{new Date(ev.timestamp).toLocaleTimeString()}</span>
+              {ev.container && <span className="deploy-log-container">{ev.container}</span>}
+              <span>{ev.message}</span>
+            </div>
+          ))}
+        </div>
+
+        {containers.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 16 }}>
+            <table>
+              <thead>
+                <tr><th>Container</th><th>Status</th><th>Current step</th></tr>
+              </thead>
+              <tbody>
+                {containers.map((c) => (
+                  <tr key={c.name}>
+                    <td className="mono">{c.name}</td>
+                    <td><Pill status={CONTAINER_LABEL[c.status] || c.status} /></td>
+                    <td className={c.status === "failed" ? "text-red" : "text-dim"}>{c.step}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Deploy() {
   const { toast } = useStore();
   const [form, setForm] = useState(DEFAULTS);
   const [result, setResult] = useState(null);
   const [deploying, setDeploying] = useState(false);
   const [managers, setManagers] = useState([]);
+  const [progress, setProgress] = useState(null);
+  const [deploymentId, setDeploymentId] = useState(null);
+
+  // Poll the server-side progress feed while a deployment is in flight
+  useEffect(() => {
+    if (!deploying || !deploymentId) return;
+    let cancelled = false;
+    let timer;
+    const poll = async () => {
+      try {
+        const res = await api.getDeployProgress(deploymentId);
+        if (!cancelled && res.data) setProgress((prev) => mergeProgress(prev, res.data));
+      } catch {
+        // Not registered yet (request still in flight) — keep polling
+      }
+      if (!cancelled) timer = setTimeout(poll, POLL_MS);
+    };
+    poll();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [deploying, deploymentId]);
 
   useEffect(() => {
     api.getManagers().then((r) => setManagers(r.data?.managers || [])).catch(() => {});
@@ -51,8 +157,16 @@ export default function Deploy() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setDeploying(true);
+    const id = newDeploymentId();
     setResult(null);
+    setDeploymentId(id);
+    setProgress({
+      deployment_id: id, status: "running", started_at: new Date().toISOString(), finished_at: null,
+      total: Number(form.count), completed: 0, successful: 0, failed: 0, containers: [],
+      events: [localEvent("Sending deployment request to the server…")],
+      local: true,
+    });
+    setDeploying(true);
     try {
       const payload = {
         count: Number(form.count),
@@ -66,6 +180,7 @@ export default function Deploy() {
         autostart: form.autostart,
         auto_create_group: form.auto_create_group,
         parallel_mode: form.parallel_mode,
+        deployment_id: id,
       };
       if (form.manager_profile_id) payload.manager_profile_id = form.manager_profile_id;
       if (!isBare) {
@@ -75,9 +190,13 @@ export default function Deploy() {
       }
       const res = await api.deploy(payload);
       setResult(res);
+      // Pull the final state so the feed ends on the server's summary
+      const final = await api.getDeployProgress(id).catch(() => null);
+      setProgress((prev) => final?.data ? mergeProgress(prev, final.data) : finishLocal(prev, res.message, res.success));
       toast(res.message || "Deployment complete", res.success ? "success" : "error");
     } catch (err) {
       setResult({ error: err.message });
+      setProgress((prev) => finishLocal(prev, `Deployment failed: ${err.message}`, false));
       toast(err.message, "error");
     } finally {
       setDeploying(false);
@@ -184,12 +303,30 @@ export default function Deploy() {
         </button>
       </form>
 
+      {progress && <DeployActivity progress={progress} active={deploying} />}
+
       {result && (
-        <div className="section" style={{ marginTop: 20 }}>
-          <div className="section-title">Deployment Result</div>
+        <details className="section" style={{ marginTop: 20 }}>
+          <summary className="section-title" style={{ cursor: "pointer" }}>Raw deployment result</summary>
           <JsonBlock data={result} />
-        </div>
+        </details>
       )}
     </>
   );
+}
+
+// Server events replace the local placeholder, but keep the "sending" line at the top
+function mergeProgress(prev, server) {
+  const localHead = prev?.local ? prev.events.slice(0, 1) : prev?.localHead || [];
+  return { ...server, events: [...localHead, ...server.events], localHead, local: false };
+}
+
+function finishLocal(prev, message, success) {
+  if (!prev) return prev;
+  return {
+    ...prev,
+    status: success ? "completed" : "failed",
+    finished_at: new Date().toISOString(),
+    events: [...prev.events, localEvent(message, success ? "success" : "error")],
+  };
 }

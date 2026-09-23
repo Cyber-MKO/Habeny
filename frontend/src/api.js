@@ -28,6 +28,7 @@ export const api = {
   getAgent: (id) => request(`/agents/${id}`),
   getAgentsStats: () => request("/agents/stats"),
   deploy: (body) => request("/agents/deploy", { method: "POST", body }),
+  getDeployProgress: (id) => request(`/agents/deploy/progress/${encodeURIComponent(id)}`),
   startAgent: (id) => request(`/agents/${id}/start`, { method: "POST" }),
   stopAgent: (id) => request(`/agents/${id}/stop`, { method: "POST" }),
   deleteAgent: (id) => request(`/agents/${id}`, { method: "DELETE" }),
