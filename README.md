@@ -135,6 +135,10 @@ sign-in page is shown to anyone without a valid session.
 - Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
   **Account → Active sessions** lists your sign-ins (device, IP, last seen) and can end
   any of them; admins can sign a user out everywhere from the Users table.
+- **Two-factor authentication** (Account → Two-factor): scan a QR code with any
+  authenticator app (Google/Microsoft Authenticator, 1Password, Authy…), then sign-in asks
+  for the 6-digit code. You get 10 one-time recovery codes for a lost phone; an admin can
+  reset 2FA for a user who lost both (Users → Reset 2FA).
 - After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
 - Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.
 - First-run setup needs a one-time **setup token**, so nobody else who can reach the

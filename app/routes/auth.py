@@ -6,8 +6,8 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
-from app.db import count_users, create_first_user, get_user_by_username, update_user_last_login
-from app.models import APIResponse, LoginRequest, SetupRequest
+from app.db import count_users, create_first_user, get_user_by_id, get_user_by_username, update_user_last_login
+from app.models import APIResponse, LoginRequest, SetupRequest, TwoFactorLoginRequest
 from app.services.activity import log_activity
 from app.services.auth import (
     check_credentials,
@@ -19,6 +19,7 @@ from app.services.auth import (
 )
 from app.services.password_policy import enforce_password_policy
 from app.services.setup_token import check_setup_token, remove_setup_token
+from app.services.totp import challenges, check_second_factor, recovery_codes_left
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
@@ -30,6 +31,7 @@ def public_user(user: dict) -> dict:
         "username": user["username"],
         "role": user.get("role") or ("admin" if user.get("is_admin") else "operator"),
         "is_admin": (user.get("role") == "admin") if user.get("role") else bool(user.get("is_admin")),
+        "totp_enabled": bool(user.get("totp_enabled")),
         "created_at": user.get("created_at"),
         "last_login_at": user.get("last_login_at"),
     }
@@ -88,9 +90,7 @@ async def setup_admin(body: SetupRequest, request: Request, response: Response):
     return APIResponse(success=True, message="Admin account created", data={"user": public_user(user)})
 
 
-@router.post("/login", response_model=APIResponse)
-async def login(body: LoginRequest, request: Request, response: Response):
-    client = request.client.host if request.client else "unknown"
+def _check_rate_limit(client: str) -> None:
     wait = login_limiter.retry_after(client)
     if wait:
         raise HTTPException(
@@ -99,17 +99,55 @@ async def login(body: LoginRequest, request: Request, response: Response):
             headers={"Retry-After": str(wait)},
         )
 
+
+def _complete_login(user: dict, request: Request, response: Response, client: str, **details) -> APIResponse:
+    login_limiter.reset(client)
+    _set_session_cookie(request, response, start_session(user["id"], request))
+    update_user_last_login(DB_PATH, user["id"])
+    log_activity("auth_login", {"username": user["username"], "client": client, **details})
+    return APIResponse(success=True, message="Signed in", data={"user": public_user(user)})
+
+
+@router.post("/login", response_model=APIResponse)
+async def login(body: LoginRequest, request: Request, response: Response):
+    client = request.client.host if request.client else "unknown"
+    _check_rate_limit(client)
+
     user = get_user_by_username(DB_PATH, body.username)
     if not check_credentials(user, body.password):
         login_limiter.record_failure(client)
         log_activity("auth_login_failed", {"username": body.username, "client": client}, status="error")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
-    login_limiter.reset(client)
-    _set_session_cookie(request, response, start_session(user["id"], request))
-    update_user_last_login(DB_PATH, user["id"])
-    log_activity("auth_login", {"username": user["username"], "client": client})
-    return APIResponse(success=True, message="Signed in", data={"user": public_user(user)})
+    if user.get("totp_enabled"):
+        # Password is right; no session until the second factor is too
+        return APIResponse(success=True, message="Enter your authentication code",
+                           data={"mfa_required": True, "mfa_token": challenges.create(user["id"])})
+    return _complete_login(user, request, response, client)
+
+
+@router.post("/login/2fa", response_model=APIResponse)
+async def login_second_factor(body: TwoFactorLoginRequest, request: Request, response: Response):
+    client = request.client.host if request.client else "unknown"
+    _check_rate_limit(client)
+    user_id = challenges.user_for(body.mfa_token)
+    user = get_user_by_id(DB_PATH, user_id) if user_id is not None else None
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Sign-in expired. Enter your username and password again.")
+
+    method = check_second_factor(user, body.code)
+    if method is None:
+        login_limiter.record_failure(client)
+        challenges.failed(body.mfa_token)
+        log_activity("auth_2fa_failed", {"username": user["username"], "client": client}, status="error")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication code")
+
+    challenges.finish(body.mfa_token)
+    details = {"second_factor": method}
+    if method == "recovery":
+        details["recovery_codes_left"] = recovery_codes_left(get_user_by_id(DB_PATH, user["id"]))
+    return _complete_login(user, request, response, client, **details)
 
 
 @router.post("/logout", response_model=APIResponse)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useStore } from "../store";
@@ -71,6 +72,178 @@ function ChangePassword() {
         </button>
       </div>
     </form>
+  );
+}
+
+function RecoveryCodes({ codes, onDone }) {
+  const { user } = useAuth();
+  const text = codes.join("\n");
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([`Habeny recovery codes for ${user.username}\n\n${text}\n`], { type: "text/plain" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `habeny-recovery-codes-${user.username}.txt` });
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <>
+      <div className="auth-notice">
+        Save these recovery codes somewhere safe. Each one signs you in once if you lose your phone.
+        They won't be shown again.
+      </div>
+      <ul className="recovery-codes">{codes.map((c) => <li key={c}>{c}</li>)}</ul>
+      <div className="btn-group">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard?.writeText(text)}>Copy</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={download}>Download</button>
+        <button type="button" className="btn btn-primary btn-sm" onClick={onDone}>I've saved them</button>
+      </div>
+    </>
+  );
+}
+
+function TwoFactor() {
+  const { refresh } = useAuth();
+  const { toast } = useStore();
+  const [status, setStatus] = useState(null);
+  // step: null | "password" (start setup) | "scan" | "codes" | "regenerate" | "disable"
+  const [step, setStep] = useState(null);
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [enrolment, setEnrolment] = useState(null);
+  const [codes, setCodes] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setStatus((await api.getMyTwoFactor()).data); }
+    catch (err) { toast(err.message, "error"); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const go = (next) => { setStep(next); setPassword(""); setCode(""); setError(null); };
+  const run = async (fn) => {
+    setError(null);
+    setBusy(true);
+    try { await fn(); } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  const start = (e) => { e.preventDefault(); run(async () => {
+    const { data } = await api.startTwoFactor({ current_password: password });
+    const qr = await QRCode.toDataURL(data.otpauth_uri, { margin: 1, width: 200 });
+    setEnrolment({ ...data, qr });
+    go("scan");
+  }); };
+  const enable = (e) => { e.preventDefault(); run(async () => {
+    const { data } = await api.enableTwoFactor({ code: code.trim() });
+    setCodes(data.recovery_codes);
+    setEnrolment(null);
+    go("codes");
+    load();
+  }); };
+  const regenerate = (e) => { e.preventDefault(); run(async () => {
+    const { data } = await api.newRecoveryCodes({ current_password: password });
+    setCodes(data.recovery_codes);
+    go("codes");
+    load();
+  }); };
+  const disable = (e) => { e.preventDefault(); run(async () => {
+    const res = await api.disableTwoFactor({ current_password: password, code: code.trim() });
+    toast(res.message, "success");
+    go(null);
+    load();
+    refresh();
+  }); };
+  const finish = () => { setCodes(null); go(null); refresh(); };
+
+  const passwordField = (
+    <div className="field">
+      <label htmlFor="tfa-password">Current password</label>
+      <input id="tfa-password" className="input" type="password" autoComplete="current-password" autoFocus
+        value={password} onChange={(e) => setPassword(e.target.value)} />
+    </div>
+  );
+  const codeField = (label) => (
+    <div className="field">
+      <label htmlFor="tfa-code">{label}</label>
+      <input id="tfa-code" className="input auth-code-input" autoComplete="one-time-code" spellCheck={false}
+        value={code} onChange={(e) => setCode(e.target.value)} />
+    </div>
+  );
+  const cancel = <button type="button" className="btn btn-secondary" onClick={() => go(null)}>Cancel</button>;
+
+  let body;
+  if (status === null) body = <Spinner />;
+  else if (step === "codes") body = <RecoveryCodes codes={codes} onDone={finish} />;
+  else if (step === "password" || step === "regenerate") body = (
+    <form onSubmit={step === "password" ? start : regenerate} className="tfa-form" noValidate>
+      {step === "regenerate" && <p className="account-help">Your current recovery codes will stop working.</p>}
+      {passwordField}
+      <div className="btn-group">
+        <button className="btn btn-primary" type="submit" disabled={busy || !password}>
+          {step === "password" ? "Continue" : "Get new codes"}
+        </button>
+        {cancel}
+      </div>
+    </form>
+  );
+  else if (step === "scan") body = (
+    <form onSubmit={enable} className="tfa-form" noValidate>
+      <p className="account-help">
+        Scan this with an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy…),
+        then enter the 6-digit code it shows.
+      </p>
+      <div className="tfa-qr">
+        <img src={enrolment.qr} alt="QR code for your authenticator app" width="200" height="200" />
+        <div className="account-help">
+          Can't scan? Enter this key: <code className="tfa-secret">{enrolment.secret.match(/.{1,4}/g).join(" ")}</code>
+        </div>
+      </div>
+      {codeField("Code from the app")}
+      <div className="btn-group">
+        <button className="btn btn-primary" type="submit" disabled={busy || !/^\d{6}$/.test(code.trim())}>Turn on</button>
+        {cancel}
+      </div>
+    </form>
+  );
+  else if (step === "disable") body = (
+    <form onSubmit={disable} className="tfa-form" noValidate>
+      {passwordField}
+      {codeField("Authenticator or recovery code")}
+      <div className="btn-group">
+        <button className="btn btn-danger" type="submit" disabled={busy || !password || code.trim().length < 6}>Turn off</button>
+        {cancel}
+      </div>
+    </form>
+  );
+  else if (status.enabled) body = (
+    <>
+      <p className="account-help">
+        On. Signing in needs a code from your authenticator app.{" "}
+        {status.recovery_codes_left} recovery code{status.recovery_codes_left === 1 ? "" : "s"} left.
+      </p>
+      <div className="btn-group">
+        <button className="btn btn-secondary btn-sm" onClick={() => go("regenerate")}>New recovery codes</button>
+        <button className="btn btn-danger btn-sm" onClick={() => go("disable")}>Turn off</button>
+      </div>
+    </>
+  );
+  else body = (
+    <>
+      <p className="account-help">
+        Off. Add a code from an authenticator app to your sign-in, so a stolen password isn't enough.
+      </p>
+      <div><button className="btn btn-primary btn-sm" onClick={() => go("password")}>Turn on</button></div>
+    </>
+  );
+
+  return (
+    <div className="card account-card">
+      <div className="account-users-head">
+        <div className="section-title">Two-factor authentication</div>
+        {status && <span className={`tag ${status.enabled ? "tag-on" : ""}`}>{status.enabled ? "on" : "off"}</span>}
+      </div>
+      {error && <div className="auth-error" role="alert">{error}</div>}
+      {body}
+    </div>
   );
 }
 
@@ -267,6 +440,13 @@ function Users() {
     catch (err) { toast(err.message, "error"); }
   };
 
+  const resetTwoFactor = async (u) => {
+    if (!confirm(`Turn off two-factor authentication for "${u.username}"? Use this when they've lost `
+      + "their authenticator and recovery codes. They'll be signed out and can set it up again.")) return;
+    try { toast((await api.resetUserTwoFactor(u.id)).message, "success"); load(); }
+    catch (err) { toast(err.message, "error"); }
+  };
+
   const remove = async (u) => {
     if (!confirm(`Delete user "${u.username}"? They'll be signed out immediately.`)) return;
     try {
@@ -286,6 +466,9 @@ function Users() {
         {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
     )},
+    { key: "totp_enabled", label: "2FA", render: (u) => (
+      <span className={`tag ${u.totp_enabled ? "tag-on" : ""}`}>{u.totp_enabled ? "on" : "off"}</span>
+    )},
     { key: "last_login_at", label: "Last sign-in", render: (u) => formatDate(u.last_login_at) },
     { key: "created_at", label: "Created", render: (u) => new Date(u.created_at).toLocaleDateString() },
     { key: "actions", label: "", render: (u) => u.id === me.id ? (
@@ -294,6 +477,7 @@ function Users() {
       <div className="btn-group">
         <button className="btn btn-sm btn-secondary" onClick={() => setResetting(u)}>Reset password</button>
         <button className="btn btn-sm btn-secondary" onClick={() => signOutEverywhere(u)}>Sign out everywhere</button>
+        {u.totp_enabled && <button className="btn btn-sm btn-secondary" onClick={() => resetTwoFactor(u)}>Reset 2FA</button>}
         <button className="btn btn-sm btn-danger" onClick={() => remove(u)}>Delete</button>
       </div>
     )},
@@ -318,7 +502,7 @@ export default function Account() {
     <>
       <PageHeader
         title="Account"
-        subtitle={user.is_admin ? "Your password and who can sign in" : "Your password"}
+        subtitle={user.is_admin ? "Your sign-in security and who can sign in" : "Your sign-in security"}
       />
       <div className="section">
         <div className="account-me">
@@ -327,6 +511,7 @@ export default function Account() {
         </div>
         <div className="account-grid">
           <ChangePassword />
+          <TwoFactor />
           <Sessions />
         </div>
       </div>

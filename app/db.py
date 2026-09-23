@@ -208,6 +208,11 @@ def init_db(db_path: Path) -> None:
             "ALTER TABLE sessions ADD COLUMN ip TEXT",
             "ALTER TABLE sessions ADD COLUMN user_agent TEXT",
             "ALTER TABLE sessions ADD COLUMN last_seen_at TEXT",
+            # Two-factor authentication (secret is encrypted; recovery codes are hashes)
+            "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+            "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN totp_last_step INTEGER",
+            "ALTER TABLE users ADD COLUMN recovery_codes TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -750,8 +755,9 @@ def _user_row(row) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     user = dict(row)
-    if "is_admin" in user:
-        user["is_admin"] = bool(user["is_admin"])
+    for flag in ("is_admin", "totp_enabled"):
+        if flag in user:
+            user[flag] = bool(user[flag])
     return user
 
 
@@ -770,7 +776,8 @@ def get_user_by_id(db_path: Path, user_id: int) -> Optional[Dict[str, Any]]:
 def list_users(db_path: Path) -> List[Dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin, role, created_at, last_login_at FROM users ORDER BY username COLLATE NOCASE"
+            "SELECT id, username, is_admin, role, totp_enabled, created_at, last_login_at FROM users"
+            " ORDER BY username COLLATE NOCASE"
         ).fetchall()
         return [_user_row(r) for r in rows]
 
@@ -839,6 +846,65 @@ def delete_user_sessions(db_path: Path, user_id: int, keep_token_hash: Optional[
         conn.commit()
 
 
+def set_pending_totp(db_path: Path, user_id: int, encrypted_secret: str) -> None:
+    """Store a secret being enrolled; it only takes effect once enable_totp confirms a code."""
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE users SET totp_secret = ? WHERE id = ? AND totp_enabled = 0",
+                     (encrypted_secret, user_id))
+        conn.commit()
+
+
+def enable_totp(db_path: Path, user_id: int, step: int, recovery_hashes: List[str]) -> None:
+    with _connection(db_path) as conn:
+        conn.execute(
+            "UPDATE users SET totp_enabled = 1, totp_last_step = ?, recovery_codes = ? WHERE id = ?",
+            (step, json.dumps(recovery_hashes), user_id),
+        )
+        conn.commit()
+
+
+def disable_totp(db_path: Path, user_id: int) -> None:
+    with _connection(db_path) as conn:
+        conn.execute(
+            "UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_last_step = NULL, recovery_codes = NULL"
+            " WHERE id = ?",
+            (user_id,),
+        )
+        conn.commit()
+
+
+def claim_totp_step(db_path: Path, user_id: int, step: int) -> bool:
+    """Record a used code's time step. False if it (or a later one) was already used."""
+    with _connection(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE users SET totp_last_step = ? WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)",
+            (step, user_id, step),
+        )
+        conn.commit()
+        return cur.rowcount == 1
+
+
+def set_recovery_codes(db_path: Path, user_id: int, recovery_hashes: List[str]) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE users SET recovery_codes = ? WHERE id = ?", (json.dumps(recovery_hashes), user_id))
+        conn.commit()
+
+
+def use_recovery_code(db_path: Path, user_id: int, code_hash: str) -> bool:
+    """Consume a recovery code. False if it isn't one of the user's unused codes."""
+    with _connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT recovery_codes FROM users WHERE id = ?", (user_id,)).fetchone()
+        codes = json.loads(row[0]) if row and row[0] else []
+        if code_hash not in codes:
+            conn.rollback()
+            return False
+        codes.remove(code_hash)
+        conn.execute("UPDATE users SET recovery_codes = ? WHERE id = ?", (json.dumps(codes), user_id))
+        conn.commit()
+        return True
+
+
 def update_user_last_login(db_path: Path, user_id: int) -> None:
     with _connection(db_path) as conn:
         conn.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (utc_now(), user_id))
@@ -882,7 +948,7 @@ def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]
     with _connection(db_path) as conn:
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.is_admin, u.role, u.created_at, u.last_login_at,
+            SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.created_at, u.last_login_at,
                    s.last_seen_at AS session_last_seen_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?

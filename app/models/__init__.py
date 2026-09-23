@@ -15,8 +15,12 @@ from app.models.agents import (
 from app.models.auth import (
     LoginRequest,
     PasswordChangeRequest,
+    PasswordConfirmRequest,
     PasswordResetRequest,
     SetupRequest,
+    TwoFactorCodeRequest,
+    TwoFactorDisableRequest,
+    TwoFactorLoginRequest,
     UserCreateRequest,
     UserUpdateRequest,
 )
@@ -91,6 +95,10 @@ __all__ = [
     "UserCreateRequest",
     "UserUpdateRequest",
     "PasswordResetRequest",
+    "PasswordConfirmRequest",
+    "TwoFactorLoginRequest",
+    "TwoFactorCodeRequest",
+    "TwoFactorDisableRequest",
     "utc_now",
     "ContainerState",
     "SIEMType",

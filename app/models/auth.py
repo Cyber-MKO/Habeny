@@ -13,6 +13,25 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=256)
 
 
+class TwoFactorLoginRequest(BaseModel):
+    """Second sign-in step: the challenge from /auth/login plus an authenticator or recovery code."""
+    mfa_token: str = Field(..., min_length=1, max_length=128)
+    code: str = Field(..., min_length=6, max_length=32)
+
+
+class PasswordConfirmRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=256)
+
+
+class TwoFactorCodeRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=32)
+
+
+class TwoFactorDisableRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=256)
+    code: str = Field(..., min_length=6, max_length=32)
+
+
 class SetupRequest(BaseModel):
     """First-run creation of the admin account."""
     setup_token: str = Field(..., min_length=1, max_length=128)

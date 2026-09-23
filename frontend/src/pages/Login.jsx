@@ -1,8 +1,75 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
 
+function SecondFactor({ mfaToken, onCancel }) {
+  const { loginSecondFactor } = useAuth();
+  const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await loginSecondFactor(mfaToken, code.trim());
+    } catch (err) {
+      if (err.message.startsWith("Sign-in expired")) return onCancel(err.message);
+      setError(err.message);
+      setCode("");
+      setBusy(false);
+    }
+  };
+
+  const valid = useRecovery ? code.replace(/[^a-z0-9]/gi, "").length === 10 : /^\d{6}$/.test(code.trim());
+  return (
+    <form className="auth-card" onSubmit={handleSubmit} noValidate>
+      <div className="auth-brand">
+        <div className="brand-wordmark">
+          habeny<span className="brand-cursor" aria-hidden="true" />
+        </div>
+        <p>Multi-SIEM Container Platform</p>
+      </div>
+      <h1 className="auth-title">Two-factor authentication</h1>
+      <p className="auth-subtitle">
+        {useRecovery
+          ? "Enter one of the recovery codes you saved when you turned on two-factor. Each works once."
+          : "Enter the 6-digit code from your authenticator app."}
+      </p>
+      {error && <div className="auth-error" role="alert">{error}</div>}
+      <div className="field">
+        <label htmlFor="auth-code">{useRecovery ? "Recovery code" : "Authentication code"}</label>
+        <input
+          id="auth-code"
+          key={useRecovery ? "recovery" : "totp"}
+          className="input auth-code-input"
+          autoComplete="one-time-code"
+          inputMode={useRecovery ? "text" : "numeric"}
+          maxLength={useRecovery ? 11 : 6}
+          placeholder={useRecovery ? "xxxxx-xxxxx" : "123456"}
+          autoFocus
+          spellCheck={false}
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+      </div>
+      <button className="btn btn-primary auth-submit" type="submit" disabled={busy || !valid}>
+        {busy ? "Verifying…" : "Verify"}
+      </button>
+      <div className="auth-links">
+        <button type="button" className="link-btn" onClick={() => { setUseRecovery(!useRecovery); setCode(""); setError(null); }}>
+          {useRecovery ? "Use an authenticator code" : "Use a recovery code"}
+        </button>
+        <button type="button" className="link-btn" onClick={() => onCancel(null)}>Back</button>
+      </div>
+    </form>
+  );
+}
+
 export default function Login() {
   const { setupRequired, expired, login, setup } = useAuth();
+  const [mfaToken, setMfaToken] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -20,7 +87,13 @@ export default function Login() {
     setBusy(true);
     try {
       if (setupRequired) await setup(username.trim(), password, setupToken.trim());
-      else await login(username.trim(), password);
+      else {
+        const result = await login(username.trim(), password);
+        if (result.mfaToken) {
+          setPassword("");
+          setMfaToken(result.mfaToken);
+        }
+      }
     } catch (err) {
       setError(err.message);
       setPassword("");
@@ -29,6 +102,14 @@ export default function Login() {
       setBusy(false);
     }
   };
+
+  if (mfaToken) {
+    return (
+      <div className="auth-page">
+        <SecondFactor mfaToken={mfaToken} onCancel={(message) => { setMfaToken(null); setError(message); }} />
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
