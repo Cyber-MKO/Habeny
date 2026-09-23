@@ -1,11 +1,11 @@
 """
-Tests for Pydantic model validation (models.py).
+Tests for Pydantic model validation (app/models).
 
 Focus on validators — the shared helpers and edge cases.
 """
 import pytest
 
-models = pytest.importorskip("models", reason="models.py requires pydantic")
+models = pytest.importorskip("app.models", reason="requires pydantic")
 
 
 def test_agent_deployment_request_validates_ip():

@@ -37,6 +37,31 @@ Open `http://<host>:9000` — the API and the web UI are both served from there.
 `start.sh` installs the frontend's npm dependencies on first run and rebuilds
 `static/` whenever the sources in `frontend/` have changed.
 
+## Authentication
+
+The web UI and the API require signing in. On first start there are no accounts:
+open the UI and it asks you to **create the admin account**. After that, the
+sign-in page is shown to anyone without a valid session.
+
+- **Account** (sidebar → Settings, or click your username): change your password.
+  This signs you out on your other devices.
+- **Users** (on the same page, administrators only): add users, make or remove
+  administrators, reset a user's password (signs them out everywhere) and delete users.
+  Non-admin users can use everything else in the app. You can't delete or demote
+  yourself, and there is always at least one administrator.
+- Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
+- After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
+- Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.
+- Until the admin account exists, anyone who can reach the server can create it,
+  so complete setup right after the first start.
+
+**Forgotten password:** another administrator can reset it on the Account page. If the only
+administrator is locked out, remove all accounts on the server and the UI will offer setup again:
+
+```bash
+sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform/platform.db'); c.execute('DELETE FROM sessions'); c.execute('DELETE FROM users'); c.commit()"
+```
+
 ## Frontend
 
 For development with hot reload, run the API and the Vite dev server together:
@@ -57,11 +82,20 @@ npm run build      # outputs to ../static/
 
 ```
 .
-├── main.py                  # FastAPI app, all API routes
-├── models.py                # Pydantic request/response models
-├── utils.py                 # SIEM installers, container helpers, simulation engine
-├── db.py                    # SQLite database layer
+├── main.py                  # Entry point: logging setup + create_app()
 ├── start.sh                 # Quick start: builds frontend, runs API
+├── app/                     # FastAPI application
+│   ├── __init__.py          # create_app(): storage init, middleware, routers
+│   ├── config.py            # Paths and tunables
+│   ├── state.py             # In-memory state shared by routes/services
+│   ├── middleware.py        # /api prefix stripping, latency tracking
+│   ├── db.py                # SQLite database layer
+│   ├── routes/              # One APIRouter per domain (agents, groups, ...)
+│   ├── services/            # Deployment, simulations, reporting, logs, benchmarks, ...
+│   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
+│   ├── installers/          # One module per SIEM agent + batch dispatcher, package cache
+│   ├── simulation/          # Attack simulation engine
+│   └── models/              # Pydantic models by domain (import from app.models)
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
 ├── index.legacy.html        # Legacy single-file frontend
@@ -76,19 +110,10 @@ npm run build      # outputs to ../static/
 │   │   └── components/      # Reusable UI components
 │   └── .eslintrc.cjs        # JavaScript linter config
 │
-├── app/                     # Modular package scaffold (migration target)
-│   ├── core/                # Shell, container, resource helpers
-│   ├── installers/          # Per-SIEM installer modules
-│   ├── routes/              # FastAPI router modules
-│   ├── services/            # Business logic layer
-│   └── simulation/          # Attack simulation engine
-│
 ├── tests/                   # Test suite
 │   ├── test_db.py           # Database layer tests
 │   ├── test_models.py       # Model validation tests
 │   └── test_core_shell.py   # Shell command tests
-│
-└── PLAN.md                  # Modularization roadmap
 ```
 
 ## API Endpoints

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { useMetricsSocket } from "./ws";
 import { useStore } from "./store";
-import { Modal } from "./components/UI";
+import { Modal, Spinner } from "./components/UI";
+import { useAuth } from "./auth";
+import Login from "./pages/Login";
 
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -20,6 +22,7 @@ import Managers from "./pages/Managers";
 import SyslogConfigs from "./pages/SyslogConfigs";
 import Benchmarks from "./pages/Benchmarks";
 import BenchmarkRunner from "./pages/BenchmarkRunner";
+import Account from "./pages/Account";
 
 const NAV = [
   {
@@ -56,6 +59,12 @@ const NAV = [
       { to: "/siem", label: "SIEM Stats", icon: "M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" },
       { to: "/reports", label: "Reports", icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
       { to: "/configs", label: "Configs", icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
+    ],
+  },
+  {
+    section: "Settings",
+    items: [
+      { to: "/account", label: "Account", icon: "M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" },
     ],
   },
 ];
@@ -122,9 +131,31 @@ function Toasts() {
   );
 }
 
-const TITLES = { "/": "Dashboard", "/system": "System Info", "/managers": "Managers", "/agents": "Containers", "/deploy": "Deploy", "/groups": "Groups", "/bulk": "Bulk Operations", "/logs": "Log Upload", "/syslog-config": "Syslog Config", "/simulations": "Simulations", "/benchmark-runner": "Benchmark Runner", "/benchmarks": "Perf Metrics", "/siem": "SIEM Stats", "/reports": "Reports", "/configs": "Configs", "/activity": "Activity Log" };
+const TITLES = { "/": "Dashboard", "/system": "System Info", "/managers": "Managers", "/agents": "Containers", "/deploy": "Deploy", "/groups": "Groups", "/bulk": "Bulk Operations", "/logs": "Log Upload", "/syslog-config": "Syslog Config", "/simulations": "Simulations", "/benchmark-runner": "Benchmark Runner", "/benchmarks": "Perf Metrics", "/siem": "SIEM Stats", "/reports": "Reports", "/configs": "Configs", "/activity": "Activity Log", "/account": "Account" };
 
 export default function App() {
+  const { status, user, error, refresh } = useAuth();
+
+  if (status === "loading") {
+    return <div className="auth-page"><Spinner /></div>;
+  }
+  if (status === "error") {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-title">Can't reach the server</h1>
+          <p className="auth-subtitle">{error}</p>
+          <button className="btn btn-primary auth-submit" onClick={refresh}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+  if (!user) return <Login />;
+  return <AppShell user={user} />;
+}
+
+function AppShell({ user }) {
+  const { logout } = useAuth();
   const { connected } = useMetricsSocket();
   const location = useLocation();
   const title = TITLES[location.pathname] || "Habeny";
@@ -161,9 +192,13 @@ export default function App() {
       <div className="main-area">
         <header className="header">
           <span className="header-title">{title}</span>
-          <div className="ws-badge">
-            <span className={`ws-dot${connected ? " on" : ""}`} />
-            {connected ? "Live" : "Disconnected"}
+          <div className="header-actions">
+            <div className="ws-badge">
+              <span className={`ws-dot${connected ? " on" : ""}`} />
+              {connected ? "Live" : "Disconnected"}
+            </div>
+            <NavLink to="/account" className="header-user" title="Account settings">{user.username}</NavLink>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={logout}>Sign out</button>
           </div>
         </header>
 
@@ -185,6 +220,7 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/configs" element={<Configs />} />
             <Route path="/activity" element={<Activity />} />
+            <Route path="/account" element={<Account />} />
           </Routes>
         </div>
       </div>

@@ -1,3 +1,6 @@
+"""
+SQLite persistence: agents, groups, manager and syslog profiles, metrics.
+"""
 import json
 import sqlite3
 from contextlib import contextmanager
@@ -160,6 +163,29 @@ def init_db(db_path: Path) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                password_hash TEXT NOT NULL,
+                is_admin INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                last_login_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_metrics_bid ON benchmark_metrics(benchmark_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_metrics_time ON benchmark_metrics(recorded_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_bottlenecks_bid ON benchmark_bottlenecks(benchmark_id)")
@@ -172,11 +198,21 @@ def init_db(db_path: Path) -> None:
         # Migrations for columns added after initial schema
         for migration in [
             "ALTER TABLE benchmarks ADD COLUMN siem_type TEXT DEFAULT 'none'",
+            "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 conn.execute(migration)
             except sqlite3.OperationalError:
                 pass  # column already exists
+
+        # Accounts created before roles existed: the oldest one becomes the admin
+        conn.execute(
+            """
+            UPDATE users SET is_admin = 1
+            WHERE id = (SELECT MIN(id) FROM users)
+              AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)
+            """
+        )
 
         conn.commit()
     finally:
@@ -645,3 +681,154 @@ def get_metric_summary(db_path: Path, metric_type: str, metric_name: str,
             d["p90"] = vals[int(n * 0.9)]
             d["p99"] = vals[min(int(n * 0.99), n - 1)]
         return d
+
+
+# ===== USERS & SESSIONS =====
+
+def count_users(db_path: Path) -> int:
+    with _connection(db_path) as conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+
+def create_first_user(db_path: Path, username: str, password_hash: str) -> Optional[Dict[str, Any]]:
+    """Create a user only if none exist yet (first-run setup). Returns None if one already exists."""
+    with _connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")  # serialize concurrent setup attempts
+        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
+            conn.rollback()
+            return None
+        now = utc_now()
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, 1, ?)",
+            (username, password_hash, now),
+        )
+        conn.commit()
+        return {"id": cur.lastrowid, "username": username, "is_admin": True, "created_at": now}
+
+
+def _user_row(row) -> Optional[Dict[str, Any]]:
+    if not row:
+        return None
+    user = dict(row)
+    if "is_admin" in user:
+        user["is_admin"] = bool(user["is_admin"])
+    return user
+
+
+def get_user_by_username(db_path: Path, username: str) -> Optional[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return _user_row(row)
+
+
+def get_user_by_id(db_path: Path, user_id: int) -> Optional[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return _user_row(row)
+
+
+def list_users(db_path: Path) -> List[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, username, is_admin, created_at, last_login_at FROM users ORDER BY username COLLATE NOCASE"
+        ).fetchall()
+        return [_user_row(r) for r in rows]
+
+
+def create_user(db_path: Path, username: str, password_hash: str, is_admin: bool) -> Optional[Dict[str, Any]]:
+    """Create a user. Returns None if the username is taken (case-insensitive)."""
+    with _connection(db_path) as conn:
+        now = utc_now()
+        try:
+            cur = conn.execute(
+                "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?)",
+                (username, password_hash, int(is_admin), now),
+            )
+        except sqlite3.IntegrityError:
+            return None
+        conn.commit()
+        return {"id": cur.lastrowid, "username": username, "is_admin": is_admin, "created_at": now, "last_login_at": None}
+
+
+def update_user_password(db_path: Path, user_id: int, password_hash: str) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+        conn.commit()
+
+
+def _is_last_admin(conn, user_id: int) -> bool:
+    row = conn.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row or not row[0]:
+        return False
+    return conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0] <= 1
+
+
+def set_user_admin(db_path: Path, user_id: int, is_admin: bool) -> bool:
+    """Change a user's admin flag. Returns False (and changes nothing) if it would remove the last admin."""
+    with _connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if not is_admin and _is_last_admin(conn, user_id):
+            conn.rollback()
+            return False
+        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+        conn.commit()
+        return True
+
+
+def delete_user(db_path: Path, user_id: int) -> bool:
+    """Delete a user and their sessions. Returns False (and changes nothing) if they are the last admin."""
+    with _connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if _is_last_admin(conn, user_id):
+            conn.rollback()
+            return False
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return True
+
+
+def delete_user_sessions(db_path: Path, user_id: int, keep_token_hash: Optional[str] = None) -> None:
+    """Sign a user out everywhere (optionally except one session)."""
+    with _connection(db_path) as conn:
+        conn.execute(
+            "DELETE FROM sessions WHERE user_id = ? AND token_hash IS NOT ?",
+            (user_id, keep_token_hash),
+        )
+        conn.commit()
+
+
+def update_user_last_login(db_path: Path, user_id: int) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (utc_now(), user_id))
+        conn.commit()
+
+
+def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (utc_now(),))
+        conn.execute(
+            "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token_hash, user_id, utc_now(), expires_at),
+        )
+        conn.commit()
+
+
+def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]:
+    """Return the user for a live (unexpired) session, or None."""
+    with _connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT u.id, u.username, u.is_admin, u.created_at, u.last_login_at
+            FROM sessions s JOIN users u ON u.id = s.user_id
+            WHERE s.token_hash = ? AND s.expires_at > ?
+            """,
+            (token_hash, utc_now()),
+        ).fetchone()
+        return _user_row(row)
+
+
+def delete_session(db_path: Path, token_hash: str) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+        conn.commit()

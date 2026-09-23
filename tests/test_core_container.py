@@ -1,15 +1,15 @@
 """
-Tests for container helper functions (currently in utils.py).
+Tests for container helper functions (app/core/container.py).
 
 These pure functions don't need LXC at runtime.  We skip the entire
 module if the lxc C-extension isn't installed.
 """
 import pytest
 
-utils = pytest.importorskip("utils", reason="utils.py requires python-lxc")
+module = pytest.importorskip("app.core.container", reason="requires python-lxc")
 
-parse_memory_limit = utils.parse_memory_limit
-validate_container_name = utils.validate_container_name
+parse_memory_limit = module.parse_memory_limit
+validate_container_name = module.validate_container_name
 
 
 def test_parse_memory_limit_megabytes():

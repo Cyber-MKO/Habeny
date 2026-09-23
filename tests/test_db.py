@@ -1,21 +1,21 @@
 """
-Tests for the database layer (db.py).
+Tests for the database layer (app/db.py).
 
 These can run immediately — they only need sqlite3 and the db module.
 """
-from db import (
-    get_or_create_agent_seq_id,
-    get_agent_by_name,
-    upsert_agent,
-    mark_agent_deleted,
-    create_group,
-    list_groups,
-    group_exists,
-    get_agents_in_group,
+from app.db import (
     assign_agents_to_group,
+    create_group,
+    delete_group,
+    get_agent_by_name,
+    get_agents_in_group,
+    get_or_create_agent_seq_id,
+    group_exists,
+    list_groups,
+    mark_agent_deleted,
     remove_agents_from_group,
     rename_group,
-    delete_group,
+    upsert_agent,
 )
 
 

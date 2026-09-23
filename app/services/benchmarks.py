@@ -8,18 +8,17 @@ import asyncio
 import json
 import logging
 import os
-import time
 import sqlite3
+import time
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+from app.config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path("/var/lib/lxc-siem-platform/platform.db")
-
-# ── DB helpers (lightweight, avoids circular import with db.py) ──────────
+# ── DB helpers (lightweight, avoids circular import with app/db.py) ──────────
 
 @contextmanager
 def _conn():
@@ -338,9 +337,10 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
             # Deploy containers for this phase
             deploy_start = time.time()
             try:
-                from main import deploy_single_siem_agent, get_or_create_agent_seq_id, write_agent_metadata, DB_PATH as MAIN_DB
                 from concurrent.futures import ProcessPoolExecutor, as_completed
                 from multiprocessing import cpu_count
+
+                from app.services.deployment import deploy_single_siem_agent
 
                 agent_names = [f"{base_name}-p{i}-{j:04d}" for j in range(1, agents_count + 1)]
                 deployment_config = {

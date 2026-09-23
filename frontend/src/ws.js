@@ -5,6 +5,8 @@ export function useMetricsSocket() {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
   const retryRef = useRef(0);
+  const timerRef = useRef(null);
+  const stoppedRef = useRef(false);
 
   const connect = useCallback(() => {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -30,17 +32,21 @@ export function useMetricsSocket() {
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
+      if (stoppedRef.current) return; // component unmounted: don't reconnect
       const delay = Math.min(1000 * 2 ** retryRef.current, 30000);
       retryRef.current += 1;
-      setTimeout(connect, delay);
+      timerRef.current = setTimeout(connect, delay);
     };
 
     ws.onerror = () => ws.close();
   }, []);
 
   useEffect(() => {
+    stoppedRef.current = false;
     connect();
     return () => {
+      stoppedRef.current = true;
+      clearTimeout(timerRef.current);
       if (wsRef.current) wsRef.current.close();
     };
   }, [connect]);

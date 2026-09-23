@@ -1,19 +1,22 @@
 """
 Shared test fixtures.
 
-These work against the *current* root-level modules (db.py, models.py, utils.py)
-and will continue to work as code migrates into app/ because the root files
-become re-export shims.
+These work against the app/ package.
 """
-import sqlite3
+import os
+import tempfile
+
 import pytest
-from pathlib import Path
+
+# Keep the app's data (database, logs, reports) out of /var/lib during tests.
+# Must be set before app.config is imported.
+os.environ.setdefault("HABENY_DATA_DIR", tempfile.mkdtemp(prefix="habeny-test-"))
 
 
 @pytest.fixture()
 def tmp_db(tmp_path):
     """Yield a temporary SQLite database initialized with the platform schema."""
-    from db import init_db
+    from app.db import init_db
     db_path = tmp_path / "test.db"
     init_db(db_path)
     return db_path
