@@ -12,7 +12,7 @@ from app.config import DB_PATH
 from app.core.resources import get_system_resources
 from app.db import get_metric_summary, query_metrics, record_metrics_batch
 from app.models import APIResponse, utc_now
-from app.services.agent_info import container_state_summary, read_agent_metadata
+from app.services.agent_info import container_counts
 from app.state import simulations_db
 
 logger = logging.getLogger(__name__)
@@ -21,16 +21,10 @@ router = APIRouter()
 
 def _collect_metrics_payload() -> dict:
     """Build one live-metrics message. Blocking (LXC + DB), so run it in a thread."""
-    scan = container_state_summary()
-    containers = scan["names"]
-    running = scan["running"]
-    by_status = {"running": running, "stopped": len(containers) - running}
-
-    by_siem = {}
-    for name in containers:
-        meta = read_agent_metadata(name)
-        stype = meta.get("siem_type") or "unknown"
-        by_siem[stype] = by_siem.get(stype, 0) + 1
+    counts = container_counts()
+    running = counts["running"]
+    by_status = {"running": running, "stopped": counts["stopped"]}
+    by_siem = counts["by_siem_type"]
 
     active_sims = len([s for s in simulations_db.values() if s.get("status") == "running"])
     total_events = sum(s.get("events_generated", 0) for s in simulations_db.values())
@@ -47,7 +41,7 @@ def _collect_metrics_payload() -> dict:
         latency_summary = {}
 
     payload = {
-        "total_agents": len(containers),
+        "total_agents": counts["total"],
         "by_status": by_status,
         "by_siem_type": by_siem,
         "active_simulations": active_sims,

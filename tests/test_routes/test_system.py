@@ -78,3 +78,21 @@ def test_container_state_summary_single_pass_and_cached(monkeypatch):
     ai.container_state_summary()  # within the TTL: served from the shared scan
     assert calls == {"list": 1, "state": 4}
     monkeypatch.setitem(ai._scan_cache, "value", None)
+
+
+def test_container_counts_uses_stored_siem_types(monkeypatch):
+    import app.services.agent_info as ai
+
+    monkeypatch.setattr(ai, "container_state_summary", lambda: {
+        "names": ["a", "b", "c", "d"], "total": 4, "by_state": {}, "running": 3,
+    })
+    monkeypatch.setattr(ai, "get_agent_siem_types", lambda db: {"a": "wazuh", "b": "wazuh", "c": None})
+    assert ai.container_counts() == {
+        "total": 4, "running": 3, "stopped": 1, "by_siem_type": {"wazuh": 2, "unknown": 2},
+    }
+
+
+def test_agents_stats_shape(client):
+    data = client.get("/agents/stats").json()["data"]
+    assert set(data) == {"total_agents", "by_siem_type", "by_status", "timestamp"}
+    assert set(data["by_status"]) == {"running", "stopped", "error"}

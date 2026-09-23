@@ -1,35 +1,40 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
-import { StatCard, PageHeader, Spinner, Pill } from "../components/UI";
+import { StatCard, PageHeader, Pill } from "../components/UI";
+
+const ACTIVITY_REFRESH_MS = 30000;
 
 export default function Dashboard() {
   const { metrics, connected } = useMetricsSocket();
   const [health, setHealth] = useState(null);
   const [stats, setStats] = useState(null);
-  const [activity, setActivity] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState(null);
 
+  // Initial snapshot, shown until the first live metrics message arrives
   useEffect(() => {
-    Promise.all([
-      api.getHealth().catch(() => null),
-      api.getAgentsStats().catch(() => null),
-      api.getActivity({ limit: 5 }).catch(() => null),
-    ]).then(([h, s, a]) => {
-      setHealth(h);
-      setStats(s);
-      setActivity(a?.data?.logs || []);
-    }).finally(() => setLoading(false));
+    api.getHealth().then(setHealth).catch(() => setHealth(null));
+    api.getAgentsStats().then((r) => setStats(r.data)).catch(() => setStats(null));
   }, []);
 
-  const live = metrics || {};
-  const byStatus = stats?.data?.by_status || live.by_status || {};
-  const bySiem = stats?.data?.by_siem_type || live.by_siem_type || {};
-  const total = stats?.data?.total_agents ?? live.total_agents ?? 0;
-  const errors = byStatus.error ?? 0;
+  const loadActivity = useCallback(() => {
+    if (document.hidden) return;
+    api.getActivity({ limit: 5 }).then((r) => setActivity(r.data?.logs || [])).catch(() => setActivity((a) => a || []));
+  }, []);
+  useEffect(() => {
+    loadActivity();
+    const t = setInterval(loadActivity, ACTIVITY_REFRESH_MS);
+    return () => clearInterval(t);
+  }, [loadActivity]);
 
-  if (loading) return <Spinner />;
+  // Live numbers win once they arrive; the snapshot only fills the gap before that
+  const source = metrics || stats || {};
+  const byStatus = source.by_status || {};
+  const bySiem = source.by_siem_type || {};
+  const total = source.total_agents;
+  const errors = byStatus.error ?? 0;
+  const pending = (v) => (v ?? "—");
 
   return (
     <>
@@ -38,13 +43,13 @@ export default function Dashboard() {
       </PageHeader>
 
       <div className="stats-grid">
-        <StatCard label="Total Containers" value={total} color="blue" meta={Object.entries(bySiem).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"} />
-        <StatCard label="Running" value={byStatus.running ?? 0} color="green" />
-        <StatCard label="Stopped" value={byStatus.stopped ?? 0} color="red" />
+        <StatCard label="Total Containers" value={pending(total)} color="blue" meta={Object.entries(bySiem).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"} />
+        <StatCard label="Running" value={pending(byStatus.running)} color="green" />
+        <StatCard label="Stopped" value={pending(byStatus.stopped)} color="red" />
         <StatCard label="Errors" value={errors} color={errors > 0 ? "red" : undefined} />
-        <StatCard label="Active Simulations" value={live.active_simulations ?? health?.system_info?.active_simulations ?? 0} color="orange" />
-        <StatCard label="Platform Status" value={health?.status === "healthy" ? "Healthy" : "Unknown"} color={health?.status === "healthy" ? "green" : "red"} />
-        <StatCard label="CPU Cores" value={health?.system_info?.cpu_count ?? "—"} />
+        <StatCard label="Active Simulations" value={pending(metrics?.active_simulations ?? health?.system_info?.active_simulations)} color="orange" />
+        <StatCard label="Platform Status" value={health?.status === "healthy" || connected ? "Healthy" : health ? "Unknown" : "—"} color={health?.status === "healthy" || connected ? "green" : "red"} />
+        <StatCard label="CPU Cores" value={pending(metrics?.system?.cpu_count ?? health?.system_info?.cpu_count)} />
         <StatCard label="WebSocket" value={connected ? "Connected" : "Disconnected"} color={connected ? "green" : "red"} />
       </div>
 
@@ -59,7 +64,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="dashboard-split">
         <div className="card">
           <div className="section-title">Quick Actions</div>
           <div className="btn-group" style={{ flexWrap: "wrap" }}>
@@ -72,11 +77,12 @@ export default function Dashboard() {
 
         <div className="card">
           <div className="section-title">Recent Activity</div>
-          {activity.length === 0 ? <div className="empty" style={{ padding: 16 }}><p>No recent activity</p></div> : (
+          {activity === null ? <div className="empty" style={{ padding: 16 }}><p>Loading…</p></div>
+            : activity.length === 0 ? <div className="empty" style={{ padding: 16 }}><p>No recent activity</p></div> : (
             <table>
               <tbody>
                 {activity.map((a, i) => (
-                  <tr key={i}>
+                  <tr key={`${a.timestamp}-${i}`}>
                     <td style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : ""}</td>
                     <td>{a.action}</td>
                     <td><Pill status={a.status} /></td>

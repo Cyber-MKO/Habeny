@@ -13,7 +13,6 @@ PROCESS_STARTED_AT = time.monotonic()
 simulations_db = {}
 reports_db = {}
 report_files = {}
-activity_logs = []
 config_templates = {}
 scheduled_log_tasks = {}
 

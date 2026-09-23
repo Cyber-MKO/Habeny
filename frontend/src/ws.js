@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-export function useMetricsSocket() {
+function useMetricsConnection() {
   const [metrics, setMetrics] = useState(null);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
@@ -52,4 +52,17 @@ export function useMetricsSocket() {
   }, [connect]);
 
   return { metrics, connected };
+}
+
+const MetricsCtx = createContext({ metrics: null, connected: false });
+
+// One /ws/metrics connection for the whole signed-in app; every page reads from it
+// instead of opening its own socket (each socket costs a metrics collection every 5 s).
+export function MetricsProvider({ children }) {
+  const value = useMetricsConnection();
+  return createElement(MetricsCtx.Provider, { value }, children);
+}
+
+export function useMetricsSocket() {
+  return useContext(MetricsCtx);
 }

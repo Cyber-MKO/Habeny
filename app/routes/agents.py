@@ -18,7 +18,7 @@ from app.core.shell import execute_in_container
 from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
 from app.services.activity import log_activity
-from app.services.agent_info import delete_agent_metadata, get_agent_info, write_agent_metadata
+from app.services.agent_info import container_counts, delete_agent_metadata, get_agent_info, write_agent_metadata
 from app.services.deployment import (
     progress_event,
     progress_finish,
@@ -254,34 +254,14 @@ async def list_agents(
 async def get_agents_stats():
     """Get aggregated container statistics"""
     try:
-        containers = lxc.list_containers()
-        total_agents = len(containers)
-
-        stats_by_siem = {}
-        stats_by_status = {"running": 0, "stopped": 0, "error": 0}
-
-        for name in containers:
-            container = lxc.Container(name)
-            agent_info = get_agent_info(container)
-
-            # Count by SIEM type
-            siem_type = agent_info.get("siem_type", "unknown")
-            stats_by_siem[siem_type] = stats_by_siem.get(siem_type, 0) + 1
-
-            # Count by status
-            lifecycle = agent_info.get("lifecycle_status", "error")
-            if lifecycle in stats_by_status:
-                stats_by_status[lifecycle] += 1
-            else:
-                stats_by_status["error"] += 1
-
+        counts = await asyncio.to_thread(container_counts)
         return APIResponse(
             success=True,
             message="Container statistics retrieved",
             data={
-                "total_agents": total_agents,
-                "by_siem_type": stats_by_siem,
-                "by_status": stats_by_status,
+                "total_agents": counts["total"],
+                "by_siem_type": counts["by_siem_type"],
+                "by_status": {"running": counts["running"], "stopped": counts["stopped"], "error": 0},
                 "timestamp": utc_now().isoformat()
             }
         )

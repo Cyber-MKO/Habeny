@@ -13,7 +13,7 @@ import lxc
 from app.config import AGENTS_DIR, DB_PATH
 from app.core.container import get_container_stats
 from app.core.shell import execute_in_container
-from app.db import get_agent_by_name, get_or_create_agent_seq_id, mark_agent_deleted, upsert_agent
+from app.db import get_agent_by_name, get_agent_siem_types, get_or_create_agent_seq_id, mark_agent_deleted, upsert_agent
 from app.models import utc_now
 
 logger = logging.getLogger(__name__)
@@ -113,6 +113,23 @@ def container_state_summary() -> Dict[str, Any]:
         summary = {"names": list(names), "total": len(names), "by_state": by_state, "running": running}
         _scan_cache.update(at=time.monotonic(), value=summary)
         return summary
+
+
+def container_counts() -> Dict[str, Any]:
+    """Dashboard totals: running/stopped from the shared state scan and SIEM type from
+    stored metadata (one DB query), without attaching to any container. Blocking."""
+    scan = container_state_summary()
+    siem_types = get_agent_siem_types(DB_PATH)
+    by_siem: Dict[str, int] = {}
+    for name in scan["names"]:
+        siem_type = siem_types.get(name) or "unknown"
+        by_siem[siem_type] = by_siem.get(siem_type, 0) + 1
+    return {
+        "total": scan["total"],
+        "running": scan["running"],
+        "stopped": scan["total"] - scan["running"],
+        "by_siem_type": by_siem,
+    }
 
 
 def get_containers_by_state() -> Dict[str, int]:
