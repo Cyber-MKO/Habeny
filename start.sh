@@ -14,6 +14,15 @@ if ! command -v npm >/dev/null 2>&1; then
     exit 1
 fi
 
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "$NODE_MAJOR" -lt 18 ]; then
+    echo "error: Node.js 18+ is required to run the frontend (found $(node -v 2>/dev/null || echo none))." >&2
+    echo "       Install a current version, e.g.:" >&2
+    echo "         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -" >&2
+    echo "         sudo apt install -y nodejs" >&2
+    exit 1
+fi
+
 if [ ! -d "$FRONTEND/node_modules" ]; then
     echo "==> Installing frontend dependencies"
     npm --prefix "$FRONTEND" ci
