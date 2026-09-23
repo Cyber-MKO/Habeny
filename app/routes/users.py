@@ -23,6 +23,7 @@ from app.models import (
 from app.routes.auth import public_user
 from app.services.activity import log_activity
 from app.services.auth import hash_password, require_admin, require_user, token_hash, verify_password
+from app.services.password_policy import enforce_password_policy
 
 router = APIRouter(prefix="/users")
 
@@ -45,6 +46,7 @@ async def change_own_password(body: PasswordChangeRequest, request: Request, use
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     if body.new_password == body.current_password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different")
+    enforce_password_policy(body.new_password, user["username"])
     update_user_password(DB_PATH, user["id"], hash_password(body.new_password))
     delete_user_sessions(DB_PATH, user["id"], keep_token_hash=token_hash(request.cookies[SESSION_COOKIE]))
     log_activity("user_password_changed", {"username": user["username"]})
@@ -59,6 +61,7 @@ async def get_users(admin: dict = Depends(require_admin)):
 
 @router.post("", response_model=APIResponse)
 async def add_user(body: UserCreateRequest, admin: dict = Depends(require_admin)):
+    enforce_password_policy(body.password, body.username)
     user = create_user(DB_PATH, body.username, hash_password(body.password), body.role)
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Username '{body.username}' is taken")
@@ -83,6 +86,7 @@ async def update_user(user_id: int, body: UserUpdateRequest, admin: dict = Depen
 async def reset_user_password(user_id: int, body: PasswordResetRequest, admin: dict = Depends(require_admin)):
     """Set a new password for another user and sign them out everywhere."""
     target = _get_other_user(user_id, admin)
+    enforce_password_policy(body.new_password, target["username"])
     update_user_password(DB_PATH, target["id"], hash_password(body.new_password))
     delete_user_sessions(DB_PATH, target["id"])
     log_activity("user_password_reset", {"username": target["username"], "by": admin["username"]})

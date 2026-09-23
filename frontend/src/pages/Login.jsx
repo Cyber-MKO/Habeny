@@ -14,7 +14,7 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     if (setupRequired) {
-      if (password.length < 8) return setError("Password must be at least 8 characters.");
+      if (password.length < 12) return setError("Password must be at least 12 characters.");
       if (password !== confirm) return setError("Passwords don't match.");
     }
     setBusy(true);
@@ -91,7 +91,7 @@ export default function Login() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {setupRequired && <span className="auth-hint">At least 8 characters.</span>}
+          {setupRequired && <span className="auth-hint">At least 12 characters; not a common password.</span>}
         </div>
         {setupRequired && (
           <div className="field">

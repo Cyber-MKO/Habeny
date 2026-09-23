@@ -17,6 +17,7 @@ from app.services.auth import (
     session_user,
     start_session,
 )
+from app.services.password_policy import enforce_password_policy
 from app.services.setup_token import check_setup_token, remove_setup_token
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ async def setup_admin(body: SetupRequest, request: Request, response: Response):
         login_limiter.record_failure(client)
         log_activity("auth_setup_token_rejected", {"client": client}, status="error")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid setup token")
+    enforce_password_policy(body.password, body.username)
     user = create_first_user(DB_PATH, body.username, hash_password(body.password))
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Setup has already been completed")

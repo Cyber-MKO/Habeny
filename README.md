@@ -130,6 +130,8 @@ sign-in page is shown to anyone without a valid session.
 
   New users are viewers unless you choose otherwise. On upgrade, existing non-admin
   accounts become operators (the access they already had).
+- New passwords need 12+ characters (`HABENY_PASSWORD_MIN_LENGTH`), can't be a common
+  password or contain the username.
 - Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
 - After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
 - Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.

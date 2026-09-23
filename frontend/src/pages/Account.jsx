@@ -4,7 +4,7 @@ import { useAuth } from "../auth";
 import { useStore } from "../store";
 import { DataTable, Modal, PageHeader, Pill, Spinner } from "../components/UI";
 
-const MIN_PASSWORD = 8;
+const MIN_PASSWORD = 12; // server also rejects common passwords and ones containing the username
 
 export const ROLES = [
   { value: "viewer", label: "Viewer", help: "Read-only: dashboards, containers, reports" },

@@ -203,3 +203,14 @@ def test_operator_can_operate_but_not_manage_users(operator_client):
     assert operator_client.post("/groups", json={"name": "ops-made"}).status_code == 200
     assert operator_client.get("/users").status_code == 403
     assert operator_client.post("/users", json={"username": "x" + _new_name(), "password": "p" * 12}).status_code == 403
+
+
+@pytest.mark.parametrize("password", ["short1", "Password123!", "zzzzzzzzzzzzzzzz"])
+def test_policy_enforced_on_new_users_and_changes(client, password):
+    resp = client.post("/users", json={"username": _new_name(), "password": password})
+    assert resp.status_code in (400, 422), resp.text
+    assert "Password must be" in resp.text or resp.status_code == 422
+    me = client.get("/auth/status").json()["data"]["user"]
+    resp = client.post("/users/me/password", json={"current_password": "correct-horse-battery", "new_password": password})
+    assert resp.status_code in (400, 422)
+    assert me["username"] == "admin"
