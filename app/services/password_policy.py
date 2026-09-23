@@ -2,9 +2,9 @@
 Password rules for new passwords (setup, new users, changes, resets). Existing
 passwords keep working; the rules apply the next time one is set.
 """
-import os
+from app import config
 
-MIN_LENGTH = int(os.environ.get("HABENY_PASSWORD_MIN_LENGTH", "12"))
+MIN_LENGTH = config.get("HABENY_PASSWORD_MIN_LENGTH")
 MAX_LENGTH = 256
 
 # Frequently breached passwords (and obvious product-specific ones), compared case-insensitively

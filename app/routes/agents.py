@@ -6,12 +6,11 @@ import json
 import logging
 import time
 import uuid
-from multiprocessing import cpu_count
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from app.config import DB_PATH
+from app.config import DB_PATH, DEPLOY_WORKERS
 from app.core.common import check_root
 from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
@@ -147,7 +146,7 @@ async def deploy_agents(
 
         # Deploy in parallel using multiprocessing, off the event loop so the
         # API (and progress polling) stays responsive during long deployments
-        progress_event(deployment_id, f"Launching {min(cpu_count(), len(agent_names))} deployment workers")
+        progress_event(deployment_id, f"Launching {min(DEPLOY_WORKERS, len(agent_names))} deployment workers")
         results, warnings = await asyncio.to_thread(
             run_deployment_workers, deployment_id, agent_names, deployment_dict, agent_seq_ids
         )

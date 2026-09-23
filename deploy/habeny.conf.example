@@ -1,0 +1,75 @@
+# Habeny configuration: /etc/habeny/habeny.conf
+# KEY=value lines. Environment variables override this file; `habeny config`
+# shows the values in effect. Restart after changing: sudo systemctl restart habeny
+# Generated from app/config.py (`habeny config example`); every setting is listed
+# with its default.
+
+# ── Server ──────────────────────────────────────────────────────
+# Address to listen on
+#HABENY_HOST=0.0.0.0
+# Port to listen on
+#HABENY_PORT=9000
+# auto: HTTPS (your certificate, else self-signed); off: plain HTTP behind a reverse proxy that terminates TLS
+#HABENY_TLS=auto
+# Your certificate (PEM, full chain)
+#HABENY_TLS_CERT=
+# Its private key (PEM)
+#HABENY_TLS_KEY=
+# Reverse proxies trusted to send X-Forwarded-Proto/-For (comma-separated IPs, or *)
+#HABENY_FORWARDED_ALLOW_IPS=127.0.0.1
+# Log level
+#HABENY_LOG_LEVEL=INFO
+# Seconds a stop/restart waits for running deployments to finish before interrupting them (the systemd unit allows up to 840)
+#HABENY_SHUTDOWN_TIMEOUT=600
+
+# ── Capacity ────────────────────────────────────────────────────
+# Containers deployed in parallel (default: CPU count)
+#HABENY_DEPLOY_WORKERS=4
+# Parallel workers for benchmark runs (default: CPU count)
+#HABENY_BENCHMARK_WORKERS=4
+
+# ── Accounts ────────────────────────────────────────────────────
+# How long a sign-in lasts (hours)
+#HABENY_SESSION_TTL_HOURS=168
+# Minimum password length
+#HABENY_PASSWORD_MIN_LENGTH=12
+# Other browser origins allowed to call the API, comma-separated (exact https://host:port); empty: none
+#HABENY_CORS_ORIGINS=
+# Key encrypting stored SIEM secrets (default: generated in DATA_DIR/secret.key)
+#HABENY_SECRET_KEY=
+
+# ── Single sign-on ──────────────────────────────────────────────
+# OIDC issuer URL; turns single sign-on on
+#HABENY_OIDC_ISSUER=
+# Client ID from the app registration
+#HABENY_OIDC_CLIENT_ID=
+# Client secret
+#HABENY_OIDC_CLIENT_SECRET=
+# Redirect URI registered at the provider (set it behind a reverse proxy)
+#HABENY_OIDC_REDIRECT_URI=
+# Scopes to request
+#HABENY_OIDC_SCOPES=openid profile email
+# Claim used as the username
+#HABENY_OIDC_USERNAME_CLAIM=preferred_username
+# Claim listing the user's groups
+#HABENY_OIDC_GROUPS_CLAIM=groups
+# Groups whose members are admins (comma-separated)
+#HABENY_OIDC_ADMIN_GROUPS=
+# Groups whose members are operators
+#HABENY_OIDC_OPERATOR_GROUPS=
+# Groups whose members are viewers
+#HABENY_OIDC_VIEWER_GROUPS=
+# Role for new SSO users when no group mapping is set
+#HABENY_OIDC_DEFAULT_ROLE=viewer
+# Sign-in button text
+#HABENY_OIDC_BUTTON_LABEL=Sign in with SSO
+# CA file for a provider with a private certificate
+#HABENY_OIDC_CA_BUNDLE=
+# Allow a plain-HTTP provider (testing only)
+#HABENY_OIDC_ALLOW_HTTP=false
+
+# Set by the installer in the systemd units (reinstall to change):
+#   HABENY_DATA_DIR (default /var/lib/lxc-siem-platform)
+#   HABENY_LXC_BACKEND (default automatic)
+#   HABENY_HELPER_SOCKET (default /run/habeny/helper.sock)
+#   HABENY_HELPER_USER (default habeny)

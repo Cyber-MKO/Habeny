@@ -112,7 +112,7 @@ function AboutModal({ onClose }) {
       </div>
 
       <div className="about-meta">
-        <span><strong>Version</strong> 2.0.0</span>
+        <span><strong>Version</strong> {__APP_VERSION__}</span>
         <span><strong>Runtime</strong> LXC containers</span>
         <span><strong>Telemetry</strong> Live over WebSocket</span>
       </div>
@@ -194,7 +194,7 @@ function AppShell({ user }) {
         </nav>
         <button type="button" className="sidebar-footer" onClick={() => setAboutOpen(true)}>
           <span>About Habeny</span>
-          <span>v2.0.0</span>
+          <span>v{__APP_VERSION__}</span>
         </button>
       </aside>
 

@@ -9,7 +9,8 @@ from multiprocessing import cpu_count
 
 from fastapi import APIRouter, HTTPException
 
-from app.config import MAX_WORKERS
+from app.config import BENCHMARK_WORKERS, DEPLOY_WORKERS
+from app.version import __version__
 from app.core.common import get_lxc_default_config_path, get_lxc_version
 from app.core.container import get_system_arch
 from app.models import APIResponse, HealthCheckResponse
@@ -28,11 +29,11 @@ async def root():
         success=True,
         message="Multi-SIEM Container Emulation Platform API",
         data={
-            "version": "2.0.0",
+            "version": __version__,
             "description": "LXC-based platform for deploying containers that run SIEM agents at scale",
             "supported_siem_types": ["wazuh", "ossec", "ossim", "utmstack", "elastic"],
             "default_os": "ubuntu_22_04",
-            "max_workers": MAX_WORKERS,
+            "max_workers": DEPLOY_WORKERS,
             "cpu_count": cpu_count(),
             "endpoint_groups": {
                 "system": ["/system/info", "/system/health"],
@@ -63,7 +64,7 @@ async def system_info():
         info = {
             "platform": {
                 "name": "Multi-SIEM Container Emulation Platform",
-                "version": "2.0.0",
+                "version": __version__,
                 "lxc_version": get_lxc_version(),
                 "default_config_path": get_lxc_default_config_path(),
                 "uptime_seconds": round(time.monotonic() - PROCESS_STARTED_AT, 1),
@@ -73,8 +74,8 @@ async def system_info():
                 "is_root": os.geteuid() == 0,
                 "cpu_count": cpu_count(),
                 "worker_config": {
-                    "thread_workers": MAX_WORKERS,
-                    "process_workers": cpu_count()
+                    "deploy_workers": DEPLOY_WORKERS,
+                    "benchmark_workers": BENCHMARK_WORKERS
                 }
             },
             "containers": {
@@ -103,7 +104,7 @@ async def health_check():
 
         return HealthCheckResponse(
             status="healthy",
-            version="2.0.0",
+            version=__version__,
             uptime_seconds=round(time.monotonic() - PROCESS_STARTED_AT, 1),
             containers_count=containers["total"],
             system_info={

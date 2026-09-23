@@ -2,7 +2,6 @@
 Multi-SIEM Container Emulation Platform — application package.
 """
 import logging
-from multiprocessing import cpu_count
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +28,9 @@ def _initialize_storage() -> None:
 
     migrate_legacy_agent_metadata()
 
+    from app.services.lifecycle import recover_interrupted_deployments
+    recover_interrupted_deployments()
+
     from app.services.setup_token import ensure_setup_token
     ensure_setup_token()
 
@@ -47,10 +49,12 @@ def create_app():
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from app.config import CORS_ORIGINS, MAX_WORKERS
+    from app.config import CORS_ORIGINS, DEPLOY_WORKERS, check
+    from app.version import __version__
     from app.middleware import StripApiPrefixMiddleware, track_request_latency
     from app.routes import register_routes
 
+    check()  # stop with every configuration problem listed, before touching anything
     _initialize_storage()
     from app.services import oidc
     if oidc.settings():  # fails fast on incomplete single sign-on settings
@@ -59,9 +63,9 @@ def create_app():
     app = FastAPI(
         title="Multi-SIEM Container Emulation Platform",
         description="LXC-based platform for deploying containers that run SIEM agents at scale",
-        version="2.0.0",
+        version=__version__,
     )
-    logger.info(f"Initialized with {MAX_WORKERS} max thread workers and {cpu_count()} CPU cores")
+    logger.info(f"Initialized; up to {DEPLOY_WORKERS} containers deploy in parallel")
 
     # The UI is served from this origin (and the dev server proxies), so browsers need no
     # cross-origin access. Only origins listed in HABENY_CORS_ORIGINS get it.

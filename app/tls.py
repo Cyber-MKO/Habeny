@@ -15,6 +15,7 @@ import socket
 from pathlib import Path
 from typing import Optional
 
+from app import config
 from app.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -25,11 +26,11 @@ SELF_SIGNED_KEY = TLS_DIR / "key.pem"
 
 
 def tls_mode() -> str:
-    return os.environ.get("HABENY_TLS", "auto").strip().lower()
+    return config.get("HABENY_TLS")
 
 
 def uses_own_certificate() -> bool:
-    return bool(os.environ.get("HABENY_TLS_CERT") and os.environ.get("HABENY_TLS_KEY"))
+    return bool(config.raw("HABENY_TLS_CERT") and config.raw("HABENY_TLS_KEY"))
 
 
 def _local_names() -> tuple[list[str], list[str]]:
@@ -90,14 +91,14 @@ def server_ssl_options() -> dict:
         logger.warning("HABENY_TLS=off: serving plain HTTP. Only do this behind a reverse proxy that terminates TLS.")
         return {}
     if uses_own_certificate():
-        return {"ssl_certfile": os.environ["HABENY_TLS_CERT"], "ssl_keyfile": os.environ["HABENY_TLS_KEY"]}
+        return {"ssl_certfile": config.raw("HABENY_TLS_CERT"), "ssl_keyfile": config.raw("HABENY_TLS_KEY")}
     if not (SELF_SIGNED_CERT.exists() and SELF_SIGNED_KEY.exists()):
         _generate_self_signed(SELF_SIGNED_CERT, SELF_SIGNED_KEY)
     return {"ssl_certfile": str(SELF_SIGNED_CERT), "ssl_keyfile": str(SELF_SIGNED_KEY)}
 
 
 def listen_address() -> tuple[str, int]:
-    return os.environ.get("HABENY_HOST", "0.0.0.0"), int(os.environ.get("HABENY_PORT", "9000"))
+    return config.get("HABENY_HOST"), config.get("HABENY_PORT")
 
 
 def hsts_enabled() -> Optional[bool]:

@@ -6,10 +6,10 @@ import os
 import queue
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
-from multiprocessing import Manager, cpu_count
+from multiprocessing.managers import SyncManager
 from typing import Any, Dict, List, Optional
 
-from app.config import DB_PATH
+from app.config import DB_PATH, DEPLOY_WORKERS
 from app.core.container import parse_memory_limit, setup_agent_health_check
 from app.core.lxc_backend import lxc
 from app.core.network import configure_container_macvlan, get_host_interface
@@ -21,6 +21,7 @@ from app.installers.ossim import install_ossim_agent
 from app.installers.utmstack import install_utmstack_agent
 from app.installers.wazuh import install_wazuh_agent
 from app.models import utc_now
+from app.services import lifecycle
 from app.services.agent_info import write_agent_metadata
 from app.state import MAX_TRACKED_DEPLOYMENTS, deployment_progress, deployment_progress_lock
 
@@ -96,7 +97,9 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
     deployment_progress. Blocking; run it off the event loop."""
     results = []
     warnings = []
-    with Manager() as mp_manager:
+    mp_manager = SyncManager()
+    mp_manager.start(lifecycle.ignore_stop_signals)  # like the workers, outlives Ctrl+C until done
+    with mp_manager:
         progress_queue = mp_manager.Queue()
 
         def drain():
@@ -105,39 +108,83 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
                     name, message = progress_queue.get_nowait()
                 except queue.Empty:
                     return
+                except (EOFError, OSError):  # progress relay gone; results still arrive
+                    return
                 progress_event(deployment_id, message, container=name, status="running")
 
-        with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-            future_to_name = {
-                executor.submit(deploy_single_siem_agent, name, deployment_dict, agent_seq_ids[name], progress_queue): name
-                for name in agent_names
-            }
-            pending = set(future_to_name)
-            while pending:
-                done, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+        def _record(result):
+            agent_name = result["agent_name"]
+            persist_deploy_result(result, deployment_dict.get("siem_type"))
+            results.append(result)
+            if result["success"]:
+                progress_event(
+                    deployment_id,
+                    f"Deployed in {result.get('deploy_time_seconds', 0)}s"
+                    + (f" ({result['ip_address']})" if result.get("ip_address") else ""),
+                    level="success", container=agent_name, status="success",
+                )
+            else:
+                error = result.get("error") or (result.get("agent_installation") or {}).get("message") or "Unknown error"
+                warnings.append(f"Failed to deploy container {agent_name}: {error}")
+                progress_event(deployment_id, f"Failed: {error}", level="error",
+                                container=agent_name, status="failed", error=error)
+
+        executor = ProcessPoolExecutor(max_workers=DEPLOY_WORKERS, initializer=lifecycle.ignore_stop_signals)
+        abandoned = False
+        try:
+            # Hand out one container per free worker (not all at once): the executor
+            # pre-queues submitted work where it can no longer be cancelled, and a stop
+            # must not start new containers
+            queued = list(agent_names)
+            future_to_name = {}
+            pending = set()
+            stop_noted = False
+            while queued or pending:
+                done = set()
+                if lifecycle.shutting_down():
+                    if not stop_noted:
+                        stop_noted = True
+                        progress_event(deployment_id, "Habeny is stopping: finishing containers in progress, "
+                                       "cancelling the rest", level="error")
+                    cancelled, queued = queued, []
+                    for agent_name in cancelled:
+                        _record(_interrupted_result(agent_name, agent_seq_ids[agent_name], started=False))
+                    if pending and lifecycle.time_left() <= 0:
+                        abandoned = True
+                        done, pending = set(pending), set()
+                while queued and len(pending) < DEPLOY_WORKERS:
+                    name = queued.pop(0)
+                    future = executor.submit(deploy_single_siem_agent, name, deployment_dict,
+                                             agent_seq_ids[name], progress_queue)
+                    future_to_name[future] = name
+                    pending.add(future)
+                if pending:
+                    finished, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+                    done |= finished
                 drain()
                 for future in done:
                     agent_name = future_to_name[future]
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        logger.error(f"Exception deploying {agent_name}: {e}")
-                        result = {"agent_name": agent_name, "success": False, "error": str(e)}
-                    persist_deploy_result(result, deployment_dict.get("siem_type"))
-                    results.append(result)
-                    if result["success"]:
-                        progress_event(
-                            deployment_id,
-                            f"Deployed in {result.get('deploy_time_seconds', 0)}s"
-                            + (f" ({result['ip_address']})" if result.get("ip_address") else ""),
-                            level="success", container=agent_name, status="success",
-                        )
+                    if not future.done():  # still running at the deadline
+                        result = _interrupted_result(agent_name, agent_seq_ids[agent_name], started=True)
                     else:
-                        error = result.get("error") or (result.get("agent_installation") or {}).get("message") or "Unknown error"
-                        warnings.append(f"Failed to deploy container {agent_name}: {error}")
-                        progress_event(deployment_id, f"Failed: {error}", level="error",
-                                        container=agent_name, status="failed", error=error)
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            logger.error(f"Exception deploying {agent_name}: {e}")
+                            result = {"agent_name": agent_name, "success": False, "error": str(e)}
+                    _record(result)
+        finally:
+            # Past the deadline, don't wait for workers still running: the service manager
+            # stops them when this process exits
+            executor.shutdown(wait=not abandoned, cancel_futures=True)
     return results, warnings
+
+
+def _interrupted_result(agent_name: str, seq_id: Optional[int], started: bool) -> dict:
+    error = ("Interrupted: Habeny stopped before this container finished deploying; delete and redeploy it"
+             if started else "Cancelled: Habeny stopped before this container was deployed")
+    metadata = {"agent_seq_id": seq_id, "lifecycle_status": lifecycle.INTERRUPTED if started else "error"}
+    return {"agent_name": agent_name, "agent_seq_id": seq_id, "success": False, "error": error, "metadata": metadata}
 
 
 def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int] = None,

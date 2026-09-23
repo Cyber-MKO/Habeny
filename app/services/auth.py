@@ -16,6 +16,7 @@ from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
 from app.db import create_session, delete_session, get_session_user, touch_session
+from app.services import lifecycle
 
 # scrypt parameters (~16 MiB memory per hash)
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 14, 8, 1
@@ -185,6 +186,12 @@ async def require_access(conn: HTTPConnection) -> dict[str, Any]:
         needed = "operator"
     if not has_role(user, needed):
         raise _forbidden(conn, needed)
+    if needed == "operator" and lifecycle.shutting_down():
+        # Don't start work that a restart would cut short
+        if conn.scope["type"] == "websocket":
+            raise WebSocketException(code=status.WS_1012_SERVICE_RESTART, reason="Habeny is restarting")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, headers={"Retry-After": "60"},
+                            detail="Habeny is restarting. Try again in a minute.")
     return user
 
 
