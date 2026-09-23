@@ -27,7 +27,8 @@ def public_user(user: dict) -> dict:
     return {
         "id": user["id"],
         "username": user["username"],
-        "is_admin": bool(user.get("is_admin")),
+        "role": user.get("role") or ("admin" if user.get("is_admin") else "operator"),
+        "is_admin": (user.get("role") == "admin") if user.get("role") else bool(user.get("is_admin")),
         "created_at": user.get("created_at"),
         "last_login_at": user.get("last_login_at"),
     }

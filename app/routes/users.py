@@ -10,7 +10,7 @@ from app.db import (
     delete_user_sessions,
     get_user_by_id,
     list_users,
-    set_user_admin,
+    set_user_role,
     update_user_password,
 )
 from app.models import (
@@ -59,23 +59,23 @@ async def get_users(admin: dict = Depends(require_admin)):
 
 @router.post("", response_model=APIResponse)
 async def add_user(body: UserCreateRequest, admin: dict = Depends(require_admin)):
-    user = create_user(DB_PATH, body.username, hash_password(body.password), body.is_admin)
+    user = create_user(DB_PATH, body.username, hash_password(body.password), body.role)
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Username '{body.username}' is taken")
-    log_activity("user_created", {"username": user["username"], "is_admin": body.is_admin, "by": admin["username"]})
+    log_activity("user_created", {"username": user["username"], "role": body.role, "by": admin["username"]})
     return APIResponse(success=True, message=f"User '{user['username']}' created", data={"user": public_user(user)})
 
 
 @router.patch("/{user_id}", response_model=APIResponse)
 async def update_user(user_id: int, body: UserUpdateRequest, admin: dict = Depends(require_admin)):
     target = _get_other_user(user_id, admin)
-    if not set_user_admin(DB_PATH, target["id"], body.is_admin):
+    if not set_user_role(DB_PATH, target["id"], body.role):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="There must be at least one administrator")
-    log_activity("user_updated", {"username": target["username"], "is_admin": body.is_admin, "by": admin["username"]})
+    log_activity("user_updated", {"username": target["username"], "role": body.role, "by": admin["username"]})
     return APIResponse(
         success=True,
-        message=f"'{target['username']}' is {'now an administrator' if body.is_admin else 'no longer an administrator'}",
-        data={"user": public_user({**target, "is_admin": body.is_admin})},
+        message=f"'{target['username']}' is now {'an' if body.role in ('admin', 'operator') else 'a'} {body.role}",
+        data={"user": public_user({**target, "role": body.role, "is_admin": body.role == "admin"})},
     )
 
 

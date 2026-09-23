@@ -22,7 +22,7 @@ def member(app, client):
     """A non-admin user created by the admin; yields (id, username, password)."""
     name, pw = _new_name(), "member-password-1"
     user = client.post("/users", json={"username": name, "password": pw}).json()["data"]["user"]
-    assert user["is_admin"] is False
+    assert user["role"] == "viewer" and user["is_admin"] is False
     yield user["id"], name, pw
     client.delete(f"/users/{user['id']}")
 
@@ -85,32 +85,32 @@ def test_admin_reset_password_signs_user_out(app, client, member):
 
 def test_promote_and_demote(app, client, member):
     uid, name, pw = member
-    assert client.patch(f"/users/{uid}", json={"is_admin": True}).status_code == 200
+    assert client.patch(f"/users/{uid}", json={"role": "admin"}).status_code == 200
     assert _sign_in(app, name, pw).get("/users").status_code == 200
-    assert client.patch(f"/users/{uid}", json={"is_admin": False}).status_code == 200
+    assert client.patch(f"/users/{uid}", json={"role": "operator"}).status_code == 200
     assert _sign_in(app, name, pw).get("/users").status_code == 403
 
 
 def test_admin_cannot_delete_or_demote_self(client):
     me = client.get("/auth/status").json()["data"]["user"]
     assert client.delete(f"/users/{me['id']}").status_code == 400
-    assert client.patch(f"/users/{me['id']}", json={"is_admin": False}).status_code == 400
+    assert client.patch(f"/users/{me['id']}", json={"role": "operator"}).status_code == 400
     assert client.post(f"/users/{me['id']}/password", json={"new_password": "whatever-123"}).status_code == 400
 
 
 def test_last_admin_cannot_be_removed(app, client, member):
     """Another admin can't delete or demote the only remaining admin."""
     uid, name, pw = member
-    client.patch(f"/users/{uid}", json={"is_admin": True})
+    client.patch(f"/users/{uid}", json={"role": "admin"})
     second = _sign_in(app, name, pw)
     admin_id = client.get("/auth/status").json()["data"]["user"]["id"]
     # demote the member again from the admin side, leaving 'admin' as the only admin
-    client.patch(f"/users/{uid}", json={"is_admin": False})
+    client.patch(f"/users/{uid}", json={"role": "operator"})
     assert second.delete(f"/users/{admin_id}").status_code == 403  # no longer admin
     # the DB-level guard, exercised directly
     from app.config import DB_PATH
-    from app.db import delete_user, set_user_admin
-    assert set_user_admin(DB_PATH, admin_id, False) is False
+    from app.db import delete_user, set_user_role
+    assert set_user_role(DB_PATH, admin_id, "viewer") is False
     assert delete_user(DB_PATH, admin_id) is False
 
 
@@ -124,7 +124,7 @@ def test_delete_user_revokes_sessions(app, client):
 
 
 def test_unknown_user_404(client):
-    assert client.patch("/users/999999", json={"is_admin": True}).status_code == 404
+    assert client.patch("/users/999999", json={"role": "admin"}).status_code == 404
 
 
 def test_legacy_account_becomes_admin_on_migration(tmp_path):
@@ -141,5 +141,65 @@ def test_legacy_account_becomes_admin_on_migration(tmp_path):
     conn.close()
     init_db(db)
     init_db(db)  # idempotent
-    roles = {u["username"]: u["is_admin"] for u in list_users(db)}
-    assert roles == {"first": True, "second": False}
+    roles = {u["username"]: u["role"] for u in list_users(db)}
+    assert roles == {"first": "admin", "second": "operator"}  # members keep their access
+
+
+
+@pytest.fixture()
+def viewer_client(app, client):
+    name, pw = _new_name(), "viewer-password-1"
+    uid = client.post("/users", json={"username": name, "password": pw, "role": "viewer"}).json()["data"]["user"]["id"]
+    yield _sign_in(app, name, pw)
+    client.delete(f"/users/{uid}")
+
+
+@pytest.fixture()
+def operator_client(app, client):
+    name, pw = _new_name(), "operator-password-1"
+    uid = client.post("/users", json={"username": name, "password": pw, "role": "operator"}).json()["data"]["user"]["id"]
+    yield _sign_in(app, name, pw)
+    client.delete(f"/users/{uid}")
+
+
+@pytest.mark.parametrize("path", ["/groups", "/agents", "/agents/stats", "/managers", "/activity/logs", "/system/info"])
+def test_viewer_can_read(viewer_client, path):
+    assert viewer_client.get(path).status_code == 200
+
+
+@pytest.mark.parametrize("method,path,body", [
+    ("POST", "/agents/deploy", {"count": 1, "siem_type": "none"}),
+    ("POST", "/groups", {"name": "viewer-made"}),
+    ("DELETE", "/agents/c1", None),
+    ("POST", "/agents/c1/stop", None),
+    ("POST", "/agents/bulk/start", {"container_names": ["c1"], "operation": "start"}),
+    ("POST", "/managers", {"name": "m", "siem_type": "none"}),
+    ("POST", "/simulations/start", {}),
+    ("POST", "/reports/generate", {}),
+])
+def test_viewer_cannot_change_anything(viewer_client, method, path, body):
+    resp = viewer_client.request(method, path, json=body)
+    assert resp.status_code == 403
+    assert "operator" in resp.json()["detail"]
+
+
+def test_viewer_cannot_open_console_but_sees_live_metrics(viewer_client):
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect) as exc, viewer_client.websocket_connect(
+            "/ws/console/c1", headers={"origin": "http://testserver"}):
+        pass
+    assert exc.value.code == 1008
+    with viewer_client.websocket_connect("/ws/metrics", headers={"origin": "http://testserver"}) as ws:
+        assert "timestamp" in ws.receive_json()
+
+
+def test_viewer_can_still_manage_own_account(viewer_client):
+    assert viewer_client.post("/users/me/password", json={"current_password": "viewer-password-1",
+                                                            "new_password": "viewer-password-2"}).status_code == 200
+    assert viewer_client.post("/benchmarks/compare", json={"benchmark_ids": []}).status_code != 403  # read-only POST
+
+
+def test_operator_can_operate_but_not_manage_users(operator_client):
+    assert operator_client.post("/groups", json={"name": "ops-made"}).status_code == 200
+    assert operator_client.get("/users").status_code == 403
+    assert operator_client.post("/users", json={"username": "x" + _new_name(), "password": "p" * 12}).status_code == 403

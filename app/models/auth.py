@@ -1,6 +1,8 @@
 """
 Authentication request models.
 """
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 USERNAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
@@ -27,11 +29,11 @@ class PasswordChangeRequest(BaseModel):
 class UserCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=32, pattern=USERNAME_PATTERN)
     password: str = Field(..., min_length=8, max_length=256)
-    is_admin: bool = False
+    role: Literal["viewer", "operator", "admin"] = "viewer"  # least privilege by default
 
 
 class UserUpdateRequest(BaseModel):
-    is_admin: bool
+    role: Literal["viewer", "operator", "admin"]
 
 
 class PasswordResetRequest(BaseModel):

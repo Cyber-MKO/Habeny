@@ -6,6 +6,12 @@ import { DataTable, Modal, PageHeader, Pill, Spinner } from "../components/UI";
 
 const MIN_PASSWORD = 8;
 
+export const ROLES = [
+  { value: "viewer", label: "Viewer", help: "Read-only: dashboards, containers, reports" },
+  { value: "operator", label: "Operator", help: "Viewer + deploy, simulations, console, profiles" },
+  { value: "admin", label: "Admin", help: "Operator + manage users" },
+];
+
 const formatDate = (iso) => (iso ? new Date(iso).toLocaleString() : "Never");
 
 function passwordProblem(password, confirm) {
@@ -70,7 +76,7 @@ function ChangePassword() {
 
 function AddUserModal({ onClose, onCreated }) {
   const { toast } = useStore();
-  const [form, setForm] = useState({ username: "", password: "", confirm: "", is_admin: false });
+  const [form, setForm] = useState({ username: "", password: "", confirm: "", role: "viewer" });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -80,7 +86,7 @@ function AddUserModal({ onClose, onCreated }) {
     if (problem) return setError(problem);
     setBusy(true);
     try {
-      const res = await api.createUser({ username: form.username.trim(), password: form.password, is_admin: form.is_admin });
+      const res = await api.createUser({ username: form.username.trim(), password: form.password, role: form.role });
       toast(res.message, "success");
       onCreated();
     } catch (err) {
@@ -109,10 +115,13 @@ function AddUserModal({ onClose, onCreated }) {
           <input id="nu-confirm" className="input" type="password" autoComplete="new-password" value={form.confirm}
             onChange={(e) => setForm({ ...form, confirm: e.target.value })} />
         </div>
-        <label className="checkbox-label">
-          <input type="checkbox" checked={form.is_admin} onChange={(e) => setForm({ ...form, is_admin: e.target.checked })} />
-          Administrator (can manage users)
-        </label>
+        <div className="field">
+          <label htmlFor="nu-role">Role</label>
+          <select id="nu-role" className="select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <span className="auth-hint">{ROLES.find((r) => r.value === form.role)?.help}</span>
+        </div>
         <div className="btn-group">
           <button className="btn btn-primary" type="submit" disabled={busy || !form.username.trim() || !form.password}>
             {busy ? "Creating…" : "Create user"}
@@ -186,9 +195,10 @@ function Users() {
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleAdmin = async (u) => {
+  const changeRole = async (u, role) => {
+    if (role === u.role) return;
     try {
-      const res = await api.updateUser(u.id, { is_admin: !u.is_admin });
+      const res = await api.updateUser(u.id, { role });
       toast(res.message, "success");
       load();
     } catch (err) { toast(err.message, "error"); }
@@ -207,16 +217,18 @@ function Users() {
     { key: "username", label: "Username", render: (u) => (
       <span className="account-username">{u.username}{u.id === me.id && <span className="tag">you</span>}</span>
     )},
-    { key: "role", label: "Role", render: (u) => <Pill status={u.is_admin ? "admin" : "member"} /> },
+    { key: "role", label: "Role", render: (u) => u.id === me.id ? <Pill status={u.role} /> : (
+      <select className="select account-role-select" value={u.role} aria-label={`Role of ${u.username}`}
+        onChange={(e) => changeRole(u, e.target.value)}>
+        {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+      </select>
+    )},
     { key: "last_login_at", label: "Last sign-in", render: (u) => formatDate(u.last_login_at) },
     { key: "created_at", label: "Created", render: (u) => new Date(u.created_at).toLocaleDateString() },
     { key: "actions", label: "", render: (u) => u.id === me.id ? (
       <span className="account-help">Use “Change password” above</span>
     ) : (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={() => toggleAdmin(u)}>
-          {u.is_admin ? "Remove admin" : "Make admin"}
-        </button>
         <button className="btn btn-sm btn-secondary" onClick={() => setResetting(u)}>Reset password</button>
         <button className="btn btn-sm btn-danger" onClick={() => remove(u)}>Delete</button>
       </div>
@@ -247,7 +259,7 @@ export default function Account() {
       <div className="section">
         <div className="account-me">
           Signed in as <strong>{user.username}</strong>
-          <Pill status={user.is_admin ? "admin" : "member"} />
+          <Pill status={user.role} />
         </div>
         <ChangePassword />
       </div>

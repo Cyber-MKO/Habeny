@@ -836,7 +836,23 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
   color: var(--accent);
   border-color: rgba(27, 179, 199, 0.3);
 }
-.pill-member {
+.pill-operator {
+  background: var(--orange-soft);
+  color: var(--orange);
+  border-color: rgba(245, 165, 36, 0.3);
+}
+.account-role-select { width: auto; padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; }
+.header-readonly {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+}
+.pill-viewer, .pill-member {
   background: rgba(92, 107, 132, 0.15);
   color: var(--text-dim);
   border-color: rgba(92, 107, 132, 0.3);

@@ -127,7 +127,42 @@ class LoginRateLimiter:
 login_limiter = LoginRateLimiter()
 
 
+# ── roles ───────────────────────────────────────────────────────────────
+# viewer: read-only · operator: + containers, simulations, console, profiles · admin: + users
+ROLES = ("viewer", "operator", "admin")
+_RANK = {role: i for i, role in enumerate(ROLES)}
+# POST endpoints that only read (safe for viewers)
+READ_ONLY_POSTS = {"/benchmarks/compare"}
+
+
+def has_role(user: dict[str, Any], minimum: str) -> bool:
+    return _RANK.get(user.get("role"), -1) >= _RANK[minimum]
+
+
+def _forbidden(conn: HTTPConnection, needed: str):
+    if conn.scope["type"] == "websocket":
+        return WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=f"{needed} role required")
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"This needs the {needed} role")
+
+
+async def require_access(conn: HTTPConnection) -> dict[str, Any]:
+    """Router-wide check: signed in, and the role the request needs. Reads (GET, the live
+    metrics socket) are open to viewers; anything that changes something, and the
+    container console, needs operator."""
+    user = await require_user(conn)
+    path = conn.scope.get("path", "")
+    if conn.scope["type"] == "websocket":
+        needed = "operator" if path.startswith("/ws/console") else "viewer"
+    elif conn.scope.get("method") in ("GET", "HEAD", "OPTIONS") or path in READ_ONLY_POSTS:
+        needed = "viewer"
+    else:
+        needed = "operator"
+    if not has_role(user, needed):
+        raise _forbidden(conn, needed)
+    return user
+
+
 async def require_admin(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not user.get("is_admin"):
+    if not has_role(user, "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access required")
     return user

@@ -172,6 +172,7 @@ def init_db(db_path: Path) -> None:
                 username TEXT UNIQUE NOT NULL COLLATE NOCASE,
                 password_hash TEXT NOT NULL,
                 is_admin INTEGER NOT NULL DEFAULT 0,
+                role TEXT NOT NULL DEFAULT 'operator',
                 created_at TEXT NOT NULL,
                 last_login_at TEXT
             )
@@ -201,6 +202,9 @@ def init_db(db_path: Path) -> None:
         for migration in [
             "ALTER TABLE benchmarks ADD COLUMN siem_type TEXT DEFAULT 'none'",
             "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+            # Roles (viewer/operator/admin). Existing non-admin accounts become operators,
+            # which keeps the access they had.
+            "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'operator'",
         ]:
             try:
                 conn.execute(migration)
@@ -215,6 +219,7 @@ def init_db(db_path: Path) -> None:
               AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = 1)
             """
         )
+        conn.execute("UPDATE users SET role = 'admin' WHERE is_admin = 1 AND role != 'admin'")
 
         conn.commit()
     finally:
@@ -731,11 +736,11 @@ def create_first_user(db_path: Path, username: str, password_hash: str) -> Optio
             return None
         now = utc_now()
         cur = conn.execute(
-            "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, 1, ?)",
+            "INSERT INTO users (username, password_hash, is_admin, role, created_at) VALUES (?, ?, 1, 'admin', ?)",
             (username, password_hash, now),
         )
         conn.commit()
-        return {"id": cur.lastrowid, "username": username, "is_admin": True, "created_at": now}
+        return {"id": cur.lastrowid, "username": username, "is_admin": True, "role": "admin", "created_at": now}
 
 
 def _user_row(row) -> Optional[Dict[str, Any]]:
@@ -762,24 +767,25 @@ def get_user_by_id(db_path: Path, user_id: int) -> Optional[Dict[str, Any]]:
 def list_users(db_path: Path) -> List[Dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin, created_at, last_login_at FROM users ORDER BY username COLLATE NOCASE"
+            "SELECT id, username, is_admin, role, created_at, last_login_at FROM users ORDER BY username COLLATE NOCASE"
         ).fetchall()
         return [_user_row(r) for r in rows]
 
 
-def create_user(db_path: Path, username: str, password_hash: str, is_admin: bool) -> Optional[Dict[str, Any]]:
+def create_user(db_path: Path, username: str, password_hash: str, role: str) -> Optional[Dict[str, Any]]:
     """Create a user. Returns None if the username is taken (case-insensitive)."""
     with _connection(db_path) as conn:
         now = utc_now()
         try:
             cur = conn.execute(
-                "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?)",
-                (username, password_hash, int(is_admin), now),
+                "INSERT INTO users (username, password_hash, is_admin, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                (username, password_hash, int(role == "admin"), role, now),
             )
         except sqlite3.IntegrityError:
             return None
         conn.commit()
-        return {"id": cur.lastrowid, "username": username, "is_admin": is_admin, "created_at": now, "last_login_at": None}
+        return {"id": cur.lastrowid, "username": username, "is_admin": role == "admin", "role": role,
+                "created_at": now, "last_login_at": None}
 
 
 def update_user_password(db_path: Path, user_id: int, password_hash: str) -> None:
@@ -795,14 +801,14 @@ def _is_last_admin(conn, user_id: int) -> bool:
     return conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0] <= 1
 
 
-def set_user_admin(db_path: Path, user_id: int, is_admin: bool) -> bool:
-    """Change a user's admin flag. Returns False (and changes nothing) if it would remove the last admin."""
+def set_user_role(db_path: Path, user_id: int, role: str) -> bool:
+    """Change a user's role. Returns False (and changes nothing) if it would remove the last admin."""
     with _connection(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        if not is_admin and _is_last_admin(conn, user_id):
+        if role != "admin" and _is_last_admin(conn, user_id):
             conn.rollback()
             return False
-        conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+        conn.execute("UPDATE users SET role = ?, is_admin = ? WHERE id = ?", (role, int(role == "admin"), user_id))
         conn.commit()
         return True
 
@@ -851,7 +857,7 @@ def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]
     with _connection(db_path) as conn:
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.is_admin, u.created_at, u.last_login_at
+            SELECT u.id, u.username, u.is_admin, u.role, u.created_at, u.last_login_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?
             """,

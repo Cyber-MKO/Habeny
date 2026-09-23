@@ -117,10 +117,19 @@ sign-in page is shown to anyone without a valid session.
 
 - **Account** (sidebar → Settings, or click your username): change your password.
   This signs you out on your other devices.
-- **Users** (on the same page, administrators only): add users, make or remove
-  administrators, reset a user's password (signs them out everywhere) and delete users.
-  Non-admin users can use everything else in the app. You can't delete or demote
-  yourself, and there is always at least one administrator.
+- **Users** (on the same page, administrators only): add users, change their role,
+  reset a user's password (signs them out everywhere) and delete users. You can't delete
+  or demote yourself, and there is always at least one administrator.
+- **Roles**, enforced by the server on every request:
+
+  | Role | Can |
+  |---|---|
+  | Viewer | See everything (dashboards, containers, reports, activity); change nothing |
+  | Operator | Viewer + deploy/start/stop/delete containers, simulations, log uploads, console, profiles |
+  | Admin | Operator + manage users |
+
+  New users are viewers unless you choose otherwise. On upgrade, existing non-admin
+  accounts become operators (the access they already had).
 - Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
 - After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
 - Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.
