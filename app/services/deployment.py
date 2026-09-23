@@ -7,7 +7,7 @@ import queue
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from multiprocessing import Manager, cpu_count
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.config import DB_PATH
 from app.core.container import parse_memory_limit, setup_agent_health_check
@@ -123,6 +123,7 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
                     except Exception as e:
                         logger.error(f"Exception deploying {agent_name}: {e}")
                         result = {"agent_name": agent_name, "success": False, "error": str(e)}
+                    persist_deploy_result(result, deployment_dict.get("siem_type"))
                     results.append(result)
                     if result["success"]:
                         progress_event(
@@ -141,7 +142,21 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
 
 def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int] = None,
                              progress_queue=None) -> dict:
-    """Deploy a single container with a SIEM agent"""
+    """Deploy a single container with a SIEM agent. Runs in a worker process.
+
+    Workers never touch the database: a process forked from the multi-threaded web
+    app must not use SQLite (inherited lock state made writes fail with "database is
+    locked"). What should be saved is returned as result["metadata"]; the parent
+    stores it with persist_deploy_result().
+    """
+    metadata: Dict[str, Any] = {}
+    result = _deploy_container(agent_name, deployment_config, agent_seq_id, progress_queue, metadata)
+    result["metadata"] = metadata
+    return result
+
+
+def _deploy_container(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int],
+                      progress_queue, metadata: Dict[str, Any]) -> dict:
     deploy_start = time.time()
     try:
         logger.info(f"[{os.getpid()}] Deploying container: {agent_name}")
@@ -149,8 +164,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
 
         # Check if container exists
         if agent_name in lxc.list_containers():
-            write_agent_metadata(
-                agent_name,
+            metadata.update(
                 {
                     "agent_seq_id": agent_seq_id,
                     "lifecycle_status": "error",
@@ -183,8 +197,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         )
 
         if not success:
-            write_agent_metadata(
-                agent_name,
+            metadata.update(
                 {
                     "agent_seq_id": agent_seq_id,
                     "lifecycle_status": "error",
@@ -228,8 +241,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         _report_step(progress_queue, agent_name, "Starting container")
         if not container.start():
             container.destroy()
-            write_agent_metadata(
-                agent_name,
+            metadata.update(
                 {
                     "agent_seq_id": agent_seq_id,
                     "lifecycle_status": "error",
@@ -292,8 +304,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         else:
             container.stop()
             container.destroy()
-            write_agent_metadata(
-                agent_name,
+            metadata.update(
                 {
                     "agent_seq_id": agent_seq_id,
                     "lifecycle_status": "error",
@@ -311,8 +322,7 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
         ips = container.get_ips() if container.running else []
 
         install_success = install_result.get("success", False)
-        write_agent_metadata(
-            agent_name,
+        metadata.update(
             {
                 "agent_seq_id": agent_seq_id,
                 "siem_type": siem_type,
@@ -353,17 +363,6 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
             "deploy_time_seconds": round(time.time() - deploy_start, 2),
         }
 
-        # Record per-container deployment timing
-        try:
-            record_metric(DB_PATH, "deployment", "container_deploy_time",
-                         time.time() - deploy_start, siem_type)
-            if install_success:
-                record_metric(DB_PATH, "deployment", "container_success", 1, siem_type)
-            else:
-                record_metric(DB_PATH, "deployment", "container_failure", 1, siem_type)
-        except Exception:
-            pass
-
     except Exception as e:
         logger.error(f"Failed to deploy {agent_name}: {e}")
         return {
@@ -371,4 +370,21 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
             "success": False,
             "error": str(e)
         }
+
+
+def persist_deploy_result(result: dict, siem_type: Optional[str] = None) -> None:
+    """Save a worker's deploy result in the parent process: container metadata and
+    per-container deploy metrics. A failure here is logged; it never turns a deployed
+    container into a failed one."""
+    name = result.get("agent_name")
+    metadata = result.pop("metadata", None)
+    try:
+        if metadata:
+            write_agent_metadata(name, metadata)
+        if result.get("deploy_time_seconds") is not None:
+            record_metric(DB_PATH, "deployment", "container_deploy_time", result["deploy_time_seconds"], siem_type)
+        record_metric(DB_PATH, "deployment", "container_success" if result.get("success") else "container_failure",
+                      1, siem_type)
+    except Exception as e:
+        logger.error(f"Deployed {name} but could not save its metadata: {e}")
 

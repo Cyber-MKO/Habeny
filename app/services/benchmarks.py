@@ -365,7 +365,7 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
                 from concurrent.futures import ProcessPoolExecutor, as_completed
                 from multiprocessing import cpu_count
 
-                from app.services.deployment import deploy_single_siem_agent
+                from app.services.deployment import deploy_single_siem_agent, persist_deploy_result
 
                 agent_names = [f"{base_name}-p{i}-{j:04d}" for j in range(1, agents_count + 1)]
                 deployment_config = {
@@ -387,6 +387,7 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
                     for future in as_completed(futures):
                         try:
                             result = future.result(timeout=600)
+                            persist_deploy_result(result, siem_type)
                             dt = result.get("deploy_time_seconds", 0)
                             deploy_times.append(dt)
                             if not result.get("success"):
