@@ -205,6 +205,9 @@ def init_db(db_path: Path) -> None:
             # Roles (viewer/operator/admin). Existing non-admin accounts become operators,
             # which keeps the access they had.
             "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'operator'",
+            "ALTER TABLE sessions ADD COLUMN ip TEXT",
+            "ALTER TABLE sessions ADD COLUMN user_agent TEXT",
+            "ALTER TABLE sessions ADD COLUMN last_seen_at TEXT",
         ]:
             try:
                 conn.execute(migration)
@@ -842,14 +845,36 @@ def update_user_last_login(db_path: Path, user_id: int) -> None:
         conn.commit()
 
 
-def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str) -> None:
+def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str,
+                   ip: Optional[str] = None, user_agent: Optional[str] = None) -> None:
     with _connection(db_path) as conn:
-        conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (utc_now(),))
+        now = utc_now()
+        conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
         conn.execute(
-            "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (token_hash, user_id, utc_now(), expires_at),
+            "INSERT INTO sessions (token_hash, user_id, created_at, expires_at, ip, user_agent, last_seen_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (token_hash, user_id, now, expires_at, ip, (user_agent or "")[:300], now),
         )
         conn.commit()
+
+
+def touch_session(db_path: Path, token_hash: str, ip: Optional[str]) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE sessions SET last_seen_at = ?, ip = COALESCE(?, ip) WHERE token_hash = ?",
+                     (utc_now(), ip, token_hash))
+        conn.commit()
+
+
+def list_user_sessions(db_path: Path, user_id: int) -> List[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT token_hash, created_at, last_seen_at, expires_at, ip, user_agent
+            FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY COALESCE(last_seen_at, created_at) DESC
+            """,
+            (user_id, utc_now()),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]:
@@ -857,7 +882,8 @@ def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]
     with _connection(db_path) as conn:
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.is_admin, u.role, u.created_at, u.last_login_at
+            SELECT u.id, u.username, u.is_admin, u.role, u.created_at, u.last_login_at,
+                   s.last_seen_at AS session_last_seen_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?
             """,

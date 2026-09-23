@@ -82,7 +82,7 @@ async def setup_admin(body: SetupRequest, request: Request, response: Response):
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Setup has already been completed")
     remove_setup_token()
-    _set_session_cookie(request, response, start_session(user["id"]))
+    _set_session_cookie(request, response, start_session(user["id"], request))
     update_user_last_login(DB_PATH, user["id"])
     log_activity("auth_setup_completed", {"username": user["username"]})
     return APIResponse(success=True, message="Admin account created", data={"user": public_user(user)})
@@ -106,7 +106,7 @@ async def login(body: LoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     login_limiter.reset(client)
-    _set_session_cookie(request, response, start_session(user["id"]))
+    _set_session_cookie(request, response, start_session(user["id"], request))
     update_user_last_login(DB_PATH, user["id"])
     log_activity("auth_login", {"username": user["username"], "client": client})
     return APIResponse(success=True, message="Signed in", data={"user": public_user(user)})

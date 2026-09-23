@@ -841,6 +841,15 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
   color: var(--orange);
   border-color: rgba(245, 165, 36, 0.3);
 }
+.account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; align-items: start; }
+.account-grid .account-card { max-width: none; }
+.session-list { list-style: none; display: flex; flex-direction: column; }
+.session-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 0; border-top: 1px solid var(--border);
+}
+.session-row:first-child { border-top: none; }
+.session-device { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .account-role-select { width: auto; padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; }
 .header-readonly {
   font-family: var(--font-mono);

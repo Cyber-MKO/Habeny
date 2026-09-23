@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.config import DB_PATH, SESSION_COOKIE
 from app.db import (
     create_user,
+    delete_session,
     delete_user,
     delete_user_sessions,
     get_user_by_id,
+    list_user_sessions,
     list_users,
     set_user_role,
     update_user_password,
@@ -22,7 +24,14 @@ from app.models import (
 )
 from app.routes.auth import public_user
 from app.services.activity import log_activity
-from app.services.auth import hash_password, require_admin, require_user, token_hash, verify_password
+from app.services.auth import (
+    hash_password,
+    require_admin,
+    require_user,
+    session_public_id,
+    token_hash,
+    verify_password,
+)
 from app.services.password_policy import enforce_password_policy
 
 router = APIRouter(prefix="/users")
@@ -51,6 +60,46 @@ async def change_own_password(body: PasswordChangeRequest, request: Request, use
     delete_user_sessions(DB_PATH, user["id"], keep_token_hash=token_hash(request.cookies[SESSION_COOKIE]))
     log_activity("user_password_changed", {"username": user["username"]})
     return APIResponse(success=True, message="Password changed. Your other sessions were signed out.")
+
+
+def _public_session(row: dict, current_id: str) -> dict:
+    sid = session_public_id(row["token_hash"])
+    return {
+        "id": sid,
+        "current": sid == current_id,
+        "created_at": row["created_at"],
+        "last_seen_at": row.get("last_seen_at") or row["created_at"],
+        "expires_at": row["expires_at"],
+        "ip": row.get("ip"),
+        "user_agent": row.get("user_agent") or "",
+    }
+
+
+@router.get("/me/sessions", response_model=APIResponse)
+async def my_sessions(user: dict = Depends(require_user)):
+    """Your active sessions (browsers/devices signed in to your account)."""
+    rows = list_user_sessions(DB_PATH, user["id"])
+    return APIResponse(success=True, message=f"{len(rows)} active sessions",
+                       data={"sessions": [_public_session(r, user["session_id"]) for r in rows]})
+
+
+@router.delete("/me/sessions/{session_id}", response_model=APIResponse)
+async def end_my_session(session_id: str, user: dict = Depends(require_user)):
+    """Sign out one of your sessions."""
+    for row in list_user_sessions(DB_PATH, user["id"]):
+        if session_public_id(row["token_hash"]) == session_id:
+            delete_session(DB_PATH, row["token_hash"])
+            log_activity("session_revoked", {"username": user["username"], "session": session_id})
+            return APIResponse(success=True, message="Session signed out")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+
+@router.post("/me/sessions/revoke-others", response_model=APIResponse)
+async def end_my_other_sessions(request: Request, user: dict = Depends(require_user)):
+    """Sign out everywhere except this browser."""
+    delete_user_sessions(DB_PATH, user["id"], keep_token_hash=token_hash(request.cookies[SESSION_COOKIE]))
+    log_activity("sessions_revoked", {"username": user["username"], "scope": "others"})
+    return APIResponse(success=True, message="Signed out of all other sessions")
 
 
 @router.get("", response_model=APIResponse)
@@ -91,6 +140,25 @@ async def reset_user_password(user_id: int, body: PasswordResetRequest, admin: d
     delete_user_sessions(DB_PATH, target["id"])
     log_activity("user_password_reset", {"username": target["username"], "by": admin["username"]})
     return APIResponse(success=True, message=f"Password reset for '{target['username']}'")
+
+
+@router.get("/{user_id}/sessions", response_model=APIResponse)
+async def user_sessions(user_id: int, admin: dict = Depends(require_admin)):
+    target = get_user_by_id(DB_PATH, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    rows = list_user_sessions(DB_PATH, user_id)
+    return APIResponse(success=True, message=f"{len(rows)} active sessions",
+                       data={"sessions": [_public_session(r, admin["session_id"]) for r in rows]})
+
+
+@router.post("/{user_id}/sessions/revoke", response_model=APIResponse)
+async def end_user_sessions(user_id: int, admin: dict = Depends(require_admin)):
+    """Sign a user out everywhere (e.g. a lost laptop)."""
+    target = _get_other_user(user_id, admin)
+    delete_user_sessions(DB_PATH, target["id"])
+    log_activity("sessions_revoked", {"username": target["username"], "scope": "all", "by": admin["username"]})
+    return APIResponse(success=True, message=f"'{target['username']}' was signed out everywhere")
 
 
 @router.delete("/{user_id}", response_model=APIResponse)

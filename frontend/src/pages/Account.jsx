@@ -74,6 +74,63 @@ function ChangePassword() {
   );
 }
 
+function describeAgent(ua) {
+  if (!ua) return "Unknown device";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome"
+    : /Safari\//.test(ua) ? "Safari" : /curl|python|httpx/i.test(ua) ? "API client" : "Browser";
+  const os = /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? "macOS" : /Android/.test(ua) ? "Android"
+    : /iPhone|iPad/.test(ua) ? "iOS" : /Linux/.test(ua) ? "Linux" : "";
+  return os ? `${browser} on ${os}` : browser;
+}
+
+function Sessions() {
+  const { toast } = useStore();
+  const [sessions, setSessions] = useState(null);
+  const load = useCallback(async () => {
+    try { setSessions((await api.getMySessions()).data.sessions); }
+    catch (err) { toast(err.message, "error"); setSessions([]); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const end = async (s) => {
+    try { toast((await api.endMySession(s.id)).message, "success"); load(); }
+    catch (err) { toast(err.message, "error"); }
+  };
+  const endOthers = async () => {
+    if (!confirm("Sign out every other browser and device?")) return;
+    try { toast((await api.endMyOtherSessions()).message, "success"); load(); }
+    catch (err) { toast(err.message, "error"); }
+  };
+
+  const others = (sessions || []).filter((s) => !s.current).length;
+  return (
+    <div className="card account-card account-sessions">
+      <div className="account-users-head">
+        <div className="section-title">Active sessions</div>
+        <button className="btn btn-secondary btn-sm" onClick={endOthers} disabled={!others}>Sign out all others</button>
+      </div>
+      <p className="account-help">Browsers and devices signed in to your account.</p>
+      {sessions === null ? <Spinner /> : (
+        <ul className="session-list">
+          {sessions.map((s) => (
+            <li key={s.id} className="session-row">
+              <div>
+                <div className="session-device">
+                  {describeAgent(s.user_agent)}{s.current && <span className="tag">this browser</span>}
+                </div>
+                <div className="account-help">
+                  {s.ip || "unknown IP"} · active {formatDate(s.last_seen_at)} · signed in {formatDate(s.created_at)}
+                </div>
+              </div>
+              {!s.current && <button className="btn btn-sm btn-secondary" onClick={() => end(s)}>Sign out</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function AddUserModal({ onClose, onCreated }) {
   const { toast } = useStore();
   const [form, setForm] = useState({ username: "", password: "", confirm: "", role: "viewer" });
@@ -204,6 +261,12 @@ function Users() {
     } catch (err) { toast(err.message, "error"); }
   };
 
+  const signOutEverywhere = async (u) => {
+    if (!confirm(`Sign "${u.username}" out of every browser and device?`)) return;
+    try { toast((await api.endUserSessions(u.id)).message, "success"); }
+    catch (err) { toast(err.message, "error"); }
+  };
+
   const remove = async (u) => {
     if (!confirm(`Delete user "${u.username}"? They'll be signed out immediately.`)) return;
     try {
@@ -230,6 +293,7 @@ function Users() {
     ) : (
       <div className="btn-group">
         <button className="btn btn-sm btn-secondary" onClick={() => setResetting(u)}>Reset password</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => signOutEverywhere(u)}>Sign out everywhere</button>
         <button className="btn btn-sm btn-danger" onClick={() => remove(u)}>Delete</button>
       </div>
     )},
@@ -261,7 +325,10 @@ export default function Account() {
           Signed in as <strong>{user.username}</strong>
           <Pill status={user.role} />
         </div>
-        <ChangePassword />
+        <div className="account-grid">
+          <ChangePassword />
+          <Sessions />
+        </div>
       </div>
       {user.is_admin && <Users />}
     </>

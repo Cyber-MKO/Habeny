@@ -214,3 +214,39 @@ def test_policy_enforced_on_new_users_and_changes(client, password):
     resp = client.post("/users/me/password", json={"current_password": "correct-horse-battery", "new_password": password})
     assert resp.status_code in (400, 422)
     assert me["username"] == "admin"
+
+
+def test_list_and_end_own_sessions(app, member):
+    _, name, pw = member
+    laptop = TestClient(app, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) Firefox/130"})
+    assert laptop.post("/auth/login", json={"username": name, "password": pw}).status_code == 200
+    phone = _sign_in(app, name, pw)
+    sessions = laptop.get("/users/me/sessions").json()["data"]["sessions"]
+    assert len(sessions) == 2
+    current = [s for s in sessions if s["current"]]
+    assert len(current) == 1 and "Firefox" in current[0]["user_agent"] and current[0]["ip"]
+    other = next(s for s in sessions if not s["current"])
+    assert "token" not in other and len(other["id"]) == 16
+
+    assert laptop.delete(f"/users/me/sessions/{other['id']}").status_code == 200
+    assert phone.get("/groups").status_code == 401            # that session is gone
+    assert laptop.get("/groups").status_code == 200           # this one isn't
+    assert laptop.delete("/users/me/sessions/0000000000000000").status_code == 404
+
+
+def test_revoke_other_sessions_and_admin_sign_out_everywhere(app, client, member):
+    uid, name, pw = member
+    a, b = _sign_in(app, name, pw), _sign_in(app, name, pw)
+    assert a.post("/users/me/sessions/revoke-others").status_code == 200
+    assert b.get("/groups").status_code == 401 and a.get("/groups").status_code == 200
+    assert len(client.get(f"/users/{uid}/sessions").json()["data"]["sessions"]) == 1
+    assert client.post(f"/users/{uid}/sessions/revoke").status_code == 200
+    assert a.get("/groups").status_code == 401
+
+
+def test_cannot_end_someone_elses_session(app, client, member):
+    _, name, pw = member
+    theirs = _sign_in(app, name, pw)
+    their_id = theirs.get("/users/me/sessions").json()["data"]["sessions"][0]["id"]
+    assert client.delete(f"/users/me/sessions/{their_id}").status_code == 404
+    assert theirs.get("/groups").status_code == 200
