@@ -38,10 +38,14 @@ Habeny runs as two services so the web app never runs as root:
   offered OS images.
 
 ```bash
-git clone <repo> /opt/habeny && cd /opt/habeny
-sudo ./deploy/install.sh          # packages, user, venv, frontend, systemd units
+git clone <repo> ~/Habeny && cd ~/Habeny     # the checkout can live anywhere
+sudo ./deploy/install.sh    # installs a copy to /opt/habeny: packages, user, venv, frontend, units
 systemctl status habeny habeny-helper
 ```
+
+The installer copies the app to `/opt/habeny` (`HABENY_INSTALL_DIR` to change; it must be
+outside `/home`) and leaves your checkout untouched. To upgrade: `git pull` in the checkout,
+then run `sudo ./deploy/install.sh` again.
 
 Optional settings (TLS certificate, reverse-proxy mode, port) go in `/etc/default/habeny`.
 Upgrading from a root install: `install.sh` hands the existing data directory to `habeny`.
