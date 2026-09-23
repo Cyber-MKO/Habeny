@@ -113,20 +113,17 @@ async def generate_report(report_request: ReportGenerateRequest):
         report_files[report_id] = {"json": str(report_file)}
 
         requested_format = (report_request.format or "json").lower()
-        download_path = report_file
         download_format = "json"
 
         if requested_format == "csv":
             csv_file = REPORTS_DIR / f"{report_id}.csv"
             generate_report_csv(report_data, csv_file)
             report_files[report_id]["csv"] = str(csv_file)
-            download_path = csv_file
             download_format = "csv"
         elif requested_format == "pdf":
             pdf_file = REPORTS_DIR / f"{report_id}.pdf"
             generate_report_pdf(report_data, agents_by_status, pdf_file)
             report_files[report_id]["pdf"] = str(pdf_file)
-            download_path = pdf_file
             download_format = "pdf"
 
         log_activity("report_generated", {"report_id": report_id})

@@ -3,7 +3,6 @@ Smoke tests for the wired application returned by create_app().
 """
 import pytest
 from fastapi.testclient import TestClient
-from starlette.routing import Match
 
 
 def test_root_returns_200(client):
@@ -30,9 +29,17 @@ def test_api_prefix_is_accepted(client):
 ])
 def test_overlapping_routes_resolve_to_specific_handler(app, method, path, endpoint):
     """Routers are included in an order where literal paths win over {param} ones."""
-    scope = {"type": "http", "method": method, "path": path, "root_path": "", "query_string": b"", "headers": []}
-    matched = next(r for r in app.router.routes if r.matches(scope)[0] == Match.FULL)
-    assert matched.name == endpoint
+    seen = {}
+
+    async def spy(scope, receive, send):
+        try:
+            await app.router(scope, receive, send)
+        finally:
+            seen.update(scope)  # the router records the matched endpoint in the scope
+
+    # Unauthenticated, so the handler itself is refused (401) after routing: no side effects
+    TestClient(spy, raise_server_exceptions=False).request(method, path)
+    assert seen["endpoint"].__name__ == endpoint
 
 
 @pytest.mark.parametrize("path", ["/..%2fmain.py", "/..%2f..%2f..%2f..%2f..%2fetc%2fpasswd", "/%2e%2e/%2e%2e/etc/passwd"])
