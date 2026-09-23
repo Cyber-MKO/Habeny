@@ -4,6 +4,8 @@ LXC-based platform for deploying containers that run SIEM agents at scale.
 Deploy hundreds of lightweight containers, each running a real SIEM agent,
 to stress-test and validate your SIEM infrastructure.
 
+![Habeny dashboard](docs/images/dashboard.png)
+
 ## Supported SIEM Types
 
 | Type | Agent | Registration |
