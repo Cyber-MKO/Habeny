@@ -19,10 +19,10 @@ from app.installers.ossec import install_ossec_agent
 from app.installers.ossim import install_ossim_agent
 from app.installers.utmstack import install_utmstack_agent
 from app.installers.wazuh import install_wazuh_agent
+from app.models import utc_now
 from app.services.agent_info import write_agent_metadata
 from app.state import MAX_TRACKED_DEPLOYMENTS, deployment_progress, deployment_progress_lock
 from db import record_metric
-from models import utc_now
 
 logger = logging.getLogger(__name__)
 

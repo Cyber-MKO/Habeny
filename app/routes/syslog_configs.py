@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query
 
 from app.config import DB_PATH
+from app.models import APIResponse, SyslogConfigCreate, SyslogConfigUpdate
 from app.services.activity import log_activity
 from db import (
     create_syslog_config,
@@ -15,7 +16,6 @@ from db import (
     list_syslog_configs,
     update_syslog_config,
 )
-from models import APIResponse, SyslogConfigCreate, SyslogConfigUpdate
 
 router = APIRouter()
 

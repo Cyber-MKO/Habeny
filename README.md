@@ -69,8 +69,7 @@ npm run build      # outputs to ../static/
 │   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
 │   ├── installers/          # One module per SIEM agent + batch dispatcher, package cache
 │   ├── simulation/          # Attack simulation engine
-│   └── models/              # Scaffold for moving models.py
-├── models.py                # Pydantic request/response models
+│   └── models/              # Pydantic models by domain (import from app.models)
 ├── db.py                    # SQLite database layer
 ├── benchmarks.py            # Benchmark engine
 ├── requirements.txt         # Python dependencies

@@ -1,9 +1,151 @@
 """
-Pydantic models split by domain.
-
-Phase 5 will populate each sub-module and this __init__ will re-export
-everything so that ``from app.models import *`` works identically to
-the current ``from models import *``.
+Pydantic models split by domain. Import from here: ``from app.models import APIResponse``.
 """
-# Phase 5: replace these with explicit re-exports from sub-modules
-# For now the root models.py is the single source of truth.
+from app.models.activity import ActivityLog, ActivityLogListResponse
+from app.models.agents import (
+    AgentDeploymentRequest,
+    AgentDeploymentResult,
+    AgentInfo,
+    AgentListResponse,
+    AgentSelector,
+    AgentStats,
+    ContainerStatus,
+    SIEMConnectivity,
+)
+from app.models.benchmarks import BenchmarkCompareRequest, BenchmarkStartRequest
+from app.models.common import utc_now
+from app.models.configs import ConfigExportResponse, ConfigImportRequest, ConfigTemplate
+from app.models.enums import (
+    AgentLifecycleStatus,
+    ArchType,
+    ContainerState,
+    LogType,
+    OSType,
+    ParallelMode,
+    SIEMConnectivityStatus,
+    SIEMType,
+    SimulationProfile,
+    SimulationStatus,
+    SyslogDeviceType,
+    SyslogProtocol,
+    TemplateType,
+)
+from app.models.groups import GroupAgentRequest, GroupCreateRequest, GroupRenameRequest
+from app.models.legacy import (
+    AlertRule,
+    BackupRequest,
+    BatchContainerCreate,
+    ContainerCreate,
+    ContainerCreateWithWazuh,
+    NetworkTopology,
+    RestoreRequest,
+    ScalingPolicy,
+    SnapshotCreate,
+)
+from app.models.logs import LogBundleUploadRequest, LogScheduleRequest, LogUploadRequest
+from app.models.operations import (
+    APIResponse,
+    BulkOperationRequest,
+    BulkOperationResult,
+    ErrorResponse,
+    HealthCheckResponse,
+    PerformanceMetrics,
+    SystemStats,
+)
+from app.models.profiles import (
+    ManagerProfileCreate,
+    ManagerProfileUpdate,
+    SyslogConfigCreate,
+    SyslogConfigUpdate,
+)
+from app.models.reports import (
+    Report,
+    ReportFinding,
+    ReportGenerateRequest,
+    ReportListResponse,
+    ReportMetrics,
+    ReportSummary,
+)
+from app.models.siem import OSSECAgentInfo, OSSIMAgentInfo, SIEMStats, WazuhAgentInfo
+from app.models.simulations import (
+    CustomLogSimulationRequest,
+    SimulationInfo,
+    SimulationListResponse,
+    SimulationStartRequest,
+    SimulationStopRequest,
+    SyslogSimulationRequest,
+)
+
+__all__ = [
+    "utc_now",
+    "ContainerState",
+    "SIEMType",
+    "OSType",
+    "ArchType",
+    "TemplateType",
+    "ParallelMode",
+    "SyslogProtocol",
+    "AgentLifecycleStatus",
+    "SIEMConnectivityStatus",
+    "SimulationStatus",
+    "SimulationProfile",
+    "LogType",
+    "SyslogDeviceType",
+    "AgentDeploymentRequest",
+    "AgentDeploymentResult",
+    "ContainerStatus",
+    "SIEMConnectivity",
+    "AgentInfo",
+    "AgentStats",
+    "AgentListResponse",
+    "AgentSelector",
+    "SimulationStartRequest",
+    "CustomLogSimulationRequest",
+    "SimulationInfo",
+    "SimulationStopRequest",
+    "SimulationListResponse",
+    "SyslogSimulationRequest",
+    "ManagerProfileCreate",
+    "ManagerProfileUpdate",
+    "SyslogConfigCreate",
+    "SyslogConfigUpdate",
+    "ConfigImportRequest",
+    "ConfigTemplate",
+    "ConfigExportResponse",
+    "LogUploadRequest",
+    "LogScheduleRequest",
+    "LogBundleUploadRequest",
+    "GroupCreateRequest",
+    "GroupRenameRequest",
+    "GroupAgentRequest",
+    "ReportGenerateRequest",
+    "ReportSummary",
+    "ReportMetrics",
+    "ReportFinding",
+    "Report",
+    "ReportListResponse",
+    "ActivityLog",
+    "ActivityLogListResponse",
+    "BulkOperationRequest",
+    "BulkOperationResult",
+    "APIResponse",
+    "ErrorResponse",
+    "HealthCheckResponse",
+    "PerformanceMetrics",
+    "SystemStats",
+    "WazuhAgentInfo",
+    "OSSECAgentInfo",
+    "OSSIMAgentInfo",
+    "SIEMStats",
+    "ContainerCreate",
+    "ContainerCreateWithWazuh",
+    "BatchContainerCreate",
+    "ScalingPolicy",
+    "AlertRule",
+    "NetworkTopology",
+    "SnapshotCreate",
+    "BackupRequest",
+    "RestoreRequest",
+    "BenchmarkStartRequest",
+    "BenchmarkCompareRequest",
+]

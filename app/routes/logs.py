@@ -7,10 +7,10 @@ import uuid
 import lxc
 from fastapi import APIRouter, HTTPException
 
+from app.models import APIResponse, LogScheduleRequest, LogUploadRequest, utc_now
 from app.services.activity import log_activity
 from app.services.logs import perform_log_upload, run_log_schedule, schedule_public
 from app.state import scheduled_log_tasks
-from models import APIResponse, LogScheduleRequest, LogUploadRequest, utc_now
 
 router = APIRouter()
 

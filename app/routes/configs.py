@@ -7,9 +7,9 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from app.config import CONFIGS_DIR
+from app.models import APIResponse, ConfigImportRequest, utc_now
 from app.services.activity import log_activity
 from app.state import config_templates
-from models import APIResponse, ConfigImportRequest, utc_now
 
 router = APIRouter()
 

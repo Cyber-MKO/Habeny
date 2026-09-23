@@ -6,8 +6,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.config import LOGS_DIR
+from app.models import utc_now
 from app.state import activity_logs
-from models import utc_now
 
 logger = logging.getLogger(__name__)
 

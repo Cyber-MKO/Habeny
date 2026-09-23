@@ -14,6 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 
 from app.config import REPORTS_DIR
+from app.models import APIResponse, ReportGenerateRequest, utc_now
 from app.services.activity import log_activity
 from app.services.agent_info import get_agent_info
 from app.services.reporting import (
@@ -24,7 +25,6 @@ from app.services.reporting import (
     normalize_dt,
 )
 from app.state import report_files, reports_db, simulations_db
-from models import APIResponse, ReportGenerateRequest, utc_now
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

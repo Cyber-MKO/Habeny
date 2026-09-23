@@ -7,6 +7,15 @@ import lxc
 from fastapi import APIRouter, HTTPException
 
 from app.config import DB_PATH
+from app.models import (
+    APIResponse,
+    BulkOperationRequest,
+    GroupAgentRequest,
+    GroupCreateRequest,
+    GroupRenameRequest,
+    LogScheduleRequest,
+    LogUploadRequest,
+)
 from app.routes.agents import bulk_agent_operation
 from app.routes.logs import schedule_log_upload
 from app.services.activity import log_activity
@@ -21,15 +30,6 @@ from db import (
     list_groups,
     remove_agents_from_group,
     rename_group,
-)
-from models import (
-    APIResponse,
-    BulkOperationRequest,
-    GroupAgentRequest,
-    GroupCreateRequest,
-    GroupRenameRequest,
-    LogScheduleRequest,
-    LogUploadRequest,
 )
 
 logger = logging.getLogger(__name__)

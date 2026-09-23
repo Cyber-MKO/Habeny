@@ -6,9 +6,9 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from app.config import DB_PATH
+from app.models import APIResponse, ManagerProfileCreate, ManagerProfileUpdate
 from app.services.activity import log_activity
 from db import create_manager, delete_manager, get_manager, get_manager_by_name, list_managers, update_manager
-from models import APIResponse, ManagerProfileCreate, ManagerProfileUpdate
 
 router = APIRouter()
 

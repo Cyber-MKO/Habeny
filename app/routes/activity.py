@@ -5,8 +5,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
+from app.models import APIResponse
 from app.services.activity import read_activity_logs_from_files
-from models import APIResponse
 
 router = APIRouter()
 

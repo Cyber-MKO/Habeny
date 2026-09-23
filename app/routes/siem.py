@@ -6,13 +6,13 @@ import logging
 import lxc
 from fastapi import APIRouter, HTTPException
 
+from app.models import APIResponse
 from app.services.agent_info import (
     check_siem_connectivity,
     detect_siem_type,
     get_agent_info,
     write_agent_metadata,
 )
-from models import APIResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

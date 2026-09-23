@@ -11,10 +11,10 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.config import DB_PATH
 from app.core.resources import get_system_resources
+from app.models import APIResponse, utc_now
 from app.services.agent_info import read_agent_metadata
 from app.state import simulations_db
 from db import get_metric_summary, query_metrics, record_metrics_batch
-from models import APIResponse, utc_now
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

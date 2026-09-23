@@ -8,6 +8,13 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.encoders import jsonable_encoder
 
+from app.models import (
+    APIResponse,
+    CustomLogSimulationRequest,
+    SimulationStartRequest,
+    SyslogSimulationRequest,
+    utc_now,
+)
 from app.services.activity import log_activity
 from app.services.simulation import (
     list_simulation_profiles,
@@ -17,13 +24,6 @@ from app.services.simulation import (
     select_agents_for_simulation,
 )
 from app.state import simulations_db
-from models import (
-    APIResponse,
-    CustomLogSimulationRequest,
-    SimulationStartRequest,
-    SyslogSimulationRequest,
-    utc_now,
-)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
