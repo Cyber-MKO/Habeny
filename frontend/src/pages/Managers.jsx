@@ -64,7 +64,7 @@ export default function Managers() {
     setForm({
       name: mgr.name || "", description: mgr.description || "",
       siem_type: mgr.siem_type || "wazuh", siem_ip: mgr.siem_ip || "",
-      siem_version: mgr.siem_version || "", siem_auth_key: mgr.siem_auth_key || "",
+      siem_version: mgr.siem_version || "", siem_auth_key: "", // write-only: blank keeps the stored key
       os_type: mgr.os_type || "ubuntu_22_04", agent_group: mgr.agent_group || "default",
       memory_limit: mgr.memory_limit || "512MB", cpu_shares: mgr.cpu_shares || 1024,
       config_template_id: mgr.config_template_id || "",
@@ -77,12 +77,15 @@ export default function Managers() {
     catch (e) { toast(e.message, "error"); }
   };
 
+  const editingKeyHint = editing ? managers.find((m) => m.manager_id === editing)?.siem_auth_key_hint : null;
+
   const cancelEdit = () => { setEditing(null); setForm({ ...EMPTY_FORM }); };
 
   const columns = [
     { key: "name", label: "Name" },
     { key: "siem_type", label: "SIEM Type", render: (r) => <Pill status={r.siem_type === "none" ? "unknown" : r.siem_type} /> },
     { key: "siem_ip", label: "Manager IP", render: (r) => r.siem_ip || "—" },
+    { key: "siem_auth_key_hint", label: "Auth Key", render: (r) => r.has_siem_auth_key ? <span style={{ fontFamily: "var(--font-mono)" }}>{r.siem_auth_key_hint}</span> : "—" },
     { key: "os_type", label: "OS" },
     { key: "agent_group", label: "Group" },
     { key: "memory_limit", label: "Memory" },
@@ -115,7 +118,8 @@ export default function Managers() {
           {!isBare && <div className="field"><label>Manager IP / Hostname</label><input className="input" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} /></div>}
           {!isBare && !needsAuthKey && <div className="field"><label>SIEM Version</label><input className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} /></div>}
           {isElastic && <div className="field"><label>Agent Version</label><input className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} /></div>}
-          {needsAuthKey && <div className="field"><label>{isElastic ? "Enrollment Token" : "Auth Key"}</label><input className="input" value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)} /></div>}
+          {needsAuthKey && <div className="field"><label>{isElastic ? "Enrollment Token" : "Auth Key"}</label><input className="input" type="password" autoComplete="off" value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
+            placeholder={editingKeyHint ? `Stored (${editingKeyHint}) — leave blank to keep` : ""} /></div>}
           <div className="field"><label>OS Type</label>
             <select className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
               {OS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

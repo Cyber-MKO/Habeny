@@ -32,6 +32,31 @@ def _conn():
 def _now():
     return datetime.now(timezone.utc).isoformat()
 
+SECRET_CONFIG_KEYS = ("siem_auth_key",)
+
+
+def _storable_config(config: dict) -> dict:
+    """Benchmark config as persisted/returned: secrets are only kept in memory for the run."""
+    return {k: v for k, v in config.items() if k not in SECRET_CONFIG_KEYS}
+
+
+def scrub_stored_benchmark_secrets() -> int:
+    """One-time upgrade: remove auth keys saved in benchmark configs before this change."""
+    changed = 0
+    with _conn() as c:
+        for row in c.execute("SELECT benchmark_id, config FROM benchmarks").fetchall():
+            try:
+                cfg = json.loads(row["config"] or "{}")
+            except ValueError:
+                continue
+            if any(k in cfg for k in SECRET_CONFIG_KEYS):
+                c.execute("UPDATE benchmarks SET config=? WHERE benchmark_id=?",
+                          (json.dumps(_storable_config(cfg)), row["benchmark_id"]))
+                changed += 1
+        c.commit()
+    return changed
+
+
 def _save_benchmark(bm: dict):
     with _conn() as c:
         c.execute(
@@ -43,7 +68,7 @@ def _save_benchmark(bm: dict):
                results=excluded.results,completed_at=excluded.completed_at""",
             (bm["benchmark_id"], bm["scenario_id"], bm.get("name"),
              bm.get("siem_type", "none"),
-             bm["status"], json.dumps(bm.get("config", {})),
+             bm["status"], json.dumps(_storable_config(bm.get("config", {}))),
              json.dumps(bm.get("phases", [])), bm.get("current_phase", 0),
              json.dumps(bm.get("results", {})), bm.get("started_at"),
              bm.get("completed_at"), bm.get("created_at", _now())))

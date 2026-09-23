@@ -57,6 +57,12 @@ sign-in page is shown to anyone without a valid session.
 - Until the admin account exists, anyone who can reach the server can create it,
   so complete setup right after the first start.
 
+**Stored secrets:** SIEM auth keys and enrollment tokens in manager profiles are encrypted
+in the database and never sent back to the browser (only the last 4 characters are shown).
+The encryption key is generated on first start at `/var/lib/lxc-siem-platform/secret.key`
+(or set `HABENY_SECRET_KEY`). **Back it up together with `platform.db`**: without it, stored
+keys can't be read and must be re-entered in each profile.
+
 **Forgotten password:** another administrator can reset it on the Account page. If the only
 administrator is locked out, remove all accounts on the server and the UI will offer setup again:
 

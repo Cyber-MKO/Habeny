@@ -7,6 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 import app.services.benchmarks as bm_engine
+from app.config import DB_PATH
+from app.db import get_manager
 from app.models import APIResponse, BenchmarkCompareRequest, BenchmarkStartRequest
 from app.services.activity import log_activity
 
@@ -31,7 +33,17 @@ async def start_benchmark(request: BenchmarkStartRequest,
         if scenario_id not in bm_engine.SCENARIOS:
             raise HTTPException(status_code=400, detail=f"Unknown scenario: {scenario_id}")
         benchmark_id = str(uuid.uuid4())
-        cfg = {k: v for k, v in request.dict().items() if v is not None}
+        cfg = {k: v for k, v in request.dict().items() if v not in (None, "")}
+        profile_id = cfg.pop("manager_profile_id", None)
+        if profile_id:
+            mgr = get_manager(DB_PATH, profile_id)
+            if not mgr:
+                raise HTTPException(status_code=404, detail=f"Manager profile '{profile_id}' not found")
+            for field in ("siem_type", "siem_ip", "siem_version", "siem_auth_key", "os_type", "agent_group"):
+                if mgr.get(field) and (field not in cfg or (field == "siem_type" and cfg[field] == "none")):
+                    cfg[field] = mgr[field]
+        if cfg.get("siem_type") in ("utmstack", "elastic") and not cfg.get("siem_auth_key"):
+            raise HTTPException(status_code=400, detail="An auth key / enrollment token is required for UTMstack and Elastic")
         if request.name:
             cfg["name"] = request.name
 

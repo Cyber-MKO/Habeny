@@ -22,6 +22,7 @@ class BenchmarkStartRequest(BaseModel):
     agent_group: Optional[str] = "benchmark"
     metric_interval: Optional[int] = None
     failure_threshold: Optional[float] = None
+    manager_profile_id: Optional[str] = None  # fills unset SIEM fields (incl. the stored auth key) server-side
 
     @field_validator('base_name')
     @classmethod

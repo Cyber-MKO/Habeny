@@ -39,7 +39,8 @@ class AgentDeploymentRequest(BaseModel):
     @validator('siem_ip', always=True)
     def validate_siem_ip(cls, v, values):
         siem_type = values.get('siem_type')
-        if siem_type and siem_type != SIEMType.NONE and siem_type != "none":
+        # With a manager profile the server fills it in (checked again after that)
+        if siem_type and siem_type != SIEMType.NONE and siem_type != "none" and not values.get('manager_profile_id'):
             if not v:
                 raise ValueError('siem_ip is required when deploying a SIEM agent')
         return INSTALL_FIELD_CHECKS["siem_ip"](v)
@@ -47,6 +48,8 @@ class AgentDeploymentRequest(BaseModel):
     @validator('siem_auth_key', always=True)
     def validate_siem_auth_key(cls, v, values):
         siem_type = values.get('siem_type')
+        if values.get('manager_profile_id'):
+            return INSTALL_FIELD_CHECKS["siem_auth_key"](v)  # stored (encrypted) in the profile
         if siem_type in (SIEMType.UTMSTACK, "utmstack") and not v:
             raise ValueError('siem_auth_key is required for UTMstack deployments')
         if siem_type in (SIEMType.ELASTIC, "elastic") and not v:

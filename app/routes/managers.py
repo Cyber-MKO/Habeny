@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from app.config import DB_PATH
+from app.core.secrets import secret_hint
 from app.db import create_manager, delete_manager, get_manager, get_manager_by_name, list_managers, update_manager
 from app.models import APIResponse, ManagerProfileCreate, ManagerProfileUpdate
 from app.services.activity import log_activity
@@ -13,12 +14,21 @@ from app.services.activity import log_activity
 router = APIRouter()
 
 
+def public_manager(mgr: dict) -> dict:
+    """Profile as returned by the API: the auth key is replaced by a presence flag and hint."""
+    key = mgr.get("siem_auth_key")
+    out = {k: v for k, v in mgr.items() if k != "siem_auth_key"}
+    out["has_siem_auth_key"] = bool(key)
+    out["siem_auth_key_hint"] = secret_hint(key)
+    return out
+
+
 @router.get("/managers", response_model=APIResponse)
 async def list_manager_profiles():
     """List all manager profiles"""
     try:
         managers = list_managers(DB_PATH)
-        return APIResponse(success=True, message=f"Retrieved {len(managers)} manager profiles", data={"managers": managers, "total": len(managers)})
+        return APIResponse(success=True, message=f"Retrieved {len(managers)} manager profiles", data={"managers": [public_manager(m) for m in managers], "total": len(managers)})
     except Exception as e:
         return APIResponse(success=False, message="Failed to list managers", error=str(e))
 
@@ -30,7 +40,7 @@ async def get_manager_profile(manager_id: str):
         mgr = get_manager(DB_PATH, manager_id)
         if not mgr:
             raise HTTPException(status_code=404, detail="Manager profile not found")
-        return APIResponse(success=True, message="Manager profile retrieved", data=mgr)
+        return APIResponse(success=True, message="Manager profile retrieved", data=public_manager(mgr))
     except HTTPException:
         raise
     except Exception as e:
@@ -47,7 +57,7 @@ async def create_manager_profile(profile: ManagerProfileCreate):
         data = profile.dict()
         mgr = create_manager(DB_PATH, manager_id, data)
         log_activity("manager_created", {"manager_id": manager_id, "name": profile.name})
-        return APIResponse(success=True, message="Manager profile created", data=mgr)
+        return APIResponse(success=True, message="Manager profile created", data=public_manager(mgr))
     except HTTPException:
         raise
     except Exception as e:
@@ -63,7 +73,7 @@ async def update_manager_profile(manager_id: str, profile: ManagerProfileUpdate)
         if not mgr:
             raise HTTPException(status_code=404, detail="Manager profile not found")
         log_activity("manager_updated", {"manager_id": manager_id})
-        return APIResponse(success=True, message="Manager profile updated", data=mgr)
+        return APIResponse(success=True, message="Manager profile updated", data=public_manager(mgr))
     except HTTPException:
         raise
     except Exception as e:

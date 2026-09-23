@@ -32,6 +32,15 @@ def _initialize_storage() -> None:
 
     migrate_legacy_agent_metadata()
 
+    # Secrets stored before encryption existed
+    from app.db import encrypt_plaintext_manager_secrets
+    from app.services.benchmarks import scrub_stored_benchmark_secrets
+    encrypted = encrypt_plaintext_manager_secrets(DB_PATH)
+    scrubbed = scrub_stored_benchmark_secrets()
+    if encrypted or scrubbed:
+        logger.info(f"Secured stored secrets: {encrypted} manager profile key(s) encrypted, "
+                    f"{scrubbed} benchmark config(s) scrubbed")
+
 
 def create_app() -> FastAPI:
     """Application factory. Initializes storage, middleware and all routes."""
