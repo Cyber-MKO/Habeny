@@ -144,6 +144,7 @@ class AgentDeploymentRequest(BaseModel):
     parallel_mode: ParallelMode = Field(default=ParallelMode.MULTIPROCESSING, description="Deployment parallelism mode")
     auto_create_group: Optional[bool] = Field(default=True, description="Create container group if missing")
     siem_auth_key: Optional[str] = Field(default=None, description="Installer authentication key (required for UTMstack)")
+    deployment_id: Optional[str] = Field(default=None, max_length=64, description="Client-chosen ID for polling /agents/deploy/progress/{id}")
     
     @validator('siem_ip', always=True)
     def validate_siem_ip(cls, v, values):
