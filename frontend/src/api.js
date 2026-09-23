@@ -1,5 +1,8 @@
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
+// Fired when the API rejects a request because the session is missing or expired
+export const UNAUTHORIZED_EVENT = "habeny:unauthorized";
+
 async function request(path, opts = {}) {
   const { method = "GET", body, params } = opts;
   let url = `${BASE}${path}`;
@@ -7,9 +10,12 @@ async function request(path, opts = {}) {
     const qs = new URLSearchParams(params).toString();
     if (qs) url += `?${qs}`;
   }
-  const init = { method, headers: { "Content-Type": "application/json" } };
+  const init = { method, headers: { "Content-Type": "application/json" }, credentials: "include" };
   if (body) init.body = JSON.stringify(body);
   const res = await fetch(url, init);
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || err.error || res.statusText);
@@ -21,6 +27,11 @@ export const api = {
   get: (p, params) => request(p, { params }),
   post: (p, body) => request(p, { method: "POST", body }),
   del: (p) => request(p, { method: "DELETE" }),
+
+  authStatus: () => request("/auth/status"),
+  login: (body) => request("/auth/login", { method: "POST", body }),
+  setupAdmin: (body) => request("/auth/setup", { method: "POST", body }),
+  logout: () => request("/auth/logout", { method: "POST" }),
 
   getHealth: () => request("/system/health"),
   getSystemInfo: () => request("/system/info"),

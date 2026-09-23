@@ -2,33 +2,23 @@
 Smoke tests for the wired application returned by create_app().
 """
 import pytest
-
-pytest.importorskip("lxc", reason="the app requires python-lxc")
-
-from fastapi.testclient import TestClient  # noqa: E402
-from starlette.routing import Match  # noqa: E402
-
-from app import create_app  # noqa: E402
+from fastapi.testclient import TestClient
+from starlette.routing import Match
 
 
-@pytest.fixture(scope="module")
-def app():
-    return create_app()
-
-
-def test_root_returns_200(app):
-    resp = TestClient(app).get("/")
+def test_root_returns_200(client):
+    resp = client.get("/")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
 
-def test_health_returns_200(app):
-    resp = TestClient(app).get("/system/health")
+def test_health_returns_200(client):
+    resp = client.get("/system/health")
     assert resp.status_code == 200
 
 
-def test_api_prefix_is_accepted(app):
-    resp = TestClient(app).get("/api/system/health")
+def test_api_prefix_is_accepted(client):
+    resp = client.get("/api/system/health")
     assert resp.status_code == 200
 
 

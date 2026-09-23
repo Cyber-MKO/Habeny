@@ -7,12 +7,13 @@ import threading
 from pathlib import Path
 from typing import List
 
+from app.config import DATA_DIR
 from app.core.shell import run_command
 
 logger = logging.getLogger(__name__)
 
 
-AGENT_CACHE_DIR = Path("/var/lib/lxc-siem-platform/agent-cache")
+AGENT_CACHE_DIR = DATA_DIR / "agent-cache"
 AGENT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 _cache_lock = threading.Lock()

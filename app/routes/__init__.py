@@ -1,7 +1,7 @@
 """
 HTTP route registration — one module per domain, each exposing an APIRouter.
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 
 def register_routes(app: FastAPI) -> None:
@@ -9,10 +9,14 @@ def register_routes(app: FastAPI) -> None:
 
     Order matters where paths overlap: e.g. POST /agents/bulk/{operation} must be
     registered before POST /agents/{agent_id}/start, and the SPA catch-all last.
+
+    Everything except /auth/* and the static frontend requires a signed-in session
+    (HTTP routes and WebSockets alike).
     """
     from app.routes import (
         activity,
         agents,
+        auth,
         benchmarks,
         configs,
         console,
@@ -27,6 +31,7 @@ def register_routes(app: FastAPI) -> None:
         syslog_configs,
         system,
     )
+    from app.services.auth import require_user
 
     for module in (
         system,
@@ -44,5 +49,6 @@ def register_routes(app: FastAPI) -> None:
         syslog_configs,
         siem,
     ):
-        app.include_router(module.router)
+        app.include_router(module.router, dependencies=[Depends(require_user)])
+    app.include_router(auth.router)
     static.register(app)

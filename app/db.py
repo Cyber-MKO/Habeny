@@ -163,6 +163,28 @@ def init_db(db_path: Path) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_login_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_metrics_bid ON benchmark_metrics(benchmark_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_metrics_time ON benchmark_metrics(recorded_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bm_bottlenecks_bid ON benchmark_bottlenecks(benchmark_id)")
@@ -648,3 +670,68 @@ def get_metric_summary(db_path: Path, metric_type: str, metric_name: str,
             d["p90"] = vals[int(n * 0.9)]
             d["p99"] = vals[min(int(n * 0.99), n - 1)]
         return d
+
+
+# ===== USERS & SESSIONS =====
+
+def count_users(db_path: Path) -> int:
+    with _connection(db_path) as conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+
+def create_first_user(db_path: Path, username: str, password_hash: str) -> Optional[Dict[str, Any]]:
+    """Create a user only if none exist yet (first-run setup). Returns None if one already exists."""
+    with _connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")  # serialize concurrent setup attempts
+        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]:
+            conn.rollback()
+            return None
+        now = utc_now()
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+            (username, password_hash, now),
+        )
+        conn.commit()
+        return {"id": cur.lastrowid, "username": username, "created_at": now}
+
+
+def get_user_by_username(db_path: Path, username: str) -> Optional[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def update_user_last_login(db_path: Path, user_id: int) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (utc_now(), user_id))
+        conn.commit()
+
+
+def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (utc_now(),))
+        conn.execute(
+            "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token_hash, user_id, utc_now(), expires_at),
+        )
+        conn.commit()
+
+
+def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]:
+    """Return the user for a live (unexpired) session, or None."""
+    with _connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT u.id, u.username, u.created_at, u.last_login_at
+            FROM sessions s JOIN users u ON u.id = s.user_id
+            WHERE s.token_hash = ? AND s.expires_at > ?
+            """,
+            (token_hash, utc_now()),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def delete_session(db_path: Path, token_hash: str) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+        conn.commit()

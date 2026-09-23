@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { useMetricsSocket } from "./ws";
 import { useStore } from "./store";
-import { Modal } from "./components/UI";
+import { Modal, Spinner } from "./components/UI";
+import { useAuth } from "./auth";
+import Login from "./pages/Login";
 
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -125,6 +127,28 @@ function Toasts() {
 const TITLES = { "/": "Dashboard", "/system": "System Info", "/managers": "Managers", "/agents": "Containers", "/deploy": "Deploy", "/groups": "Groups", "/bulk": "Bulk Operations", "/logs": "Log Upload", "/syslog-config": "Syslog Config", "/simulations": "Simulations", "/benchmark-runner": "Benchmark Runner", "/benchmarks": "Perf Metrics", "/siem": "SIEM Stats", "/reports": "Reports", "/configs": "Configs", "/activity": "Activity Log" };
 
 export default function App() {
+  const { status, user, error, refresh } = useAuth();
+
+  if (status === "loading") {
+    return <div className="auth-page"><Spinner /></div>;
+  }
+  if (status === "error") {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h1 className="auth-title">Can't reach the server</h1>
+          <p className="auth-subtitle">{error}</p>
+          <button className="btn btn-primary auth-submit" onClick={refresh}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+  if (!user) return <Login />;
+  return <AppShell user={user} />;
+}
+
+function AppShell({ user }) {
+  const { logout } = useAuth();
   const { connected } = useMetricsSocket();
   const location = useLocation();
   const title = TITLES[location.pathname] || "Habeny";
@@ -161,9 +185,13 @@ export default function App() {
       <div className="main-area">
         <header className="header">
           <span className="header-title">{title}</span>
-          <div className="ws-badge">
-            <span className={`ws-dot${connected ? " on" : ""}`} />
-            {connected ? "Live" : "Disconnected"}
+          <div className="header-actions">
+            <div className="ws-badge">
+              <span className={`ws-dot${connected ? " on" : ""}`} />
+              {connected ? "Live" : "Disconnected"}
+            </div>
+            <span className="header-user" title="Signed in">{user.username}</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={logout}>Sign out</button>
           </div>
         </header>
 

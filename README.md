@@ -37,6 +37,24 @@ Open `http://<host>:9000` — the API and the web UI are both served from there.
 `start.sh` installs the frontend's npm dependencies on first run and rebuilds
 `static/` whenever the sources in `frontend/` have changed.
 
+## Authentication
+
+The web UI and the API require signing in. On first start there are no accounts:
+open the UI and it asks you to **create the admin account**. After that, the
+sign-in page is shown to anyone without a valid session.
+
+- Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
+- After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
+- Sign-ins, failed sign-ins and the initial setup are recorded in the Activity log.
+- Until the admin account exists, anyone who can reach the server can create it,
+  so complete setup right after the first start.
+
+**Forgotten password:** remove the account(s) on the server and the UI will offer setup again:
+
+```bash
+sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform/platform.db'); c.execute('DELETE FROM sessions'); c.execute('DELETE FROM users'); c.commit()"
+```
+
 ## Frontend
 
 For development with hot reload, run the API and the Vite dev server together:

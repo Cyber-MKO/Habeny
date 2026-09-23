@@ -84,7 +84,14 @@ async def metrics_stream(websocket: WebSocket):
             except Exception as e:
                 logger.debug(f"Metrics collection error: {e}")
 
-            await asyncio.sleep(5)
+            # Wait for the next tick, but stop as soon as the client disconnects
+            # (otherwise the loop outlives the connection)
+            try:
+                message = await asyncio.wait_for(websocket.receive(), timeout=5)
+                if message["type"] == "websocket.disconnect":
+                    break
+            except asyncio.TimeoutError:
+                pass
     except WebSocketDisconnect:
         pass
     except Exception:
