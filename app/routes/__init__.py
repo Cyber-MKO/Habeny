@@ -30,6 +30,7 @@ def register_routes(app: FastAPI) -> None:
         static,
         syslog_configs,
         system,
+        users,
     )
     from app.services.auth import require_user
 
@@ -48,6 +49,7 @@ def register_routes(app: FastAPI) -> None:
         benchmarks,
         syslog_configs,
         siem,
+        users,
     ):
         app.include_router(module.router, dependencies=[Depends(require_user)])
     app.include_router(auth.router)

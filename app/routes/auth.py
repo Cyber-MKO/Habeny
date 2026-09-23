@@ -22,8 +22,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth")
 
 
-def _public_user(user: dict) -> dict:
-    return {"username": user["username"], "created_at": user.get("created_at"), "last_login_at": user.get("last_login_at")}
+def public_user(user: dict) -> dict:
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "is_admin": bool(user.get("is_admin")),
+        "created_at": user.get("created_at"),
+        "last_login_at": user.get("last_login_at"),
+    }
 
 
 def _set_session_cookie(request: Request, response: Response, token: str) -> None:
@@ -48,7 +54,7 @@ async def auth_status(request: Request):
         data={
             "setup_required": count_users(DB_PATH) == 0,
             "authenticated": user is not None,
-            "user": _public_user(user) if user else None,
+            "user": public_user(user) if user else None,
         },
     )
 
@@ -62,7 +68,7 @@ async def setup_admin(body: SetupRequest, request: Request, response: Response):
     _set_session_cookie(request, response, start_session(user["id"]))
     update_user_last_login(DB_PATH, user["id"])
     log_activity("auth_setup_completed", {"username": user["username"]})
-    return APIResponse(success=True, message="Admin account created", data={"user": _public_user(user)})
+    return APIResponse(success=True, message="Admin account created", data={"user": public_user(user)})
 
 
 @router.post("/login", response_model=APIResponse)
@@ -86,7 +92,7 @@ async def login(body: LoginRequest, request: Request, response: Response):
     _set_session_cookie(request, response, start_session(user["id"]))
     update_user_last_login(DB_PATH, user["id"])
     log_activity("auth_login", {"username": user["username"], "client": client})
-    return APIResponse(success=True, message="Signed in", data={"user": _public_user(user)})
+    return APIResponse(success=True, message="Signed in", data={"user": public_user(user)})
 
 
 @router.post("/logout", response_model=APIResponse)

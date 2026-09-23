@@ -32,6 +32,12 @@ export const api = {
   login: (body) => request("/auth/login", { method: "POST", body }),
   setupAdmin: (body) => request("/auth/setup", { method: "POST", body }),
   logout: () => request("/auth/logout", { method: "POST" }),
+  changeOwnPassword: (body) => request("/users/me/password", { method: "POST", body }),
+  getUsers: () => request("/users"),
+  createUser: (body) => request("/users", { method: "POST", body }),
+  updateUser: (id, body) => request(`/users/${id}`, { method: "PATCH", body }),
+  resetUserPassword: (id, body) => request(`/users/${id}/password`, { method: "POST", body }),
+  deleteUser: (id) => request(`/users/${id}`, { method: "DELETE" }),
 
   getHealth: () => request("/system/health"),
   getSystemInfo: () => request("/system/info"),

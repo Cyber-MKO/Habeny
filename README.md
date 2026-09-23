@@ -43,13 +43,20 @@ The web UI and the API require signing in. On first start there are no accounts:
 open the UI and it asks you to **create the admin account**. After that, the
 sign-in page is shown to anyone without a valid session.
 
+- **Account** (sidebar → Settings, or click your username): change your password.
+  This signs you out on your other devices.
+- **Users** (on the same page, administrators only): add users, make or remove
+  administrators, reset a user's password (signs them out everywhere) and delete users.
+  Non-admin users can use everything else in the app. You can't delete or demote
+  yourself, and there is always at least one administrator.
 - Sessions are HttpOnly cookies, valid for 7 days (`HABENY_SESSION_TTL_HOURS` to change).
 - After 10 failed sign-ins from one IP within 15 minutes, further attempts are refused for a while.
-- Sign-ins, failed sign-ins and the initial setup are recorded in the Activity log.
+- Sign-ins, failed sign-ins, setup and every user-management action are recorded in the Activity log.
 - Until the admin account exists, anyone who can reach the server can create it,
   so complete setup right after the first start.
 
-**Forgotten password:** remove the account(s) on the server and the UI will offer setup again:
+**Forgotten password:** another administrator can reset it on the Account page. If the only
+administrator is locked out, remove all accounts on the server and the UI will offer setup again:
 
 ```bash
 sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform/platform.db'); c.execute('DELETE FROM sessions'); c.execute('DELETE FROM users'); c.commit()"

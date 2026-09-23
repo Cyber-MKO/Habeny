@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import HTTPException, WebSocketException, status
+from fastapi import Depends, HTTPException, WebSocketException, status
 from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
@@ -49,7 +49,7 @@ def check_credentials(user: dict[str, Any] | None, password: str) -> bool:
     return verify_password(password, user["password_hash"])
 
 
-def _token_hash(token: str) -> str:
+def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
@@ -57,19 +57,19 @@ def start_session(user_id: int) -> str:
     """Create a session and return its token (only the hash is stored)."""
     token = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS)
-    create_session(DB_PATH, _token_hash(token), user_id, expires.isoformat())
+    create_session(DB_PATH, token_hash(token), user_id, expires.isoformat())
     return token
 
 
 def end_session(token: str) -> None:
-    delete_session(DB_PATH, _token_hash(token))
+    delete_session(DB_PATH, token_hash(token))
 
 
 def session_user(conn: HTTPConnection) -> dict[str, Any] | None:
     token = conn.cookies.get(SESSION_COOKIE)
     if not token:
         return None
-    return get_session_user(DB_PATH, _token_hash(token))
+    return get_session_user(DB_PATH, token_hash(token))
 
 
 def _same_origin(conn: HTTPConnection) -> bool:
@@ -125,3 +125,9 @@ class LoginRateLimiter:
 
 
 login_limiter = LoginRateLimiter()
+
+
+async def require_admin(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access required")
+    return user

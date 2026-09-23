@@ -3,6 +3,8 @@ Authentication request models.
 """
 from pydantic import BaseModel, Field
 
+USERNAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=64)
@@ -11,5 +13,26 @@ class LoginRequest(BaseModel):
 
 class SetupRequest(BaseModel):
     """First-run creation of the admin account."""
-    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    username: str = Field(..., min_length=3, max_length=32, pattern=USERNAME_PATTERN)
     password: str = Field(..., min_length=8, max_length=256)
+
+
+class PasswordChangeRequest(BaseModel):
+    """A signed-in user changing their own password."""
+    current_password: str = Field(..., min_length=1, max_length=256)
+    new_password: str = Field(..., min_length=8, max_length=256)
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=32, pattern=USERNAME_PATTERN)
+    password: str = Field(..., min_length=8, max_length=256)
+    is_admin: bool = False
+
+
+class UserUpdateRequest(BaseModel):
+    is_admin: bool
+
+
+class PasswordResetRequest(BaseModel):
+    """An admin setting a new password for another user."""
+    new_password: str = Field(..., min_length=8, max_length=256)

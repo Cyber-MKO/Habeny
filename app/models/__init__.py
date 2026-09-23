@@ -12,7 +12,14 @@ from app.models.agents import (
     ContainerStatus,
     SIEMConnectivity,
 )
-from app.models.auth import LoginRequest, SetupRequest
+from app.models.auth import (
+    LoginRequest,
+    PasswordChangeRequest,
+    PasswordResetRequest,
+    SetupRequest,
+    UserCreateRequest,
+    UserUpdateRequest,
+)
 from app.models.benchmarks import BenchmarkCompareRequest, BenchmarkStartRequest
 from app.models.common import utc_now
 from app.models.configs import ConfigExportResponse, ConfigImportRequest, ConfigTemplate
@@ -80,6 +87,10 @@ from app.models.simulations import (
 __all__ = [
     "LoginRequest",
     "SetupRequest",
+    "PasswordChangeRequest",
+    "UserCreateRequest",
+    "UserUpdateRequest",
+    "PasswordResetRequest",
     "utc_now",
     "ContainerState",
     "SIEMType",
