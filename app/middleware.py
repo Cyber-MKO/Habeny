@@ -4,7 +4,11 @@ HTTP middleware: /api prefix stripping and API latency tracking.
 import time
 
 from app.config import DB_PATH, STATIC_DIR
+from app.tls import hsts_enabled
 from app.db import record_metric
+
+
+HSTS = hsts_enabled()
 
 
 class StripApiPrefixMiddleware:
@@ -46,4 +50,6 @@ async def track_request_latency(request, call_next):
         except Exception:
             pass
     response.headers["X-Response-Time-Ms"] = f"{latency_ms:.1f}"
+    if request.url.scheme == "https" and HSTS:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response

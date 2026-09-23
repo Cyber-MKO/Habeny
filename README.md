@@ -35,9 +35,49 @@ pip install -r requirements.txt
 sudo ./start.sh
 ```
 
-Open `http://<host>:9000` — the API and the web UI are both served from there.
+Open `https://<host>:9000` — the API and the web UI are both served from there (see [HTTPS](#https)).
 `start.sh` installs the frontend's npm dependencies on first run and rebuilds
 `static/` whenever the sources in `frontend/` have changed.
+
+## HTTPS
+
+The server speaks **HTTPS only** on port 9000. On first start it generates a
+self-signed certificate (`/var/lib/lxc-siem-platform/tls/`), so browsers show a
+warning once; traffic is encrypted either way.
+
+| Setting | Purpose |
+|---|---|
+| `HABENY_TLS_CERT`, `HABENY_TLS_KEY` | Use your own certificate (PEM paths). Also enables HSTS. |
+| `HABENY_TLS=off` | Plain HTTP, **only** behind a reverse proxy that terminates TLS |
+| `HABENY_HOST`, `HABENY_PORT` | Listen address (default `0.0.0.0:9000`) |
+
+Behind a reverse proxy, bind to localhost and let the proxy handle TLS. The proxy
+must send `X-Forwarded-Proto` so session cookies are marked `Secure` (trusted from
+`127.0.0.1` by default; set `FORWARDED_ALLOW_IPS` if the proxy is elsewhere):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name habeny.example.com;
+    ssl_certificate     /etc/ssl/habeny.crt;
+    ssl_certificate_key /etc/ssl/habeny.key;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;                       # WebSockets (live metrics, console)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+```bash
+sudo HABENY_TLS=off HABENY_HOST=127.0.0.1 ./start.sh
+```
+
+The dev server (`./start.sh --dev`, port 3000) is plain HTTP for development only.
 
 ## Authentication
 
@@ -75,7 +115,7 @@ sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform
 For development with hot reload, run the API and the Vite dev server together:
 
 ```bash
-sudo ./start.sh --dev   # UI on http://<host>:3000, proxies API to :9000
+sudo ./start.sh --dev   # UI on http://<host>:3000 (dev only), proxies to the API on :9000
 ```
 
 To build the frontend manually:

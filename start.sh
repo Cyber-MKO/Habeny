@@ -29,7 +29,7 @@ if [ ! -d "$FRONTEND/node_modules" ]; then
 fi
 
 if [ "${1:-}" = "--dev" ]; then
-    echo "==> Starting API server on http://0.0.0.0:9000"
+    echo "==> Starting API server on https://0.0.0.0:9000"
     python3 "$ROOT/main.py" &
     API_PID=$!
     trap 'kill "$API_PID" 2>/dev/null || true' EXIT INT TERM
@@ -46,5 +46,6 @@ if [ ! -f "$STATIC_INDEX" ] || [ -n "$(find "$FRONTEND/src" "$FRONTEND/index.htm
     npm --prefix "$FRONTEND" run build
 fi
 
-echo "==> Starting Habeny on http://0.0.0.0:9000"
+if [ "${HABENY_TLS:-auto}" = "off" ]; then SCHEME=http; else SCHEME=https; fi
+echo "==> Starting Habeny on ${SCHEME}://${HABENY_HOST:-0.0.0.0}:${HABENY_PORT:-9000}"
 exec python3 "$ROOT/main.py"

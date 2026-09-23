@@ -14,4 +14,8 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+
+    from app.tls import listen_address, server_ssl_options
+
+    host, port = listen_address()
+    uvicorn.run(app, host=host, port=port, proxy_headers=True, **server_ssl_options())
