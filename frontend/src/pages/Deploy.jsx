@@ -141,7 +141,7 @@ export default function Deploy() {
       siem_type: mgr.siem_type || p.siem_type,
       siem_ip: mgr.siem_ip || "",
       siem_version: mgr.siem_version || "",
-      siem_auth_key: mgr.siem_auth_key || "",
+      siem_auth_key: "", // stored encrypted in the profile; the server fills it in
       os_type: mgr.os_type || p.os_type,
       agent_group: mgr.agent_group || p.agent_group,
       memory_limit: mgr.memory_limit || p.memory_limit,
@@ -150,6 +150,7 @@ export default function Deploy() {
     }));
   };
 
+  const selectedManager = managers.find((m) => m.manager_id === form.manager_profile_id);
   const isBare = form.siem_type === "none";
   const isUtm = form.siem_type === "utmstack";
   const isElastic = form.siem_type === "elastic";
@@ -253,7 +254,12 @@ export default function Deploy() {
             {needsAuthKey && (
               <div className="field">
                 <label>{isElastic ? "Enrollment Token" : "Installer Auth Key"}</label>
-                <input className="input" placeholder={isElastic ? "Fleet enrollment token" : "UTMstack auth key"} value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)} required />
+                <input className="input"
+                  placeholder={selectedManager?.has_siem_auth_key
+                    ? `From profile (${selectedManager.siem_auth_key_hint}) — type to override`
+                    : isElastic ? "Fleet enrollment token" : "UTMstack auth key"}
+                  value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
+                  required={!selectedManager?.has_siem_auth_key} />
               </div>
             )}
             <div className="field">

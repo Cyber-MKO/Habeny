@@ -25,19 +25,84 @@ to stress-test and validate your SIEM infrastructure.
 - **Python 3.10+** with pip
 - **Node.js 18+** (to build and run the frontend)
 
+## Production install
+
+Habeny runs as two services so the web app never runs as root:
+
+- **habeny** — the web app, as the unprivileged `habeny` user, sandboxed by systemd
+  (read-only system, no capabilities; it can only write its data directory).
+- **habeny-helper** — a small root service that performs container operations for it
+  over a Unix socket (`/run/habeny/helper.sock`, only `habeny`/root may connect). It
+  accepts a fixed list of LXC operations and validates every argument: e.g. it will
+  set only the network keys the app uses, never hooks or mounts, and create only the
+  offered OS images.
+
+```bash
+git clone <repo> /opt/habeny && cd /opt/habeny
+sudo ./deploy/install.sh          # packages, user, venv, frontend, systemd units
+systemctl status habeny habeny-helper
+```
+
+Optional settings (TLS certificate, reverse-proxy mode, port) go in `/etc/default/habeny`.
+Upgrading from a root install: `install.sh` hands the existing data directory to `habeny`.
+
+Note: containers are still privileged LXC containers, so root inside a container is
+powerful; the helper keeps web-app bugs from being root on the host, but the console
+and agent installs run as root *inside* containers by design.
+
 ## Quick Start
 
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Build the frontend (if needed) and start the API server
+# Development: build the frontend (if needed) and run everything as root
 sudo ./start.sh
 ```
 
-Open `http://<host>:9000` — the API and the web UI are both served from there.
+Open `https://<host>:9000` — the API and the web UI are both served from there (see [HTTPS](#https)).
 `start.sh` installs the frontend's npm dependencies on first run and rebuilds
 `static/` whenever the sources in `frontend/` have changed.
+
+## HTTPS
+
+The server speaks **HTTPS only** on port 9000. On first start it generates a
+self-signed certificate (`/var/lib/lxc-siem-platform/tls/`), so browsers show a
+warning once; traffic is encrypted either way.
+
+| Setting | Purpose |
+|---|---|
+| `HABENY_TLS_CERT`, `HABENY_TLS_KEY` | Use your own certificate (PEM paths). Also enables HSTS. |
+| `HABENY_TLS=off` | Plain HTTP, **only** behind a reverse proxy that terminates TLS |
+| `HABENY_HOST`, `HABENY_PORT` | Listen address (default `0.0.0.0:9000`) |
+
+Behind a reverse proxy, bind to localhost and let the proxy handle TLS. The proxy
+must send `X-Forwarded-Proto` so session cookies are marked `Secure` (trusted from
+`127.0.0.1` by default; set `FORWARDED_ALLOW_IPS` if the proxy is elsewhere):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name habeny.example.com;
+    ssl_certificate     /etc/ssl/habeny.crt;
+    ssl_certificate_key /etc/ssl/habeny.key;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_http_version 1.1;                       # WebSockets (live metrics, console)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+```bash
+sudo HABENY_TLS=off HABENY_HOST=127.0.0.1 ./start.sh
+```
+
+The dev server (`./start.sh --dev`, port 3000) is plain HTTP for development only.
 
 ## Authentication
 
@@ -57,6 +122,12 @@ sign-in page is shown to anyone without a valid session.
 - Until the admin account exists, anyone who can reach the server can create it,
   so complete setup right after the first start.
 
+**Stored secrets:** SIEM auth keys and enrollment tokens in manager profiles are encrypted
+in the database and never sent back to the browser (only the last 4 characters are shown).
+The encryption key is generated on first start at `/var/lib/lxc-siem-platform/secret.key`
+(or set `HABENY_SECRET_KEY`). **Back it up together with `platform.db`**: without it, stored
+keys can't be read and must be re-entered in each profile.
+
 **Forgotten password:** another administrator can reset it on the Account page. If the only
 administrator is locked out, remove all accounts on the server and the UI will offer setup again:
 
@@ -69,7 +140,7 @@ sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform
 For development with hot reload, run the API and the Vite dev server together:
 
 ```bash
-sudo ./start.sh --dev   # UI on http://<host>:3000, proxies API to :9000
+sudo ./start.sh --dev   # UI on http://<host>:3000 (dev only), proxies to the API on :9000
 ```
 
 To build the frontend manually:
@@ -85,6 +156,7 @@ npm run build      # outputs to ../static/
 ```
 .
 ├── main.py                  # Entry point: logging setup + create_app()
+├── deploy/                  # install.sh + systemd units (web app + root helper)
 ├── start.sh                 # Quick start: builds frontend, runs API
 ├── app/                     # FastAPI application
 │   ├── __init__.py          # create_app(): storage init, middleware, routers
@@ -92,6 +164,7 @@ npm run build      # outputs to ../static/
 │   ├── state.py             # In-memory state shared by routes/services
 │   ├── middleware.py        # /api prefix stripping, latency tracking
 │   ├── db.py                # SQLite database layer
+│   ├── helper/              # Privileged LXC helper (root) + client used by the web app
 │   ├── routes/              # One APIRouter per domain (agents, groups, ...)
 │   ├── services/            # Deployment, simulations, reporting, logs, benchmarks, ...
 │   ├── core/                # Shell/lxc-attach, container, network, resources, helpers

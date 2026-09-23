@@ -5,15 +5,13 @@ import asyncio
 import fcntl
 import json
 import os
-import pty
 import struct
-import subprocess
 import termios
 
-import lxc
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.container import validate_container_name
+from app.core.lxc_backend import lxc, open_console
 
 router = APIRouter()
 
@@ -29,9 +27,6 @@ def resize_pty(fd: int, cols: int, rows: int) -> None:
 async def console_session(websocket: WebSocket, container_name: str):
     """WebSocket console session into a running container."""
     await websocket.accept()
-
-    if os.geteuid() != 0:
-        await websocket.send_text("WARNING: API is not running as root. Console access may fail.\n")
 
     if not validate_container_name(container_name):
         await websocket.send_text("ERROR: Invalid container name.\n")
@@ -49,33 +44,9 @@ async def console_session(websocket: WebSocket, container_name: str):
         await websocket.close(code=1008)
         return
 
-    master_fd, slave_fd = pty.openpty()
-    env = os.environ.copy()
-    env["TERM"] = "xterm-256color"
-
-    def set_controlling_tty():
-        # Runs in the child after setsid(): make the PTY slave (fd 0) the
-        # controlling terminal so the shell binds to the websocket PTY
-        # instead of the terminal the API server was started from.
-        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
     try:
-        process = subprocess.Popen(
-            ["lxc-attach", "-n", container_name, "--", "/bin/bash", "-l"],
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            env=env,
-            close_fds=True,
-            start_new_session=True,
-            preexec_fn=set_controlling_tty
-        )
-        os.close(slave_fd)
+        master_fd = await asyncio.to_thread(open_console, container_name, 80, 24)
     except Exception as e:
-        try:
-            os.close(slave_fd)
-        except Exception:
-            pass
         await websocket.send_text(f"ERROR: Failed to start console: {e}\n")
         await websocket.close(code=1011)
         return
@@ -120,12 +91,7 @@ async def console_session(websocket: WebSocket, container_name: str):
     for task in pending:
         task.cancel()
 
-    try:
-        process.terminate()
-        process.wait(timeout=2)
-    except Exception:
-        process.kill()
-
+    # Closing the PTY hangs up the session; the shell exits and is reaped by its parent
     try:
         os.close(master_fd)
     except Exception:

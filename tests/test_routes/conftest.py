@@ -1,10 +1,12 @@
 import importlib.util
+import os
 
 import pytest
 from fastapi.testclient import TestClient
 
-# The app imports python-lxc; skip these tests (not the whole run) where it's missing
-if importlib.util.find_spec("lxc") is None:
+# The app needs LXC access: python-lxc (direct mode) or the helper (HABENY_LXC_BACKEND=helper).
+# Skip these tests (not the whole run) where neither is available.
+if os.environ.get("HABENY_LXC_BACKEND") != "helper" and importlib.util.find_spec("lxc") is None:
     collect_ignore_glob = ["test_*.py"]
 
 ADMIN = {"username": "admin", "password": "correct-horse-battery"}

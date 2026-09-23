@@ -4,9 +4,9 @@ Agent deployment, status, info and selection models.
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, field_validator, root_validator, validator
 
-from app.models.common import HOSTNAME_PATTERN, IP_PATTERN, validate_alphanumeric_name
+from app.models.common import INSTALL_FIELD_CHECKS, validate_alphanumeric_name
 from app.models.enums import (
     AgentLifecycleStatus,
     ContainerState,
@@ -39,21 +39,27 @@ class AgentDeploymentRequest(BaseModel):
     @validator('siem_ip', always=True)
     def validate_siem_ip(cls, v, values):
         siem_type = values.get('siem_type')
-        if siem_type and siem_type != SIEMType.NONE and siem_type != "none":
+        # With a manager profile the server fills it in (checked again after that)
+        if siem_type and siem_type != SIEMType.NONE and siem_type != "none" and not values.get('manager_profile_id'):
             if not v:
                 raise ValueError('siem_ip is required when deploying a SIEM agent')
-            if not (IP_PATTERN.match(v) or HOSTNAME_PATTERN.match(v)):
-                raise ValueError('siem_ip must be a valid IP address or hostname')
-        return v
+        return INSTALL_FIELD_CHECKS["siem_ip"](v)
     
     @validator('siem_auth_key', always=True)
     def validate_siem_auth_key(cls, v, values):
         siem_type = values.get('siem_type')
+        if values.get('manager_profile_id'):
+            return INSTALL_FIELD_CHECKS["siem_auth_key"](v)  # stored (encrypted) in the profile
         if siem_type in (SIEMType.UTMSTACK, "utmstack") and not v:
             raise ValueError('siem_auth_key is required for UTMstack deployments')
         if siem_type in (SIEMType.ELASTIC, "elastic") and not v:
             raise ValueError('siem_auth_key (enrollment token) is required for Elastic deployments')
-        return v
+        return INSTALL_FIELD_CHECKS["siem_auth_key"](v)
+
+    @field_validator('siem_version', 'agent_group')
+    @classmethod
+    def validate_install_fields(cls, v, info):
+        return INSTALL_FIELD_CHECKS[info.field_name](v)
     
     @validator('agent_base_name')
     def validate_base_name(cls, v):

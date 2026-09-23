@@ -8,12 +8,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import lxc
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 
 from app.config import REPORTS_DIR
+from app.core.lxc_backend import lxc
 from app.models import APIResponse, ReportGenerateRequest, utc_now
 from app.services.activity import log_activity
 from app.services.agent_info import get_agent_info

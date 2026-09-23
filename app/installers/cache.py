@@ -2,12 +2,12 @@
 Host-side cache of downloaded agent packages, shared by the installers.
 """
 import logging
-import subprocess
 import threading
 from pathlib import Path
 from typing import List
 
 from app.config import DATA_DIR
+from app.core.lxc_backend import attach_run
 from app.core.shell import run_command
 
 logger = logging.getLogger(__name__)
@@ -44,13 +44,10 @@ def ensure_cached(filename: str, download_cmd: List[str], timeout: int = 120) ->
 def copy_to_container(container_name: str, host_path: Path, container_path: str) -> bool:
     """Copy a host file into a running container via lxc-attach stdin pipe."""
     try:
-        with open(host_path, "rb") as f:
-            proc = subprocess.run(
-                ["lxc-attach", "-n", container_name, "--", "bash", "-c",
-                 f"cat > {container_path} && chmod 644 {container_path}"],
-                stdin=f, capture_output=True, timeout=120,
-            )
-            return proc.returncode == 0
+        data = Path(host_path).read_bytes()
+        result = attach_run(container_name, ["bash", "-c", 'cat > "$1" && chmod 644 "$1"', "copy", container_path],
+                            input_bytes=data, timeout=120)
+        return result["returncode"] == 0
     except Exception as e:
         logger.warning(f"copy_to_container failed for {container_name}: {e}")
         return False

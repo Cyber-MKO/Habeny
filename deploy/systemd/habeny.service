@@ -1,0 +1,47 @@
+[Unit]
+Description=Habeny web app (unprivileged)
+Documentation=file://@INSTALL_DIR@/README.md
+After=network-online.target habeny-helper.service
+Wants=network-online.target
+Requires=habeny-helper.service
+
+[Service]
+Type=simple
+User=habeny
+Group=habeny
+WorkingDirectory=@INSTALL_DIR@
+Environment=HABENY_LXC_BACKEND=helper
+Environment=HABENY_HELPER_SOCKET=/run/habeny/helper.sock
+Environment=HABENY_DATA_DIR=@DATA_DIR@
+# Optional: your own certificate / reverse-proxy mode, listen address (see README)
+EnvironmentFile=-/etc/default/habeny
+ExecStart=@INSTALL_DIR@/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=2
+
+# Sandboxing: the web app never needs root, capabilities or write access outside its data
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=@DATA_DIR@
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

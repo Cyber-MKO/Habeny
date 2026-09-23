@@ -3,9 +3,9 @@ Per-SIEM aggregate stats.
 """
 import logging
 
-import lxc
 from fastapi import APIRouter, HTTPException
 
+from app.core.lxc_backend import lxc
 from app.models import APIResponse
 from app.services.agent_info import (
     check_siem_connectivity,

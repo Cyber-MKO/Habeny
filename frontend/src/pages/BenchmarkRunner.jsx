@@ -29,7 +29,7 @@ export default function BenchmarkRunner() {
   const [loading, setLoading] = useState(true);
 
   const [selScenario, setSelScenario] = useState("linear_scale");
-  const [launchConfig, setLaunchConfig] = useState({ name: "", siem_type: "none", siem_ip: "", siem_version: "", siem_auth_key: "", base_name: "bm", memory_limit: "256MB" });
+  const [launchConfig, setLaunchConfig] = useState({ name: "", siem_type: "none", siem_ip: "", siem_version: "", siem_auth_key: "", base_name: "bm", memory_limit: "256MB", manager_profile_id: "" });
   const [launching, setLaunching] = useState(false);
 
   const [managers, setManagers] = useState([]);
@@ -93,6 +93,7 @@ export default function BenchmarkRunner() {
         if (launchConfig.siem_version) payload.siem_version = launchConfig.siem_version;
         if (launchConfig.siem_auth_key) payload.siem_auth_key = launchConfig.siem_auth_key;
       }
+      if (launchConfig.manager_profile_id) payload.manager_profile_id = launchConfig.manager_profile_id;
       const res = await api.startBenchmark(payload);
       toast(res.message, "success");
       load();
@@ -173,13 +174,14 @@ export default function BenchmarkRunner() {
                 <label>Manager Profile</label>
                 <select className="select" onChange={(e) => {
                   const mgr = managers.find((m) => m.manager_id === e.target.value);
-                  if (!mgr) return;
+                  if (!mgr) { setLaunchConfig((p) => ({ ...p, manager_profile_id: "" })); return; }
                   setLaunchConfig((p) => ({
                     ...p,
+                    manager_profile_id: mgr.manager_id,
                     siem_type: mgr.siem_type || p.siem_type,
                     siem_ip: mgr.siem_ip || "",
                     siem_version: mgr.siem_version || "",
-                    siem_auth_key: mgr.siem_auth_key || "",
+                    siem_auth_key: "", // stored encrypted in the profile; the server fills it in
                   }));
                 }}>
                   <option value="">— Manual configuration —</option>
@@ -199,7 +201,8 @@ export default function BenchmarkRunner() {
                 <div className="field"><label>{launchConfig.siem_type === "elastic" ? "Agent Version" : "SIEM Version"}</label><input className="input" value={launchConfig.siem_version} onChange={(e) => set("siem_version", e.target.value)} placeholder={launchConfig.siem_type === "elastic" ? "9.0.2" : "4.14.2"} /></div>
               )}
               {(launchConfig.siem_type === "utmstack" || launchConfig.siem_type === "elastic") && (
-                <div className="field"><label>{launchConfig.siem_type === "elastic" ? "Fleet Enrollment Token" : "UTMstack Auth Key"}</label><input className="input" value={launchConfig.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)} /></div>
+                <div className="field"><label>{launchConfig.siem_type === "elastic" ? "Fleet Enrollment Token" : "UTMstack Auth Key"}</label><input className="input" value={launchConfig.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
+                  placeholder={(() => { const m = managers.find((x) => x.manager_id === launchConfig.manager_profile_id); return m?.has_siem_auth_key ? `From profile (${m.siem_auth_key_hint}) — type to override` : ""; })()} /></div>
               )}
               <div className="field"><label>Base Name</label><input className="input" value={launchConfig.base_name} onChange={(e) => set("base_name", e.target.value)} /></div>
               <div className="field"><label>Memory per Container</label><input className="input" value={launchConfig.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>

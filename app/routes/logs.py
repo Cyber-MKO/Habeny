@@ -4,9 +4,9 @@ Per-container log upload and recurring log upload schedules.
 import asyncio
 import uuid
 
-import lxc
 from fastapi import APIRouter, HTTPException
 
+from app.core.lxc_backend import lxc
 from app.models import APIResponse, LogScheduleRequest, LogUploadRequest, utc_now
 from app.services.activity import log_activity
 from app.services.logs import perform_log_upload, run_log_schedule, schedule_public

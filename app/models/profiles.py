@@ -3,8 +3,9 @@ SIEM manager profile and syslog config profile models.
 """
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.models.common import INSTALL_FIELD_CHECKS
 from app.models.enums import OSType, SIEMType, SyslogProtocol
 
 
@@ -21,6 +22,13 @@ class ManagerProfileCreate(BaseModel):
     memory_limit: Optional[str] = Field(default="512MB")
     cpu_shares: Optional[int] = Field(default=1024, ge=2, le=10240)
     config_template_id: Optional[str] = Field(None)
+
+
+    @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
+    @classmethod
+    def validate_install_fields(cls, v, info):
+        """These values end up in agent install scripts and host paths."""
+        return INSTALL_FIELD_CHECKS[info.field_name](v)
 
     class Config:
         use_enum_values = True
@@ -39,6 +47,13 @@ class ManagerProfileUpdate(BaseModel):
     memory_limit: Optional[str] = None
     cpu_shares: Optional[int] = Field(None, ge=2, le=10240)
     config_template_id: Optional[str] = None
+
+
+    @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
+    @classmethod
+    def validate_install_fields(cls, v, info):
+        """These values end up in agent install scripts and host paths."""
+        return INSTALL_FIELD_CHECKS[info.field_name](v)
 
     class Config:
         use_enum_values = True

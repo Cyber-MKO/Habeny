@@ -8,8 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional
 
-import lxc
-
+from app.core.lxc_backend import lxc
 from app.core.shell import run_command
 
 logger = logging.getLogger(__name__)

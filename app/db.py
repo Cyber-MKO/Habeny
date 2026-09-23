@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.core.secrets import decrypt_secret, encrypt_secret, is_encrypted
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -483,6 +485,30 @@ def delete_group(db_path: Path, name: str) -> int:
 
 
 # ===== MANAGER PROFILES =====
+# siem_auth_key is stored encrypted (app.core.secrets); these functions return it
+# decrypted for internal use. API responses must go through a masking step.
+
+def _manager_row(row) -> Optional[Dict[str, Any]]:
+    if not row:
+        return None
+    mgr = dict(row)
+    mgr["siem_auth_key"] = decrypt_secret(mgr.get("siem_auth_key"))
+    return mgr
+
+
+def encrypt_plaintext_manager_secrets(db_path: Path) -> int:
+    """One-time upgrade: encrypt auth keys stored before encryption existed."""
+    with _connection(db_path) as conn:
+        rows = conn.execute("SELECT manager_id, siem_auth_key FROM managers WHERE siem_auth_key IS NOT NULL AND siem_auth_key != ''").fetchall()
+        changed = 0
+        for r in rows:
+            if not is_encrypted(r["siem_auth_key"]):
+                conn.execute("UPDATE managers SET siem_auth_key = ? WHERE manager_id = ?",
+                             (encrypt_secret(r["siem_auth_key"]), r["manager_id"]))
+                changed += 1
+        conn.commit()
+        return changed
+
 
 def create_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
     with _connection(db_path) as conn:
@@ -495,7 +521,7 @@ def create_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Dict
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (manager_id, data["name"], data.get("description"), data["siem_type"],
-             data.get("siem_ip"), data.get("siem_version"), data.get("siem_auth_key"),
+             data.get("siem_ip"), data.get("siem_version"), encrypt_secret(data.get("siem_auth_key")),
              data.get("os_type", "ubuntu_22_04"), data.get("agent_group", "default"),
              data.get("memory_limit", "512MB"), data.get("cpu_shares", 1024),
              data.get("config_template_id"), now, now)
@@ -507,19 +533,19 @@ def create_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Dict
 def list_managers(db_path: Path) -> List[Dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute("SELECT * FROM managers ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
+        return [_manager_row(r) for r in rows]
 
 
 def get_manager(db_path: Path, manager_id: str) -> Optional[Dict[str, Any]]:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM managers WHERE manager_id = ?", (manager_id,)).fetchone()
-        return dict(row) if row else None
+        return _manager_row(row)
 
 
 def get_manager_by_name(db_path: Path, name: str) -> Optional[Dict[str, Any]]:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM managers WHERE name = ?", (name,)).fetchone()
-        return dict(row) if row else None
+        return _manager_row(row)
 
 
 def update_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -536,16 +562,16 @@ def update_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Opti
         for f in fields:
             if f in data:
                 updates.append(f"{f} = ?")
-                values.append(data[f])
+                values.append(encrypt_secret(data[f]) if f == "siem_auth_key" else data[f])
         if not updates:
-            return dict(existing)
+            return _manager_row(existing)
         updates.append("updated_at = ?")
         values.append(now)
         values.append(manager_id)
         conn.execute(f"UPDATE managers SET {', '.join(updates)} WHERE manager_id = ?", values)
         conn.commit()
         row = conn.execute("SELECT * FROM managers WHERE manager_id = ?", (manager_id,)).fetchone()
-        return dict(row)
+        return _manager_row(row)
 
 
 def delete_manager(db_path: Path, manager_id: str) -> bool:

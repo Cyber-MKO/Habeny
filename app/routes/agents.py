@@ -9,11 +9,11 @@ import uuid
 from multiprocessing import cpu_count
 from typing import Optional
 
-import lxc
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from app.config import DB_PATH
 from app.core.common import check_root
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
 from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
@@ -82,6 +82,10 @@ async def deploy_agents(
         # Validate: siem_ip required unless deploying bare containers
         if deployment.siem_type != "none" and not deployment.siem_ip:
             raise HTTPException(status_code=400, detail="siem_ip is required when deploying a SIEM agent")
+        if deployment.siem_type in ("utmstack", "elastic") and not deployment.siem_auth_key:
+            detail = ("The manager profile's auth key can't be read (the secret key changed?); re-enter it in the profile"
+                      if deployment.manager_profile_id else "siem_auth_key is required for UTMstack and Elastic deployments")
+            raise HTTPException(status_code=400, detail=detail)
 
         if deployment.agent_group:
             if not group_exists(DB_PATH, deployment.agent_group):

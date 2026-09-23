@@ -4,9 +4,6 @@ Multi-SIEM Container Emulation Platform — application package.
 import logging
 from multiprocessing import cpu_count
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,9 +29,21 @@ def _initialize_storage() -> None:
 
     migrate_legacy_agent_metadata()
 
+    # Secrets stored before encryption existed
+    from app.db import encrypt_plaintext_manager_secrets
+    from app.services.benchmarks import scrub_stored_benchmark_secrets
+    encrypted = encrypt_plaintext_manager_secrets(DB_PATH)
+    scrubbed = scrub_stored_benchmark_secrets()
+    if encrypted or scrubbed:
+        logger.info(f"Secured stored secrets: {encrypted} manager profile key(s) encrypted, "
+                    f"{scrubbed} benchmark config(s) scrubbed")
 
-def create_app() -> FastAPI:
+
+def create_app():
     """Application factory. Initializes storage, middleware and all routes."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
     from app.config import MAX_WORKERS
     from app.middleware import StripApiPrefixMiddleware, track_request_latency
     from app.routes import register_routes

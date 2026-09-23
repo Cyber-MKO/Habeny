@@ -4,6 +4,14 @@ Shared validation patterns/helpers and utc_now.
 import re
 from datetime import datetime, timezone
 
+from app.core.validation import (
+    validate_container_path,
+    validate_group,
+    validate_host,
+    validate_token,
+    validate_version,
+)
+
 IP_PATTERN = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
 
@@ -21,7 +29,23 @@ def validate_absolute_path(v: str) -> str:
         raise ValueError('Path must be absolute (start with /)')
     if '..' in v:
         raise ValueError('Path cannot contain ..')
-    return v
+    # Only characters that are inert in shell scripts (the path is written into one)
+    return validate_container_path(v)
+
+
+def optional(check):
+    """Wrap a strict validator so None/"" (not provided) pass through."""
+    def validator_fn(v):
+        return v if v in (None, "") else check(v)
+    return validator_fn
+
+
+INSTALL_FIELD_CHECKS = {
+    "siem_ip": optional(validate_host),
+    "siem_version": optional(validate_version),
+    "siem_auth_key": optional(validate_token),
+    "agent_group": optional(validate_group),
+}
 
 
 def validate_alphanumeric_name(v: str) -> str:

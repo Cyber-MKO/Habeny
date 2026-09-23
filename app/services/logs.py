@@ -6,9 +6,10 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-import lxc
-
+from app.core.container import build_write_file_script
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
+from app.core.validation import validate_container_path
 from app.models import LogUploadRequest, utc_now
 from app.services.activity import log_activity
 from app.services.agent_info import detect_siem_type, read_agent_metadata
@@ -18,14 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _build_log_upload_script(log_upload: LogUploadRequest) -> str:
-    operator = ">>" if log_upload.append else ">"
-    return f"""
-mkdir -p $(dirname {log_upload.destination_path})
-cat {operator} {log_upload.destination_path} << 'EOFLOG'
-{log_upload.content}
-EOFLOG
-chmod 644 {log_upload.destination_path}
-"""
+    return build_write_file_script(log_upload.destination_path, log_upload.content, log_upload.append)
 
 
 def escape_json_string(value: str) -> str:
@@ -52,6 +46,7 @@ def _build_utmstack_filebeat_script(log_path: str) -> str:
       2. ``#var.paths:`` (default/commented) → uncomment and add path below
       3. ``var.paths:`` exists (already uncommented) → append path to list
     """
+    validate_container_path(log_path)  # used inside grep/sed expressions below
     yml = "/opt/utmstack-linux-agent/beats/filebeat/modules.d/system.yml"
     return f"""
 if [ ! -f {yml} ]; then exit 0; fi

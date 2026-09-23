@@ -9,11 +9,11 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from multiprocessing import Manager, cpu_count
 from typing import Dict, List, Optional
 
-import lxc
-
 from app.config import DB_PATH
 from app.core.container import parse_memory_limit, setup_agent_health_check
+from app.core.lxc_backend import lxc
 from app.core.network import configure_container_macvlan, get_host_interface
+from app.core.os_images import get_os_config
 from app.db import record_metric
 from app.installers.elastic import install_elastic_agent
 from app.installers.ossec import install_ossec_agent
@@ -372,12 +372,3 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
             "error": str(e)
         }
 
-
-def get_os_config(os_type: str) -> dict:
-    """Map OS type to LXC configuration"""
-    os_configs = {
-        "ubuntu_22_04": {"distro": "ubuntu", "release": "jammy", "arch": "amd64"},
-        "ubuntu_20_04": {"distro": "ubuntu", "release": "focal", "arch": "amd64"},
-        "debian_11": {"distro": "debian", "release": "bullseye", "arch": "amd64"},
-    }
-    return os_configs.get(os_type, os_configs["ubuntu_22_04"])

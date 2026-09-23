@@ -1,17 +1,19 @@
 """
 LXC container lifecycle, stats, config generation, health checks and log injection.
 """
+import base64
 import logging
 import random
 import re
+import shlex
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-import lxc
-
+from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container_shell, run_command
+from app.core.validation import validate_container_path
 
 logger = logging.getLogger(__name__)
 
@@ -493,6 +495,23 @@ def stop_container_gracefully(name: str, timeout: int = 10) -> bool:
     return container.stop()
 
 
+def build_write_file_script(path: str, content: str, append: bool = False) -> str:
+    """Shell snippet that writes `content` to `path` in a container.
+
+    The content travels base64-encoded, so nothing in it (e.g. a line that matches a
+    heredoc terminator) can be interpreted by the shell; the path is validated and quoted.
+    """
+    validate_container_path(path)
+    qpath = shlex.quote(path)
+    encoded = base64.b64encode(content.encode()).decode()
+    operator = ">>" if append else ">"
+    return (
+        f"mkdir -p \"$(dirname -- {qpath})\"\n"
+        f"printf '%s' '{encoded}' | base64 -d {operator} {qpath}\n"
+        f"chmod 644 {qpath}\n"
+    )
+
+
 def inject_logs_to_container(container_name: str, log_content: str,
                             destination_path: str, append: bool = False) -> Dict[str, Any]:
     """
@@ -508,16 +527,8 @@ def inject_logs_to_container(container_name: str, log_content: str,
         Dict with success status
     """
     try:
-        operator = ">>" if append else ">"
-
-        script = f"""
-mkdir -p $(dirname {destination_path})
-cat {operator} {destination_path} << 'EOFLOG'
-{log_content}
-EOFLOG
-chmod 644 {destination_path}
-echo "Injected $(wc -l < {destination_path}) lines to {destination_path}"
-"""
+        script = build_write_file_script(destination_path, log_content, append)
+        script += f'echo "Injected $(wc -l < {shlex.quote(destination_path)}) lines to "{shlex.quote(destination_path)}\n'
 
         result = execute_in_container_shell(container_name, script, timeout=30)
 

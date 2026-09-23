@@ -1,17 +1,18 @@
 """
 Shared helpers: privilege check and LXC host introspection.
 """
-import os
 
-import lxc
 from fastapi import HTTPException
+
+from app.core.lxc_backend import has_lxc_access, lxc
 
 
 def check_root():
-    if os.geteuid() != 0:
+    """Container operations need LXC access: root (direct mode) or the privileged helper."""
+    if not has_lxc_access():
         raise HTTPException(
             status_code=403,
-            detail="This operation requires root privileges. Run with sudo."
+            detail="Container operations need root or the habeny LXC helper (HABENY_LXC_BACKEND=helper)."
         )
     return True
 
