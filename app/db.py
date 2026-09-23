@@ -272,6 +272,12 @@ def get_agent_by_name(db_path: Path, agent_name: str) -> Optional[Dict[str, Any]
         return data
 
 
+def get_agent_siem_types(db_path: Path) -> Dict[str, Optional[str]]:
+    """agent_name -> stored siem_type for every agent, in one query."""
+    with _connection(db_path) as conn:
+        return {r["agent_name"]: r["siem_type"] for r in conn.execute("SELECT agent_name, siem_type FROM agents")}
+
+
 def get_or_create_agent_seq_id(db_path: Path, agent_name: str) -> int:
     with _connection(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")

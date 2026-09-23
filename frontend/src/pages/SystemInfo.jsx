@@ -1,20 +1,50 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import { PageHeader, StatCard, Spinner, JsonBlock } from "../components/UI";
+import { useStore } from "../store";
+import { PageHeader, StatCard, Spinner } from "../components/UI";
+
+function formatUptime(seconds) {
+  if (seconds == null) return "—";
+  const d = Math.floor(seconds / 86400), h = Math.floor((seconds % 86400) / 3600), m = Math.floor((seconds % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
 export default function SystemInfo() {
+  const { toast } = useStore();
   const [info, setInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    try { const res = await api.getSystemInfo(); setInfo(res.data); } catch {}
-    setLoading(false);
-  };
-  useEffect(() => { load(); }, []);
+  // Keeps the current numbers on screen while refreshing instead of blanking the page
+  const load = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await api.getSystemInfo();
+      if (!res.success) throw new Error(res.error || res.message);
+      setInfo(res.data);
+      setError(null);
+      setUpdatedAt(new Date());
+    } catch (err) {
+      setError(err.message);
+      toast(`System info: ${err.message}`, "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Spinner />;
-  if (!info) return <div className="empty"><p>Failed to load system info</p></div>;
+  if (!info) {
+    if (!error) return <Spinner />;
+    return (
+      <div className="empty">
+        <p>Failed to load system info: {error}</p>
+        <button className="btn btn-secondary" onClick={load} disabled={refreshing}>Retry</button>
+      </div>
+    );
+  }
 
   const p = info.platform || {};
   const s = info.system || {};
@@ -24,15 +54,20 @@ export default function SystemInfo() {
 
   return (
     <>
-      <PageHeader title="System Info" subtitle="Platform and LXC configuration">
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
+      <PageHeader
+        title="System Info"
+        subtitle={updatedAt ? `Platform and LXC configuration · updated ${updatedAt.toLocaleTimeString()}` : "Platform and LXC configuration"}
+      >
+        <button className="btn btn-secondary" onClick={load} disabled={refreshing}>
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
       </PageHeader>
 
       <div className="section">
         <div className="section-title">Platform</div>
         <div className="stats-grid">
-          <StatCard label="Name" value={p.name || "—"} />
           <StatCard label="Version" value={p.version || "—"} />
+          <StatCard label="Uptime" value={formatUptime(p.uptime_seconds)} meta="Since the API server started" />
           <StatCard label="LXC Version" value={p.lxc_version || "—"} />
           <StatCard label="Config Path" value={p.default_config_path || "—"} />
         </div>
@@ -56,6 +91,7 @@ export default function SystemInfo() {
           <StatCard label="Running" value={byState.RUNNING ?? 0} color="green" />
           <StatCard label="Stopped" value={byState.STOPPED ?? 0} color="red" />
           <StatCard label="Frozen" value={byState.FROZEN ?? 0} color="cyan" />
+          {byState.OTHER > 0 && <StatCard label="Other" value={byState.OTHER} meta="Starting, stopping or aborting" />}
         </div>
       </div>
 
@@ -73,7 +109,7 @@ export default function SystemInfo() {
         </div>
       </div>
 
-      {info.templates && (
+      {info.templates?.length > 0 && (
         <div className="section">
           <div className="section-title">LXC Templates</div>
           <div className="card"><pre className="json-block">{(info.templates||[]).join("\n")}</pre></div>

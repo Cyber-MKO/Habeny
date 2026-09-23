@@ -1,12 +1,13 @@
 """
 Activity log retrieval.
 """
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Query
 
 from app.models import APIResponse
-from app.services.activity import read_activity_logs_from_files
+from app.services.activity import read_activity_page
 
 router = APIRouter()
 
@@ -19,9 +20,7 @@ async def get_activity_logs(
 ):
     """Retrieve activity logs with filtering"""
     try:
-        filtered_logs = read_activity_logs_from_files(action)
-        total = len(filtered_logs)
-        paginated_logs = filtered_logs[offset:offset + limit]
+        paginated_logs, total = await asyncio.to_thread(read_activity_page, action, offset, limit)
 
         return APIResponse(
             success=True,

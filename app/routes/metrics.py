@@ -6,18 +6,69 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import lxc
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from app.config import DB_PATH
 from app.core.resources import get_system_resources
 from app.db import get_metric_summary, query_metrics, record_metrics_batch
 from app.models import APIResponse, utc_now
-from app.services.agent_info import read_agent_metadata
+from app.services.agent_info import container_counts
 from app.state import simulations_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _collect_metrics_payload() -> dict:
+    """Build one live-metrics message. Blocking (LXC + DB), so run it in a thread."""
+    counts = container_counts()
+    running = counts["running"]
+    by_status = {"running": running, "stopped": counts["stopped"]}
+    by_siem = counts["by_siem_type"]
+
+    active_sims = len([s for s in simulations_db.values() if s.get("status") == "running"])
+    total_events = sum(s.get("events_generated", 0) for s in simulations_db.values())
+    running_sims_eps = sum(s.get("eps_target", 0) for s in simulations_db.values() if s.get("status") == "running")
+
+    # System resources
+    sys_res = get_system_resources()
+
+    # Recent API latency (last 60s)
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+        latency_summary = get_metric_summary(DB_PATH, "api_latency", "/agents/deploy", since)
+    except Exception:
+        latency_summary = {}
+
+    payload = {
+        "total_agents": counts["total"],
+        "by_status": by_status,
+        "by_siem_type": by_siem,
+        "active_simulations": active_sims,
+        "total_events_generated": total_events,
+        "current_eps_target": running_sims_eps,
+        "system": {
+            "cpu_count": sys_res.get("cpu_count"),
+            "memory_used_percent": round(sys_res.get("memory_used_percent", 0), 1),
+            "memory_available_mb": sys_res.get("memory_available_mb"),
+            "disk_used_percent": round(sys_res.get("disk_used_percent", 0), 1),
+            "load_average": sys_res.get("load_average", []),
+        },
+        "deploy_latency": latency_summary,
+        "timestamp": utc_now().isoformat(),
+    }
+
+    # Persist system metrics snapshot for historical trending
+    try:
+        record_metrics_batch(DB_PATH, [
+            ("system", "memory_used_percent", sys_res.get("memory_used_percent", 0), None),
+            ("system", "cpu_load_1m", sys_res.get("load_average", [0])[0] if sys_res.get("load_average") else 0, None),
+            ("system", "disk_used_percent", sys_res.get("disk_used_percent", 0), None),
+            ("system", "containers_running", running, None),
+        ])
+    except Exception:
+        pass
+    return payload
 
 
 @router.websocket("/ws/metrics")
@@ -27,59 +78,7 @@ async def metrics_stream(websocket: WebSocket):
     try:
         while True:
             try:
-                containers = lxc.list_containers()
-                running = sum(1 for n in containers if lxc.Container(n).running)
-                by_status = {"running": running, "stopped": len(containers) - running}
-
-                by_siem = {}
-                for name in containers:
-                    meta = read_agent_metadata(name)
-                    stype = meta.get("siem_type") or "unknown"
-                    by_siem[stype] = by_siem.get(stype, 0) + 1
-
-                active_sims = len([s for s in simulations_db.values() if s.get("status") == "running"])
-                total_events = sum(s.get("events_generated", 0) for s in simulations_db.values())
-                running_sims_eps = sum(s.get("eps_target", 0) for s in simulations_db.values() if s.get("status") == "running")
-
-                # System resources
-                sys_res = get_system_resources()
-
-                # Recent API latency (last 60s)
-                try:
-                    since = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
-                    latency_summary = get_metric_summary(DB_PATH, "api_latency", "/agents/deploy", since)
-                except Exception:
-                    latency_summary = {}
-
-                payload = {
-                    "total_agents": len(containers),
-                    "by_status": by_status,
-                    "by_siem_type": by_siem,
-                    "active_simulations": active_sims,
-                    "total_events_generated": total_events,
-                    "current_eps_target": running_sims_eps,
-                    "system": {
-                        "cpu_count": sys_res.get("cpu_count"),
-                        "memory_used_percent": round(sys_res.get("memory_used_percent", 0), 1),
-                        "memory_available_mb": sys_res.get("memory_available_mb"),
-                        "disk_used_percent": round(sys_res.get("disk_used_percent", 0), 1),
-                        "load_average": sys_res.get("load_average", []),
-                    },
-                    "deploy_latency": latency_summary,
-                    "timestamp": utc_now().isoformat(),
-                }
-
-                # Persist system metrics snapshot for historical trending
-                try:
-                    record_metrics_batch(DB_PATH, [
-                        ("system", "memory_used_percent", sys_res.get("memory_used_percent", 0), None),
-                        ("system", "cpu_load_1m", sys_res.get("load_average", [0])[0] if sys_res.get("load_average") else 0, None),
-                        ("system", "disk_used_percent", sys_res.get("disk_used_percent", 0), None),
-                        ("system", "containers_running", running, None),
-                    ])
-                except Exception:
-                    pass
-
+                payload = await asyncio.to_thread(_collect_metrics_payload)
                 await websocket.send_json(payload)
             except Exception as e:
                 logger.debug(f"Metrics collection error: {e}")

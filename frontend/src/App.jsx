@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
-import { useMetricsSocket } from "./ws";
+import { MetricsProvider, useMetricsSocket } from "./ws";
 import { useStore } from "./store";
 import { Modal, Spinner } from "./components/UI";
 import { useAuth } from "./auth";
@@ -151,7 +151,11 @@ export default function App() {
     );
   }
   if (!user) return <Login />;
-  return <AppShell user={user} />;
+  return (
+    <MetricsProvider>
+      <AppShell user={user} />
+    </MetricsProvider>
+  );
 }
 
 function AppShell({ user }) {

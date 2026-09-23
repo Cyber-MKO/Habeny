@@ -1,22 +1,21 @@
 """
 Root and system info/health endpoints.
 """
+import asyncio
 import logging
 import os
 import time
 from multiprocessing import cpu_count
 
-import lxc
 from fastapi import APIRouter, HTTPException
 
 from app.config import MAX_WORKERS
 from app.core.common import get_lxc_default_config_path, get_lxc_version
 from app.core.container import get_system_arch
-from app.core.shell import run_command
 from app.models import APIResponse, HealthCheckResponse
-from app.services.agent_info import get_containers_by_state
+from app.services.agent_info import container_state_summary
 from app.services.simulation import list_simulation_profiles
-from app.state import simulations_db
+from app.state import PROCESS_STARTED_AT, simulations_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -49,16 +48,25 @@ async def root():
     )
 
 
+def _lxc_templates() -> list:
+    try:
+        return sorted(os.listdir("/usr/share/lxc/templates"))
+    except OSError:
+        return []
+
+
 @router.get("/system/info", response_model=APIResponse)
 async def system_info():
     """Get comprehensive system and LXC information"""
     try:
+        containers = await asyncio.to_thread(container_state_summary)
         info = {
             "platform": {
                 "name": "Multi-SIEM Container Emulation Platform",
                 "version": "2.0.0",
                 "lxc_version": get_lxc_version(),
                 "default_config_path": get_lxc_default_config_path(),
+                "uptime_seconds": round(time.monotonic() - PROCESS_STARTED_AT, 1),
             },
             "system": {
                 "arch": get_system_arch(),
@@ -70,8 +78,8 @@ async def system_info():
                 }
             },
             "containers": {
-                "total": len(lxc.list_containers()),
-                "by_state": get_containers_by_state()
+                "total": containers["total"],
+                "by_state": dict(containers["by_state"]),
             },
             "supported_features": {
                 "siem_types": ["wazuh", "ossec", "ossim", "utmstack", "elastic"],
@@ -79,7 +87,7 @@ async def system_info():
                 "simulation_profiles": list_simulation_profiles(),
                 "parallel_modes": ["multiprocessing", "threading", "sequential"]
             },
-            "templates": run_command(["ls", "/usr/share/lxc/templates"])["stdout"].split()
+            "templates": _lxc_templates(),
         }
         return APIResponse(success=True, message="System info retrieved", data=info)
     except Exception as e:
@@ -91,20 +99,16 @@ async def system_info():
 async def health_check():
     """Comprehensive health check endpoint"""
     try:
-        containers = lxc.list_containers()
-        running_containers = sum(1 for name in containers if lxc.Container(name).running)
-
-        # Calculate uptime (simplified - use actual process start time in production)
-        uptime = time.time()  # Placeholder
+        containers = await asyncio.to_thread(container_state_summary)
 
         return HealthCheckResponse(
             status="healthy",
             version="2.0.0",
-            uptime_seconds=uptime,
-            containers_count=len(containers),
+            uptime_seconds=round(time.monotonic() - PROCESS_STARTED_AT, 1),
+            containers_count=containers["total"],
             system_info={
                 "cpu_count": cpu_count(),
-                "running_containers": running_containers,
+                "running_containers": containers["running"],
                 "active_simulations": len([s for s in simulations_db.values() if s.get("status") == "running"])
             }
         )

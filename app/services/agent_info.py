@@ -4,6 +4,8 @@ Agent introspection — persisted container metadata, live container state and S
 import json
 import logging
 import os
+import threading
+import time
 from typing import Any, Dict, Optional
 
 import lxc
@@ -11,7 +13,7 @@ import lxc
 from app.config import AGENTS_DIR, DB_PATH
 from app.core.container import get_container_stats
 from app.core.shell import execute_in_container
-from app.db import get_agent_by_name, get_or_create_agent_seq_id, mark_agent_deleted, upsert_agent
+from app.db import get_agent_by_name, get_agent_siem_types, get_or_create_agent_seq_id, mark_agent_deleted, upsert_agent
 from app.models import utc_now
 
 logger = logging.getLogger(__name__)
@@ -83,17 +85,56 @@ def migrate_legacy_agent_metadata() -> None:
             logger.warning(f"Failed to migrate {legacy_file}: {e}")
 
 
+# Scanning every container's state costs a round-trip per running container, and
+# several endpoints (system info, health, live metrics) need the same numbers.
+# Share one scan for a couple of seconds; concurrent callers wait for it instead
+# of each starting their own.
+CONTAINER_SCAN_TTL = 2.0
+_scan_lock = threading.Lock()
+_scan_cache: Dict[str, Any] = {"at": 0.0, "value": None}
+
+
+def container_state_summary() -> Dict[str, Any]:
+    """Names, total, counts by state, and `running` (anything not STOPPED, like lxc's
+    Container.running) from a single pass over all containers. Blocking: call it via
+    asyncio.to_thread from async code."""
+    with _scan_lock:
+        cached = _scan_cache["value"]
+        if cached is not None and time.monotonic() - _scan_cache["at"] < CONTAINER_SCAN_TTL:
+            return cached
+        names = lxc.list_containers()
+        by_state = {"RUNNING": 0, "STOPPED": 0, "FROZEN": 0, "OTHER": 0}
+        running = 0
+        for name in names:
+            state = lxc.Container(name).state
+            by_state[state if state in by_state else "OTHER"] += 1
+            if state and state != "STOPPED":
+                running += 1
+        summary = {"names": list(names), "total": len(names), "by_state": by_state, "running": running}
+        _scan_cache.update(at=time.monotonic(), value=summary)
+        return summary
+
+
+def container_counts() -> Dict[str, Any]:
+    """Dashboard totals: running/stopped from the shared state scan and SIEM type from
+    stored metadata (one DB query), without attaching to any container. Blocking."""
+    scan = container_state_summary()
+    siem_types = get_agent_siem_types(DB_PATH)
+    by_siem: Dict[str, int] = {}
+    for name in scan["names"]:
+        siem_type = siem_types.get(name) or "unknown"
+        by_siem[siem_type] = by_siem.get(siem_type, 0) + 1
+    return {
+        "total": scan["total"],
+        "running": scan["running"],
+        "stopped": scan["total"] - scan["running"],
+        "by_siem_type": by_siem,
+    }
+
+
 def get_containers_by_state() -> Dict[str, int]:
     """Get container counts by state"""
-    state_counts = {"RUNNING": 0, "STOPPED": 0, "FROZEN": 0, "OTHER": 0}
-    for name in lxc.list_containers():
-        container = lxc.Container(name)
-        state = container.state
-        if state in state_counts:
-            state_counts[state] += 1
-        else:
-            state_counts["OTHER"] += 1
-    return state_counts
+    return dict(container_state_summary()["by_state"])
 
 
 def get_agent_info(container, detailed: bool = False) -> dict:

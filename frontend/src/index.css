@@ -868,3 +868,7 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
 }
 .account-users-head .section-title { margin-bottom: 0; }
 .account-username { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ── Dashboard ──────────────────────────────────────────── */
+.dashboard-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .dashboard-split { grid-template-columns: 1fr; } }
