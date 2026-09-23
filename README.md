@@ -79,6 +79,7 @@ warning once; traffic is encrypted either way.
 | `HABENY_TLS_CERT`, `HABENY_TLS_KEY` | Use your own certificate (PEM paths). Also enables HSTS. |
 | `HABENY_TLS=off` | Plain HTTP, **only** behind a reverse proxy that terminates TLS |
 | `HABENY_HOST`, `HABENY_PORT` | Listen address (default `0.0.0.0:9000`) |
+| `HABENY_CORS_ORIGINS` | Comma-separated origins allowed to call the API from another site (default: none, same-origin only) |
 
 Behind a reverse proxy, bind to localhost and let the proxy handle TLS. The proxy
 must send `X-Forwarded-Proto` so session cookies are marked `Secure` (trusted from

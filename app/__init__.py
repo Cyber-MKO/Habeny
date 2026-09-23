@@ -44,7 +44,7 @@ def create_app():
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from app.config import MAX_WORKERS
+    from app.config import CORS_ORIGINS, MAX_WORKERS
     from app.middleware import StripApiPrefixMiddleware, track_request_latency
     from app.routes import register_routes
 
@@ -57,13 +57,16 @@ def create_app():
     )
     logger.info(f"Initialized with {MAX_WORKERS} max thread workers and {cpu_count()} CPU cores")
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # The UI is served from this origin (and the dev server proxies), so browsers need no
+    # cross-origin access. Only origins listed in HABENY_CORS_ORIGINS get it.
+    if CORS_ORIGINS:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=CORS_ORIGINS,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Content-Type"],
+        )
     app.add_middleware(StripApiPrefixMiddleware)
     app.middleware("http")(track_request_latency)
 

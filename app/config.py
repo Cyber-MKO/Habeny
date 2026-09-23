@@ -22,3 +22,9 @@ MAX_WORKERS = cpu_count() * 2
 # Authentication
 SESSION_COOKIE = "habeny_session"
 SESSION_TTL_HOURS = int(os.environ.get("HABENY_SESSION_TTL_HOURS", "168"))  # 7 days
+
+# Browser origins allowed to call the API cross-origin (comma-separated, exact
+# "https://host:port" values). Empty (default): same-origin only.
+CORS_ORIGINS = [o.strip().rstrip("/") for o in os.environ.get("HABENY_CORS_ORIGINS", "").split(",") if o.strip()]
+if "*" in CORS_ORIGINS:
+    raise RuntimeError("HABENY_CORS_ORIGINS must list exact origins; '*' is not allowed")

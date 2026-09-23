@@ -100,3 +100,10 @@ def test_rate_limiter_blocks_after_max_failures():
     assert rl.retry_after("5.6.7.8") == 0
     rl.reset("1.2.3.4")
     assert rl.retry_after("1.2.3.4") == 0
+
+
+def test_no_cross_origin_access_by_default(client):
+    resp = client.get("/groups", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in {k.lower() for k in resp.headers}
+    pre = client.options("/groups", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
+    assert "access-control-allow-origin" not in {k.lower() for k in pre.headers}
