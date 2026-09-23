@@ -458,7 +458,9 @@ function Users() {
 
   const columns = [
     { key: "username", label: "Username", render: (u) => (
-      <span className="account-username">{u.username}{u.id === me.id && <span className="tag">you</span>}</span>
+      <span className="account-username">
+        {u.username}{u.id === me.id && <span className="tag">you</span>}{u.sso && <span className="tag">SSO</span>}
+      </span>
     )},
     { key: "role", label: "Role", render: (u) => u.id === me.id ? <Pill status={u.role} /> : (
       <select className="select account-role-select" value={u.role} aria-label={`Role of ${u.username}`}
@@ -466,16 +468,16 @@ function Users() {
         {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
       </select>
     )},
-    { key: "totp_enabled", label: "2FA", render: (u) => (
+    { key: "totp_enabled", label: "2FA", render: (u) => u.sso ? <span className="account-help">via SSO</span> : (
       <span className={`tag ${u.totp_enabled ? "tag-on" : ""}`}>{u.totp_enabled ? "on" : "off"}</span>
     )},
     { key: "last_login_at", label: "Last sign-in", render: (u) => formatDate(u.last_login_at) },
     { key: "created_at", label: "Created", render: (u) => new Date(u.created_at).toLocaleDateString() },
     { key: "actions", label: "", render: (u) => u.id === me.id ? (
-      <span className="account-help">Use “Change password” above</span>
+      <span className="account-help">{me.sso ? "" : "Use “Change password” above"}</span>
     ) : (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={() => setResetting(u)}>Reset password</button>
+        {!u.sso && <button className="btn btn-sm btn-secondary" onClick={() => setResetting(u)}>Reset password</button>}
         <button className="btn btn-sm btn-secondary" onClick={() => signOutEverywhere(u)}>Sign out everywhere</button>
         {u.totp_enabled && <button className="btn btn-sm btn-secondary" onClick={() => resetTwoFactor(u)}>Reset 2FA</button>}
         <button className="btn btn-sm btn-danger" onClick={() => remove(u)}>Delete</button>
@@ -510,8 +512,20 @@ export default function Account() {
           <Pill status={user.role} />
         </div>
         <div className="account-grid">
-          <ChangePassword />
-          <TwoFactor />
+          {user.sso ? (
+            <div className="card account-card">
+              <div className="section-title">Single sign-on</div>
+              <p className="account-help">
+                You sign in through your organization's identity provider. Change your password and
+                two-factor settings there.
+              </p>
+            </div>
+          ) : (
+            <>
+              <ChangePassword />
+              <TwoFactor />
+            </>
+          )}
           <Sessions />
         </div>
       </div>

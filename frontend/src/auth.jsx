@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
   const refresh = useCallback(async () => {
     try {
       const res = await api.authStatus();
-      setState({ status: "ready", setupRequired: res.data.setup_required, user: res.data.user, error: null });
+      setState({ status: "ready", setupRequired: res.data.setup_required, user: res.data.user, sso: res.data.sso, error: null });
     } catch (err) {
       setState((s) => ({ ...s, status: "error", error: err.message }));
     }
@@ -29,18 +29,18 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (username, password) => {
     const res = await api.login({ username, password });
     if (res.data.mfa_required) return { mfaToken: res.data.mfa_token };
-    setState({ status: "ready", setupRequired: false, user: res.data.user, error: null });
+    setState((s) => ({ ...s, status: "ready", setupRequired: false, user: res.data.user, error: null }));
     return {};
   }, []);
 
   const loginSecondFactor = useCallback(async (mfaToken, code) => {
     const res = await api.loginSecondFactor({ mfa_token: mfaToken, code });
-    setState({ status: "ready", setupRequired: false, user: res.data.user, error: null });
+    setState((s) => ({ ...s, status: "ready", setupRequired: false, user: res.data.user, error: null }));
   }, []);
 
   const setup = useCallback(async (username, password, setupToken) => {
     const res = await api.setupAdmin({ username, password, setup_token: setupToken });
-    setState({ status: "ready", setupRequired: false, user: res.data.user, error: null });
+    setState((s) => ({ ...s, status: "ready", setupRequired: false, user: res.data.user, error: null }));
   }, []);
 
   const logout = useCallback(async () => {

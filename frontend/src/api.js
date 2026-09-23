@@ -33,6 +33,7 @@ export const api = {
   loginSecondFactor: (body) => request("/auth/login/2fa", { method: "POST", body }),
   setupAdmin: (body) => request("/auth/setup", { method: "POST", body }),
   logout: () => request("/auth/logout", { method: "POST" }),
+  ssoLoginUrl: `${BASE}/auth/oidc/login`,
   changeOwnPassword: (body) => request("/users/me/password", { method: "POST", body }),
   getMySessions: () => request("/users/me/sessions"),
   endMySession: (id) => request(`/users/me/sessions/${id}`, { method: "DELETE" }),

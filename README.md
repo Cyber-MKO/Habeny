@@ -146,6 +146,34 @@ sign-in page is shown to anyone without a valid session.
   root and the service can read:
   `sudo cat /var/lib/lxc-siem-platform/setup-token` or `journalctl -u habeny | grep "setup token"`.
 
+### Single sign-on (OpenID Connect)
+
+Users can sign in through your identity provider: Microsoft Entra ID, Okta, Google
+Workspace, Keycloak, Authentik or anything else that speaks OIDC. Register Habeny as a
+web application ("confidential client") with this redirect URI:
+
+    https://<your-habeny-host>:9000/api/auth/oidc/callback
+
+then add to `/etc/default/habeny` (keep it `chmod 600`: it holds the client secret) and
+`sudo systemctl restart habeny`:
+
+| Variable | Meaning |
+|---|---|
+| `HABENY_OIDC_ISSUER` | Issuer URL, e.g. `https://login.microsoftonline.com/<tenant-id>/v2.0` (turns SSO on) |
+| `HABENY_OIDC_CLIENT_ID` / `HABENY_OIDC_CLIENT_SECRET` | From the app registration |
+| `HABENY_OIDC_REDIRECT_URI` | The redirect URI above. Set it when behind a reverse proxy |
+| `HABENY_OIDC_ADMIN_GROUPS`, `..._OPERATOR_GROUPS`, `..._VIEWER_GROUPS` | Comma-separated group names/IDs from the `groups` claim. When any is set, the role follows group membership on every sign-in and people in none of them are refused |
+| `HABENY_OIDC_DEFAULT_ROLE` | Without group mapping: role for new SSO users (default `viewer`; admins can change it) |
+| `HABENY_OIDC_USERNAME_CLAIM` | Claim used as the username (default `preferred_username`, then `email`) |
+| `HABENY_OIDC_GROUPS_CLAIM`, `HABENY_OIDC_SCOPES`, `HABENY_OIDC_BUTTON_LABEL`, `HABENY_OIDC_CA_BUNDLE` | Optional: groups claim name (default `groups`), scopes (default `openid profile email`; add `groups` for Keycloak/Authentik), sign-in button text, CA file for a private IdP |
+
+The sign-in page then shows a "Sign in with SSO" button. The first SSO sign-in creates the
+account; SSO accounts have no Habeny password, and their two-factor is whatever the identity
+provider enforces. An SSO identity never takes over an existing local account with the same
+name: that sign-in is refused. Local accounts keep working, so keep one local admin as a
+break-glass account. SAML and LDAP aren't supported; most identity providers that offer
+them offer OIDC too.
+
 **Stored secrets:** SIEM auth keys and enrollment tokens in manager profiles are encrypted
 in the database and never sent back to the browser (only the last 4 characters are shown).
 The encryption key is generated on first start at `/var/lib/lxc-siem-platform/secret.key`

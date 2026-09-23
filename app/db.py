@@ -213,11 +213,15 @@ def init_db(db_path: Path) -> None:
             "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE users ADD COLUMN totp_last_step INTEGER",
             "ALTER TABLE users ADD COLUMN recovery_codes TEXT",
+            # Single sign-on: "<issuer>|<subject>" of the linked identity-provider account
+            "ALTER TABLE users ADD COLUMN oidc_subject TEXT",
         ]:
             try:
                 conn.execute(migration)
             except sqlite3.OperationalError:
                 pass  # column already exists
+
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_subject ON users(oidc_subject)")
 
         # Accounts created before roles existed: the oldest one becomes the admin
         conn.execute(
@@ -776,7 +780,7 @@ def get_user_by_id(db_path: Path, user_id: int) -> Optional[Dict[str, Any]]:
 def list_users(db_path: Path) -> List[Dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin, role, totp_enabled, created_at, last_login_at FROM users"
+            "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at FROM users"
             " ORDER BY username COLLATE NOCASE"
         ).fetchall()
         return [_user_row(r) for r in rows]
@@ -796,6 +800,35 @@ def create_user(db_path: Path, username: str, password_hash: str, role: str) -> 
         conn.commit()
         return {"id": cur.lastrowid, "username": username, "is_admin": role == "admin", "role": role,
                 "created_at": now, "last_login_at": None}
+
+
+# Stored as the password hash of single sign-on accounts: matches no password
+SSO_ONLY_PASSWORD = "!sso"
+
+
+def get_user_by_oidc_subject(db_path: Path, subject: str) -> Optional[Dict[str, Any]]:
+    with _connection(db_path) as conn:
+        row = conn.execute("SELECT * FROM users WHERE oidc_subject = ?", (subject,)).fetchone()
+        return _user_row(row)
+
+
+def create_sso_user(db_path: Path, username: str, subject: str, role: str) -> Optional[Dict[str, Any]]:
+    """Create an account for a single sign-on identity. None if the username is taken."""
+    with _connection(db_path) as conn:
+        now = utc_now()
+        try:
+            cur = conn.execute(
+                "INSERT INTO users (username, password_hash, is_admin, role, oidc_subject, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (username, SSO_ONLY_PASSWORD, int(role == "admin"), role, subject, now),
+            )
+        except sqlite3.IntegrityError:
+            return None
+        conn.commit()
+        return {
+            "id": cur.lastrowid, "username": username, "is_admin": role == "admin", "role": role,
+            "oidc_subject": subject, "totp_enabled": False, "created_at": now, "last_login_at": None,
+        }
 
 
 def update_user_password(db_path: Path, user_id: int, password_hash: str) -> None:
@@ -948,7 +981,7 @@ def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]
     with _connection(db_path) as conn:
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.created_at, u.last_login_at,
+            SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.oidc_subject, u.created_at, u.last_login_at,
                    s.last_seen_at AS session_last_seen_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?

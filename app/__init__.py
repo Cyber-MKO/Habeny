@@ -52,6 +52,9 @@ def create_app():
     from app.routes import register_routes
 
     _initialize_storage()
+    from app.services import oidc
+    if oidc.settings():  # fails fast on incomplete single sign-on settings
+        logger.info("Single sign-on (OIDC) enabled with issuer %s", oidc.settings().issuer)
 
     app = FastAPI(
         title="Multi-SIEM Container Emulation Platform",

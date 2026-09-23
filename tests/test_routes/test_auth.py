@@ -18,7 +18,8 @@ def test_password_hash_roundtrip():
 
 def test_status_reports_signed_out(app, admin_created):
     data = TestClient(app).get("/auth/status").json()["data"]
-    assert data == {"setup_required": False, "authenticated": False, "user": None}
+    assert data == {"setup_required": False, "authenticated": False, "user": None,
+                    "sso": {"enabled": False}}
 
 
 def test_setup_cannot_run_twice(app, admin_created):

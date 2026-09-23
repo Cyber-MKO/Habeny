@@ -59,9 +59,7 @@ def _get_other_user(user_id: int, current: dict) -> dict:
 @router.post("/me/password", response_model=APIResponse)
 async def change_own_password(body: PasswordChangeRequest, request: Request, user: dict = Depends(require_user)):
     """Change your own password. Signs out your other sessions."""
-    full = get_user_by_id(DB_PATH, user["id"])
-    if not verify_password(body.current_password, full["password_hash"]):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    _confirm_password(user, body.current_password)
     if body.new_password == body.current_password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must be different")
     enforce_password_policy(body.new_password, user["username"])
@@ -71,9 +69,14 @@ async def change_own_password(body: PasswordChangeRequest, request: Request, use
     return APIResponse(success=True, message="Password changed. Your other sessions were signed out.")
 
 
+SSO_MANAGED = "This account signs in with single sign-on; its password and two-factor are managed there"
+
+
 def _confirm_password(user: dict, password: str) -> dict:
     """Re-check the password before sensitive account changes; returns the full user row."""
     full = get_user_by_id(DB_PATH, user["id"])
+    if full.get("oidc_subject"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=SSO_MANAGED)
     if not verify_password(password, full["password_hash"]):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     return full
@@ -221,6 +224,8 @@ async def update_user(user_id: int, body: UserUpdateRequest, admin: dict = Depen
 async def reset_user_password(user_id: int, body: PasswordResetRequest, admin: dict = Depends(require_admin)):
     """Set a new password for another user and sign them out everywhere."""
     target = _get_other_user(user_id, admin)
+    if target.get("oidc_subject"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=SSO_MANAGED)
     enforce_password_policy(body.new_password, target["username"])
     update_user_password(DB_PATH, target["id"], hash_password(body.new_password))
     delete_user_sessions(DB_PATH, target["id"])

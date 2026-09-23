@@ -897,6 +897,9 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
 /* ── Dashboard ──────────────────────────────────────────── */
 .dashboard-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .dashboard-split { grid-template-columns: 1fr; } }
+.auth-divider { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+a.auth-submit { display: inline-flex; text-decoration: none; margin-top: 0; }
 .auth-code-input { font-family: var(--font-mono); font-size: 18px; letter-spacing: 3px; text-align: center; }
 .auth-links { display: flex; justify-content: space-between; }
 .link-btn {

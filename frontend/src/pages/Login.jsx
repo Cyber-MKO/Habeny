@@ -1,5 +1,14 @@
 import { useState } from "react";
+import { api } from "../api";
 import { useAuth } from "../auth";
+
+// A failed single sign-on comes back as /?sso_error=...; show it once and tidy the URL
+function takeSsoError() {
+  const params = new URLSearchParams(window.location.search);
+  const message = params.get("sso_error");
+  if (message) window.history.replaceState(null, "", window.location.pathname);
+  return message;
+}
 
 function SecondFactor({ mfaToken, onCancel }) {
   const { loginSecondFactor } = useAuth();
@@ -68,13 +77,13 @@ function SecondFactor({ mfaToken, onCancel }) {
 }
 
 export default function Login() {
-  const { setupRequired, expired, login, setup } = useAuth();
+  const { setupRequired, expired, sso, login, setup } = useAuth();
   const [mfaToken, setMfaToken] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [setupToken, setSetupToken] = useState("");
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(takeSsoError);
   const [busy, setBusy] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -192,6 +201,12 @@ export default function Login() {
         <button className="btn btn-primary auth-submit" type="submit" disabled={busy || !username.trim() || !password || (setupRequired && !setupToken.trim())}>
           {busy ? (setupRequired ? "Creating account…" : "Signing in…") : setupRequired ? "Create account" : "Sign in"}
         </button>
+        {!setupRequired && sso?.enabled && (
+          <>
+            <div className="auth-divider"><span>or</span></div>
+            <a className="btn btn-secondary auth-submit" href={api.ssoLoginUrl}>{sso.label}</a>
+          </>
+        )}
       </form>
     </div>
   );
