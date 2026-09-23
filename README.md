@@ -21,7 +21,7 @@ to stress-test and validate your SIEM infrastructure.
 
 - **Ubuntu 22.04+** host
 - **Root access** (LXC requires root)
-- **LXC** installed: `sudo apt install lxc lxc-utils`
+- **LXC** and its Python bindings: `sudo apt install lxc lxc-utils python3-lxc`
 - **Python 3.10+** with pip
 - **Node.js 18+** (to build and run the frontend)
 
@@ -169,7 +169,7 @@ npm run build      # outputs to ../static/
 
 ```bash
 # Python (ruff)
-pip install ruff
+pip install -r requirements-dev.txt
 ruff check .
 ruff format .
 
@@ -180,7 +180,7 @@ cd frontend && npx eslint src/
 ## Testing
 
 ```bash
-pip install pytest
+pip install -r requirements-dev.txt
 python3 -m pytest tests/ -v
 ```
 
