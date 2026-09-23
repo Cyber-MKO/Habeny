@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 def _initialize_storage() -> None:
     """Create data directories, initialize the database and recover leftover state."""
     from app.config import AGENTS_DIR, CONFIGS_DIR, DATA_DIR, DB_PATH, LOGS_DIR, REPORTS_DIR
+    from app.db import init_db
     from app.services.agent_info import migrate_legacy_agent_metadata
-    from db import init_db
 
     for dir_path in [DATA_DIR, CONFIGS_DIR, REPORTS_DIR, LOGS_DIR, AGENTS_DIR]:
         dir_path.mkdir(parents=True, exist_ok=True)
@@ -23,7 +23,7 @@ def _initialize_storage() -> None:
 
     # Clean up benchmarks left in "running" state from a previous crash/restart
     try:
-        from benchmarks import cleanup_stale_benchmarks
+        from app.services.benchmarks import cleanup_stale_benchmarks
         cleaned = cleanup_stale_benchmarks()
         if cleaned:
             logger.info(f"Recovered {cleaned} stale benchmark(s) from previous session")

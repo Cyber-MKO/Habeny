@@ -18,8 +18,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.config import DB_PATH
+from app.db import get_metric_summary
 from app.state import simulations_db
-from db import get_metric_summary
 
 
 def normalize_dt(value: datetime) -> datetime:

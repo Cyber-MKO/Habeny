@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
-import benchmarks as bm_engine
+import app.services.benchmarks as bm_engine
 from app.models import APIResponse, BenchmarkCompareRequest, BenchmarkStartRequest
 from app.services.activity import log_activity
 

@@ -7,6 +7,17 @@ import lxc
 from fastapi import APIRouter, HTTPException
 
 from app.config import DB_PATH
+from app.db import (
+    assign_agents_to_group,
+    create_group,
+    delete_group,
+    get_agents_in_group,
+    get_or_create_agent_seq_id,
+    group_exists,
+    list_groups,
+    remove_agents_from_group,
+    rename_group,
+)
 from app.models import (
     APIResponse,
     BulkOperationRequest,
@@ -20,17 +31,6 @@ from app.routes.agents import bulk_agent_operation
 from app.routes.logs import schedule_log_upload
 from app.services.activity import log_activity
 from app.services.logs import perform_log_upload
-from db import (
-    assign_agents_to_group,
-    create_group,
-    delete_group,
-    get_agents_in_group,
-    get_or_create_agent_seq_id,
-    group_exists,
-    list_groups,
-    remove_agents_from_group,
-    rename_group,
-)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

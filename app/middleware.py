@@ -4,7 +4,7 @@ HTTP middleware: /api prefix stripping and API latency tracking.
 import time
 
 from app.config import DB_PATH
-from db import record_metric
+from app.db import record_metric
 
 
 class StripApiPrefixMiddleware:

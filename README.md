@@ -64,14 +64,13 @@ npm run build      # outputs to ../static/
 │   ├── config.py            # Paths and tunables
 │   ├── state.py             # In-memory state shared by routes/services
 │   ├── middleware.py        # /api prefix stripping, latency tracking
+│   ├── db.py                # SQLite database layer
 │   ├── routes/              # One APIRouter per domain (agents, groups, ...)
-│   ├── services/            # Deployment, simulations, reporting, logs, ...
+│   ├── services/            # Deployment, simulations, reporting, logs, benchmarks, ...
 │   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
 │   ├── installers/          # One module per SIEM agent + batch dispatcher, package cache
 │   ├── simulation/          # Attack simulation engine
 │   └── models/              # Pydantic models by domain (import from app.models)
-├── db.py                    # SQLite database layer
-├── benchmarks.py            # Benchmark engine
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
 ├── index.legacy.html        # Legacy single-file frontend

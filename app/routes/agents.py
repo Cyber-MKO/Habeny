@@ -15,6 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from app.config import DB_PATH
 from app.core.common import check_root
 from app.core.shell import execute_in_container
+from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
 from app.services.activity import log_activity
 from app.services.agent_info import delete_agent_metadata, get_agent_info, write_agent_metadata
@@ -25,7 +26,6 @@ from app.services.deployment import (
     run_deployment_workers,
 )
 from app.state import deployment_progress, deployment_progress_lock
-from db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
