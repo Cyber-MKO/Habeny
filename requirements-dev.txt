@@ -1,4 +1,4 @@
 -r requirements.txt
 pytest
-httpx<0.28                # FastAPI 0.104's TestClient is incompatible with httpx 0.28+
+httpx                     # FastAPI TestClient
 ruff

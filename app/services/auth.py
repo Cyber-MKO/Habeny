@@ -8,14 +8,14 @@ import threading
 import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from fastapi import Depends, HTTPException, WebSocketException, status
 from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
-from app.db import create_session, delete_session, get_session_user
+from app.db import create_session, delete_session, get_session_user, touch_session
 
 # scrypt parameters (~16 MiB memory per hash)
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P = 2 ** 14, 8, 1
@@ -53,12 +53,26 @@ def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def start_session(user_id: int) -> str:
+def client_ip(conn: HTTPConnection) -> Optional[str]:
+    return conn.client.host if conn.client else None
+
+
+def start_session(user_id: int, conn: Optional[HTTPConnection] = None) -> str:
     """Create a session and return its token (only the hash is stored)."""
     token = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS)
-    create_session(DB_PATH, token_hash(token), user_id, expires.isoformat())
+    create_session(DB_PATH, token_hash(token), user_id, expires.isoformat(),
+                   ip=client_ip(conn) if conn else None,
+                   user_agent=conn.headers.get("user-agent") if conn else None)
     return token
+
+
+def session_public_id(hashed: str) -> str:
+    """Short handle for listing/revoking a session; can't be used to authenticate."""
+    return hashed[:16]
+
+
+TOUCH_INTERVAL = timedelta(seconds=60)
 
 
 def end_session(token: str) -> None:
@@ -69,7 +83,19 @@ def session_user(conn: HTTPConnection) -> dict[str, Any] | None:
     token = conn.cookies.get(SESSION_COOKIE)
     if not token:
         return None
-    return get_session_user(DB_PATH, token_hash(token))
+    hashed = token_hash(token)
+    user = get_session_user(DB_PATH, hashed)
+    if user is not None:
+        # "Last active" for the sessions list, written at most once a minute per session
+        seen = user.pop("session_last_seen_at", None)
+        now = datetime.now(timezone.utc)
+        if not seen or now - datetime.fromisoformat(seen) > TOUCH_INTERVAL:
+            try:
+                touch_session(DB_PATH, hashed, client_ip(conn))
+            except Exception:
+                pass
+        user["session_id"] = session_public_id(hashed)
+    return user
 
 
 def _same_origin(conn: HTTPConnection) -> bool:
@@ -127,7 +153,42 @@ class LoginRateLimiter:
 login_limiter = LoginRateLimiter()
 
 
+# ── roles ───────────────────────────────────────────────────────────────
+# viewer: read-only · operator: + containers, simulations, console, profiles · admin: + users
+ROLES = ("viewer", "operator", "admin")
+_RANK = {role: i for i, role in enumerate(ROLES)}
+# POST endpoints that only read (safe for viewers)
+READ_ONLY_POSTS = {"/benchmarks/compare"}
+
+
+def has_role(user: dict[str, Any], minimum: str) -> bool:
+    return _RANK.get(user.get("role"), -1) >= _RANK[minimum]
+
+
+def _forbidden(conn: HTTPConnection, needed: str):
+    if conn.scope["type"] == "websocket":
+        return WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason=f"{needed} role required")
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"This needs the {needed} role")
+
+
+async def require_access(conn: HTTPConnection) -> dict[str, Any]:
+    """Router-wide check: signed in, and the role the request needs. Reads (GET, the live
+    metrics socket) are open to viewers; anything that changes something, and the
+    container console, needs operator."""
+    user = await require_user(conn)
+    path = conn.scope.get("path", "")
+    if conn.scope["type"] == "websocket":
+        needed = "operator" if path.startswith("/ws/console") else "viewer"
+    elif conn.scope.get("method") in ("GET", "HEAD", "OPTIONS") or path in READ_ONLY_POSTS:
+        needed = "viewer"
+    else:
+        needed = "operator"
+    if not has_role(user, needed):
+        raise _forbidden(conn, needed)
+    return user
+
+
 async def require_admin(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    if not user.get("is_admin"):
+    if not has_role(user, "admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access required")
     return user
