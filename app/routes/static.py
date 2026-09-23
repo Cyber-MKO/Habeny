@@ -19,7 +19,8 @@ def register(app: FastAPI) -> None:
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         """Serve the React SPA; fall back to index.html for client-side routing."""
-        file = STATIC_DIR / path
-        if file.is_file():
+        file = (STATIC_DIR / path).resolve()
+        # Never serve anything outside the build directory (e.g. /..%2f..%2fetc/shadow)
+        if file.is_relative_to(STATIC_DIR.resolve()) and file.is_file():
             return StarletteFileResponse(str(file))
         return StarletteFileResponse(str(STATIC_DIR / "index.html"))
