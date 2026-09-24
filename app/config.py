@@ -8,7 +8,7 @@ Values come from, highest priority first:
      (KEY=value lines, the same format as a systemd EnvironmentFile)
   3. the defaults below
 
-`habeny config` shows the effective values and where each came from; README's
+`habeny config` shows the effective values and where each came from; the admin guide's
 "Configuration" table and deploy/habeny.conf.example are checked against SETTINGS
 by the tests, so they can't drift.
 """
@@ -140,7 +140,7 @@ SETTINGS: list[Setting] = [
     Setting("HABENY_BACKUP_KEEP", "14", "Full backups to keep (the oldest are deleted)", "Retention and backups",
             _int(1, 1000)),
     Setting("HABENY_BACKUP_DIR", "", "Where full backups go (default: `DATA_DIR/backups`). Outside the data "
-            "directory, also allow it in systemd (see README)", "Retention and backups"),
+            "directory, also allow it in systemd (see the admin guide, Backups)", "Retention and backups"),
     # Accounts and access
     Setting("HABENY_SESSION_TTL_HOURS", "168", "How long a sign-in lasts (hours)", "Accounts", _int(1, 24 * 365)),
     Setting("HABENY_PASSWORD_MIN_LENGTH", "12", "Minimum password length", "Accounts", _int(8, 128)),

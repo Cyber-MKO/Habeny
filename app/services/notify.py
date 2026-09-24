@@ -92,7 +92,7 @@ def validate(channel_type: str, settings: dict[str, Any]) -> dict[str, Any]:
         if not to or not all("@" in a and " " not in a and len(a) <= 254 for a in to):
             raise ChannelError("to: one or more email addresses")
         if not config.get("HABENY_SMTP_HOST"):
-            raise ChannelError("email needs a mail server: set HABENY_SMTP_HOST (see README → Notifications)")
+            raise ChannelError("email needs a mail server: set HABENY_SMTP_HOST (see the administrator guide, Notifications)")
         return {"to": to[:50]}
     url = (settings.get("url") or "").strip()
     if not url.startswith(("https://", "http://")) or len(url) > 2000:

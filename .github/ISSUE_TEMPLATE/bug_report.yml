@@ -1,0 +1,96 @@
+name: Bug report
+description: Something in Habeny doesn't work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Don't paste support bundles, logs with private data, API tokens,
+        auth keys or license files here:** issues may be public. Email those to support
+        (see SUPPORT.md) and mention the issue number. Security problems go to SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Habeny version
+      description: "`sudo habeny version`"
+      placeholder: Habeny 2.2.0 (database schema v7)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it's installed
+      options:
+        - .deb package
+        - Release tarball (install.sh)
+        - Git checkout (install.sh)
+        - Development (start.sh)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Host OS
+      placeholder: Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installing or upgrading
+        - Signing in, users, SSO
+        - Deploying containers
+        - SIEM agents
+        - Simulations or log uploads
+        - Benchmarks, metrics, reports
+        - Backups
+        - Notifications, monitoring
+        - Several hosts
+        - License
+        - API
+        - Web interface
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the error message and its request ID if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Deploy 5 Wazuh containers with profile X
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: "`journalctl -u habeny --since -1h`. Remove anything private first."
+      render: text
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Impact
+      description: As defined in SUPPORT.md
+      options:
+        - P1 Critical, no workaround
+        - P2 High
+        - P3 Normal, has a workaround
+        - P4 Low
+    validations:
+      required: true

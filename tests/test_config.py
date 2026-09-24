@@ -103,9 +103,9 @@ def test_every_setting_the_code_reads_is_registered():
     assert not unregistered, f"add these to app/config.py SETTINGS: {sorted(unregistered)}"
 
 
-def test_readme_lists_every_setting():
-    readme = (ROOT / "README.md").read_text()
-    assert cli.docs_table() in readme, "README's configuration table is out of date: run `habeny config docs`"
+def test_admin_guide_lists_every_setting():
+    guide = (ROOT / "docs" / "admin-guide.md").read_text()
+    assert cli.docs_table() in guide, "docs/admin-guide.md's configuration table is out of date: run `habeny config docs`"
 
 
 def test_example_config_is_current():

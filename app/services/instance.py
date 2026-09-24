@@ -1,7 +1,7 @@
 """
 One Habeny per data directory. Habeny keeps live state in its process (running jobs,
 sessions' caches, the maintenance task), so a second process on the same data would
-misbehave in subtle ways; it's refused at startup instead (README: "Scaling and limits").
+misbehave in subtle ways; it's refused at startup instead (docs/requirements.md: "Limits of one server").
 """
 import contextlib
 import fcntl

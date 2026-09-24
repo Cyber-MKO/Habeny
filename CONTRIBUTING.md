@@ -38,6 +38,19 @@ would change every later commit ID, break existing clones and forks, and orphan 
 merged pull requests that refer to them. [CHANGELOG.md](CHANGELOG.md) is the readable
 record of what changed.
 
+## Documentation
+
+Customer documentation lives in `docs/` (index: `docs/README.md`); the README is for
+developers. When a change is visible to users or administrators, update the guide it belongs
+in: `admin-guide.md` for installing, settings and operations, `user-guide.md` for the
+interface, `api.md` for API behaviour, and `troubleshooting.md` for new error messages.
+Generated parts are checked by the tests:
+
+- the settings table in `admin-guide.md`: `python3 -m app.cli config docs`
+- `api-reference.md`: `PYTHONPATH=tests/stubs python3 deploy/api_reference.py`
+
+The tests also check that relative links and `#anchors` in the docs resolve.
+
 ## Interface text and translations
 
 Wrap text shown in the UI in `t()` from `frontend/src/i18n`: `t("Delete group")`, or with
