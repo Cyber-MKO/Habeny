@@ -16,7 +16,15 @@ const SIM_COLUMNS = [
   { key: "events_generated", label: t("Events"), render: (r) => (r.events_generated ?? 0).toLocaleString() },
 ];
 
-const PROFILES = ["auth_bruteforce", "web_attacks", "malware_beacon", "lateral_movement", "privilege_escalation", "port_scan"];
+// Attack profiles (app/services/simulation.py): what each writes, so users can pick knowingly
+const PROFILES = [
+  { id: "auth_bruteforce", label: t("SSH brute force"), about: t("Failed SSH passwords from one external address against many user names (/var/log/auth.log).") },
+  { id: "web_attacks", label: t("Web attacks"), about: t("SQL injection, path traversal, XSS, Shellshock and scanner requests (/var/log/apache2/access.log).") },
+  { id: "malware_beacon", label: t("Malware beacon"), about: t("Repeated outbound connections to a command-and-control address, blocked by the firewall (/var/log/syslog).") },
+  { id: "lateral_movement", label: t("Lateral movement"), about: t("One service account signing in over SSH from many internal hosts (/var/log/auth.log).") },
+  { id: "data_exfiltration", label: t("Data exfiltration"), about: t("Archiving sensitive directories with sudo and copying them to an external host (auth.log and syslog).") },
+  { id: "privilege_escalation", label: t("Privilege escalation"), about: t("A web server account trying sudo and su to become root (/var/log/auth.log).") },
+];
 
 export default function Simulations() {
   const { toast } = useStore();
@@ -34,7 +42,7 @@ export default function Simulations() {
   }, []);
 
   const [form, setForm] = useState({
-    profile_id: "auth_bruteforce", duration: 300, eps_target: 100, intensity: "medium", burst_mode: false, custom_parameters: "",
+    profile_id: "auth_bruteforce", duration: 300, eps_target: 100,
     sel_count: 10, sel_siem: "", sel_group: "", sel_ids: "",
   });
   const [sysForm, setSysForm] = useState({
@@ -73,12 +81,9 @@ export default function Simulations() {
   const handleAttack = async (e) => {
     e.preventDefault();
     try {
-      let cp = {};
-      if (form.custom_parameters.trim()) try { cp = JSON.parse(form.custom_parameters); } catch { return toast(t("Invalid custom_parameters JSON"), "error"); }
       const res = await api.startSimulation({
         profile_id: form.profile_id, agent_selector: buildSelector(form),
         duration: Number(form.duration), eps_target: Number(form.eps_target),
-        intensity: form.intensity, burst_mode: form.burst_mode, custom_parameters: cp,
       });
       setResult(res); toast(t("Simulation started"), "success"); load();
     } catch (e) { toast(e.message, "error"); }
@@ -137,12 +142,10 @@ export default function Simulations() {
         <form onSubmit={handleAttack} className="card" style={{ marginBottom: 20 }}>
           <div className="section-title">{t("Attack Simulation")}</div>
           <div className="form-grid">
-            <div className="field"><label htmlFor="simulations-profile">{t("Profile")}</label><select id="simulations-profile" className="select" value={form.profile_id} onChange={(e) => setForm((p) => ({ ...p, profile_id: e.target.value }))}>{PROFILES.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div className="field"><label htmlFor="simulations-profile">{t("Profile")}</label><select id="simulations-profile" aria-describedby="simulations-profile-about" className="select" value={form.profile_id} onChange={(e) => setForm((p) => ({ ...p, profile_id: e.target.value }))}>{PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
+              <span id="simulations-profile-about" className="auth-hint">{PROFILES.find((p) => p.id === form.profile_id)?.about}</span></div>
             <div className="field"><label htmlFor="simulations-duration-s">{t("Duration (s)")}</label><input id="simulations-duration-s" className="input" type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))} /></div>
-            <div className="field"><label htmlFor="simulations-eps-target">{t("EPS Target")}</label><input id="simulations-eps-target" className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
-            <div className="field"><label htmlFor="simulations-intensity">{t("Intensity")}</label><select id="simulations-intensity" className="select" value={form.intensity} onChange={(e) => setForm((p) => ({ ...p, intensity: e.target.value }))}><option value="low">{t("Low")}</option><option value="medium">{t("Medium")}</option><option value="high">{t("High")}</option></select></div>
-            <div className="field"><label className="checkbox-label"><input type="checkbox" checked={form.burst_mode} onChange={(e) => setForm((p) => ({ ...p, burst_mode: e.target.checked }))} /> {t("Burst mode")}</label></div>
-            <div className="field"><label htmlFor="simulations-custom-parameters-json">{t("Custom Parameters (JSON)")}</label><input id="simulations-custom-parameters-json" className="input" value={form.custom_parameters} onChange={(e) => setForm((p) => ({ ...p, custom_parameters: e.target.value }))} placeholder='{}' /></div>
+            <div className="field"><label htmlFor="simulations-eps-target">{t("Events per second, per container")}</label><input id="simulations-eps-target" className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
           </div>
           <SelectorFields f={form} setF={setForm} />
           <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>{t("Start Simulation")}</button>

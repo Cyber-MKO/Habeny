@@ -49,9 +49,10 @@ export default function Dashboard() {
         <StatCard label={t("Stopped")} value={pending(byStatus.stopped)} color="red" />
         <StatCard label={t("Errors")} value={errors} color={errors > 0 ? "red" : undefined} />
         <StatCard label={t("Active Simulations")} value={pending(metrics?.active_simulations ?? health?.system_info?.active_simulations)} color="orange" />
-        <StatCard label={t("Platform Status")} value={health?.status === "healthy" || connected ? "Healthy" : health ? "Unknown" : "—"} color={health?.status === "healthy" || connected ? "green" : "red"} />
+        <StatCard label={t("Platform Status")} value={health ? (health.status === "degraded" ? t("Degraded") : t("Healthy")) : "—"}
+          color={!health ? undefined : health.status === "degraded" ? "red" : "green"} />
         <StatCard label={t("CPU Cores")} value={pending(metrics?.system?.cpu_count ?? health?.system_info?.cpu_count)} />
-        <StatCard label={t("WebSocket")} value={connected ? "Connected" : "Disconnected"} color={connected ? "green" : "red"} />
+        <StatCard label={t("WebSocket")} value={connected ? t("Connected") : t("Disconnected")} color={connected ? "green" : "red"} />
       </div>
 
       {bySiem && Object.keys(bySiem).length > 0 && (

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, Spinner } from "../components/UI";
+import { PageHeader, ScrollArea, Spinner } from "../components/UI";
 import { Details, RecordTable } from "../components/Details";
 import { formatDateTime, t } from "../i18n";
 
@@ -35,10 +35,14 @@ export default function Reports() {
     end_time: new Date().toISOString().slice(0, 16),
     format: "json", metrics: "all", include_findings: true,
   });
-  const [fetchId, setFetchId] = useState("");
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const loadHistory = useCallback(() => {
+    api.getReports().then((res) => setHistory(res.data?.reports || [])).catch((e) => toast(e.message, "error"));
+  }, [toast]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
 
   const handleGenerate = async (e) => {
@@ -52,22 +56,23 @@ export default function Reports() {
         format: form.format, include_findings: form.include_findings, metrics,
       });
       setResult(res);
-      const rid = res.data?.report_id;
-      if (rid && !history.includes(rid)) setHistory((p) => [rid, ...p]);
+      loadHistory();
       toast(t("Report generated"), "success");
     } catch (e) { toast(e.message, "error"); }
     finally { setLoading(false); }
   };
 
-  const handleFetch = async () => {
-    if (!fetchId.trim()) return toast(t("Enter a report ID"), "error");
+  const handleView = async (rid) => {
     setLoading(true);
-    try { const res = await api.getReport(fetchId.trim()); setResult(res); toast(t("Report fetched"), "success"); }
-    catch (e) { toast(e.message, "error"); }
+    try {
+      const res = await api.getReport(rid);
+      setResult({ data: { report_id: rid, report: res.data, format: "json" } });
+    } catch (e) { toast(e.message, "error"); }
     finally { setLoading(false); }
   };
 
   const reportId = result?.data?.report_id;
+  const resultFormat = result?.data?.format || "json";
 
   return (
     <>
@@ -86,43 +91,38 @@ export default function Reports() {
       </form>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">{t("Fetch Report by ID")}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input className="input" placeholder={t("Report ID")} value={fetchId} onChange={(e) => setFetchId(e.target.value)} style={{ flex: 1 }} />
-          <button className="btn btn-secondary" onClick={handleFetch} disabled={loading}>{t("Fetch")}</button>
-        </div>
+        <div className="section-title">{t("Report History")}</div>
+        {history.length === 0 ? <p className="muted">{t("No reports yet.")}</p> : (
+          <ScrollArea label={t("Report History")}>
+            <table>
+              <thead><tr><th>{t("Generated")}</th><th>{t("Period")}</th><th>{t("Actions")}</th></tr></thead>
+              <tbody>
+                {history.map((r) => (
+                  <tr key={r.report_id}>
+                    <td>{r.generated_at ? <time dateTime={r.generated_at}>{formatDateTime(r.generated_at)}</time> : "—"}</td>
+                    <td>{r.time_range ? `${formatDateTime(r.time_range.start)} – ${formatDateTime(r.time_range.end)}` : "—"}</td>
+                    <td>
+                      <div className="btn-group">
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => handleView(r.report_id)}>{t("View")}</button>
+                        {r.formats.map((f) => (
+                          <a key={f} className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(r.report_id, f)} target="_blank" rel="noopener noreferrer">{f.toUpperCase()}</a>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollArea>
+        )}
       </div>
-
-      {history.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="section-title">{t("Report History")}</div>
-          <table>
-            <thead><tr><th>{t("Report ID")}</th><th>{t("Actions")}</th></tr></thead>
-            <tbody>
-              {history.map((rid) => (
-                <tr key={rid}>
-                  <td style={{ fontFamily: "monospace", fontSize: 12 }}>{rid}</td>
-                  <td>
-                    <div className="btn-group">
-                      <button className="btn btn-sm btn-secondary" onClick={() => { setFetchId(rid); handleFetch(); }}>{t("View")}</button>
-                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "json")} target="_blank" rel="noopener noreferrer">JSON</a>
-                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "csv")} target="_blank" rel="noopener noreferrer">CSV</a>
-                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "pdf")} target="_blank" rel="noopener noreferrer">PDF</a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
       {loading && <Spinner />}
       {result && (
         <div className="card">
           <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>{t("Result")}</span>
-            {reportId && <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(reportId, form.format)} target="_blank" rel="noopener noreferrer">{t("Download")} {form.format.toUpperCase()}</a>}
+            {reportId && <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(reportId, resultFormat)} target="_blank" rel="noopener noreferrer">{t("Download")} {resultFormat.toUpperCase()}</a>}
           </div>
           <ReportView report={result.data?.report} fallback={result} />
         </div>

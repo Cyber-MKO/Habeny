@@ -10,7 +10,6 @@ import { t } from "../i18n";
 
 const COLUMNS = [
   { key: "agent_name", label: t("Name") },
-  { key: "agent_seq_id", label: t("Seq"), render: (r) => r.agent_seq_id ?? "—" },
   { key: "siem_type", label: "SIEM", render: (r) => r.siem_type || "—" },
   { key: "lifecycle_status", label: t("Status"), render: (r) => <Pill status={r.lifecycle_status} /> },
   { key: "siem_agent_status", label: t("Agent Svc"), render: (r) => r.siem_agent_running === true ? <Pill status="running" /> : r.siem_agent_running === false ? <Pill status="stopped" /> : <span style={{ color: "var(--text-muted)" }}>—</span> },

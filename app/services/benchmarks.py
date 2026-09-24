@@ -389,7 +389,7 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict, owner
                 tenancy.record([n for n in agent_names if n not in existing], owner)
                 deployment_config = {
                     "siem_type": siem_type, "siem_ip": siem_ip,
-                    "os_type": config.get("os_type", "ubuntu_22_04"),
+                    "os_type": config.get("os_type") or "ubuntu_22_04",
                     "agent_group": config.get("agent_group", "benchmark"),
                     "memory_limit": config.get("memory_limit", "256MB"),
                     "cpu_shares": config.get("cpu_shares", 512),

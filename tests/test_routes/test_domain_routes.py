@@ -101,6 +101,8 @@ def test_report_generation_and_download(client, fmt):
         assert len(rows) > 1
     else:
         assert download.json()
+    listed = next(r for r in client.get("/reports").json()["data"]["reports"] if r["report_id"] == report_id)
+    assert listed["formats"] == sorted({"json", fmt}) and listed["generated_at"] and listed["time_range"]
 
 
 def test_report_rejects_backwards_time_range(client):
@@ -249,7 +251,6 @@ def test_simulation_targets_only_the_selected_containers(client, attach):
         assert pick(siem_type="wazuh") == sorted([names[0], names[2]])
         assert pick(agent_group="red") == sorted(names[:2])
         assert pick(siem_type="wazuh", agent_group="red") == [names[0]]
-        assert pick(tags=["nope"]) == []
         assert len(select_agents_for_simulation(AgentSelector(agent_ids=names, count=2))) == 2
         resp = client.post("/simulations/start", json={"profile_id": "auth_bruteforce",
                                                        "agent_selector": {"agent_ids": ["no-such-container"]}})

@@ -5,7 +5,6 @@ import { PageHeader, DataTable, Pill, Spinner } from "../components/UI";
 import { Details } from "../components/Details";
 import { t } from "../i18n";
 
-const LOG_TYPES = ["auth", "web", "application", "system", "security", "custom"];
 
 export default function LogUpload() {
   const { toast } = useStore();
@@ -19,7 +18,7 @@ export default function LogUpload() {
   const [mode, setMode] = useState("once");
   const [form, setForm] = useState({
     agent_id: "", group: "", destination_path: "/var/log/custom.log",
-    log_type: "custom", append: true, content: "",
+    append: true, content: "",
     interval_seconds: 120, duration_seconds: 600, indefinite: false,
   });
 
@@ -44,7 +43,7 @@ export default function LogUpload() {
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    const body = { content: form.content, destination_path: form.destination_path, log_type: form.log_type, append: form.append };
+    const body = { content: form.content, destination_path: form.destination_path, append: form.append };
     try {
       let res;
       if (mode === "once") {
@@ -117,12 +116,7 @@ export default function LogUpload() {
             <label htmlFor="log-upload-destination-path">{t("Destination Path")}</label>
             <input id="log-upload-destination-path" className="input" value={form.destination_path} onChange={(e) => set("destination_path", e.target.value)} required />
           </div>
-          <div className="field">
-            <label htmlFor="log-upload-log-type">{t("Log Type")}</label>
-            <select id="log-upload-log-type" className="select" value={form.log_type} onChange={(e) => set("log_type", e.target.value)}>
-              {LOG_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
+          
           <div className="field">
             <label className="checkbox-label"><input type="checkbox" checked={form.append} onChange={(e) => set("append", e.target.checked)} /> {t("Append")}</label>
           </div>

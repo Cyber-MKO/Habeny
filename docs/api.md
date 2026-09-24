@@ -158,7 +158,7 @@ SIM=$(curl -sS -X POST -H "Authorization: Bearer $HABENY_TOKEN" -H "Content-Type
     "profile_id": "auth_bruteforce",
     "agent_selector": {"agent_group": "ci"},
     "duration": 300,
-    "intensity": "medium"
+    "eps_target": 20
   }' | jq -r '.data.simulation_id')
 
 curl -sS -H "Authorization: Bearer $HABENY_TOKEN" "$HABENY/simulations" | jq '.data'

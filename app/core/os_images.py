@@ -10,5 +10,7 @@ OS_IMAGES = {
 
 
 def get_os_config(os_type: str) -> dict:
-    """Map OS type to LXC configuration"""
-    return dict(OS_IMAGES.get(os_type, OS_IMAGES["ubuntu_22_04"]))
+    """The LXC image for an OS type. An unknown type is an error, never a silent substitute."""
+    if os_type not in OS_IMAGES:
+        raise ValueError(f"Unsupported OS type {os_type!r}; choose one of: {', '.join(OS_IMAGES)}")
+    return dict(OS_IMAGES[os_type])

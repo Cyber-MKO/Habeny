@@ -48,9 +48,3 @@ class ConfigTemplate(BaseModel):
     model_config = ConfigDict(
         use_enum_values=True,
     )
-
-
-class ConfigExportResponse(BaseModel):
-    """Response for config export"""
-    template: ConfigTemplate
-    download_url: str | None = None

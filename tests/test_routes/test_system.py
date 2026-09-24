@@ -5,15 +5,22 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-def test_root_returns_200(client):
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert resp.json()["success"] is True
+def test_system_info_lists_what_the_platform_supports(client):
+    features = client.get("/system/info").json()["data"]["supported_features"]
+    assert features["siem_types"] == ["wazuh", "ossec", "utmstack", "elastic"]
+    assert features["os_types"] == ["ubuntu_22_04", "ubuntu_20_04", "debian_11"]
 
 
-def test_health_returns_200(client):
+def test_health_reflects_critical_alerts(client):
+    from app.services import alerts
     resp = client.get("/system/health")
-    assert resp.status_code == 200
+    assert resp.status_code == 200 and resp.json()["status"] == "healthy"
+    alerts.manager.fire("lxc_unavailable", "critical", "test")
+    try:
+        body = client.get("/system/health").json()
+        assert body["status"] == "degraded" and body["system_info"]["critical_alerts"] == 1
+    finally:
+        alerts.manager.clear("lxc_unavailable")
 
 
 def test_api_prefix_is_accepted(client):

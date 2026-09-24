@@ -28,25 +28,7 @@ class OSType(str, Enum):
     UBUNTU_22_04 = "ubuntu_22_04"
     UBUNTU_20_04 = "ubuntu_20_04"
     DEBIAN_11 = "debian_11"
-    DEBIAN_10 = "debian_10"
     CENTOS_8 = "centos_8"
-
-
-class ArchType(str, Enum):
-    """Supported architectures"""
-    AMD64 = "amd64"
-    ARM64 = "arm64"
-    ARMHF = "armhf"
-    I386 = "i386"
-
-
-class TemplateType(str, Enum):
-    """LXC template types"""
-    DOWNLOAD = "download"
-    UBUNTU = "ubuntu"
-    DEBIAN = "debian"
-    ALPINE = "alpine"
-    BUSYBOX = "busybox"
 
 
 class ParallelMode(str, Enum):
@@ -97,20 +79,6 @@ class SimulationProfile(str, Enum):
     LATERAL_MOVEMENT = "lateral_movement"
     DATA_EXFILTRATION = "data_exfiltration"
     PRIVILEGE_ESCALATION = "privilege_escalation"
-    PORT_SCAN = "port_scan"
-    SQL_INJECTION = "sql_injection"
-    XSS_ATTACK = "xss_attack"
-    DDoS_ATTACK = "ddos_attack"
-
-
-class LogType(str, Enum):
-    """Log types for injection"""
-    AUTH = "auth"
-    WEB = "web"
-    APPLICATION = "application"
-    SYSTEM = "system"
-    SECURITY = "security"
-    CUSTOM = "custom"
 
 
 class SyslogDeviceType(str, Enum):

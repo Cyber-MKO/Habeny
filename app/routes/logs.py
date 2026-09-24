@@ -36,7 +36,6 @@ async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest,
         log_upload = LogUploadRequest(
             content=schedule.content,
             destination_path=schedule.destination_path,
-            log_type=schedule.log_type,
             append=schedule.append
         )
 

@@ -9,7 +9,7 @@ const DEFAULTS = {
   count: 2, siem_type: "none", siem_ip: "", siem_version: "4.14.2", siem_auth_key: "",
   os_type: "ubuntu_22_04", agent_group: "default", agent_base_name: "container",
   memory_limit: "512MB", cpu_shares: 1024, config_template_id: "",
-  autostart: true, auto_create_group: true, parallel_mode: "multiprocessing",
+  autostart: true, auto_create_group: true,
   manager_profile_id: "",
 };
 
@@ -182,7 +182,6 @@ export default function Deploy() {
         config_template_id: form.config_template_id || null,
         autostart: form.autostart,
         auto_create_group: form.auto_create_group,
-        parallel_mode: form.parallel_mode,
         deployment_id: id,
       };
       if (form.manager_profile_id) payload.manager_profile_id = form.manager_profile_id;
@@ -290,14 +289,6 @@ export default function Deploy() {
             <div className="field">
               <label htmlFor="deploy-config-template-id">{t("Config Template ID")}</label>
               <input id="deploy-config-template-id" className="input" placeholder={t("optional template id")} value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="deploy-parallel-mode">{t("Parallel Mode")}</label>
-              <select id="deploy-parallel-mode" className="select" value={form.parallel_mode} onChange={(e) => set("parallel_mode", e.target.value)}>
-                <option value="multiprocessing">{t("Multiprocessing")}</option>
-                <option value="threading">{t("Threading")}</option>
-                <option value="sequential">{t("Sequential")}</option>
-              </select>
             </div>
           </div>
           <div style={{ marginTop: 16, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>

@@ -23,7 +23,7 @@ def test_new_ossim_deployments_and_profiles_are_refused(client):
     assert resp.status_code == 422
     resp = client.post("/managers", json={"name": "old", "siem_type": "ossim", "siem_ip": "10.0.0.1"})
     assert resp.status_code == 422
-    assert "ossim" not in client.get("/").json()["data"]["supported_siem_types"]
+    assert "ossim" not in client.get("/system/info").json()["data"]["supported_features"]["siem_types"]
 
 
 def test_saved_ossim_profile_gets_a_clear_error(client):

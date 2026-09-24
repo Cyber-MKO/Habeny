@@ -149,6 +149,23 @@ async def generate_report(report_request: ReportGenerateRequest, user: dict | No
         return APIResponse(success=False, message="Failed to generate report", error=str(e))
 
 
+@router.get("/reports", response_model=APIResponse)
+async def list_reports(user: dict | None = Depends(current_user)):
+    """Generated reports you can see (your team's; all for admins), newest first"""
+    rows = []
+    for report_id, report in list(reports_db.items()):
+        if not tenancy.same_team(user, report.get("team_id")):
+            continue
+        rows.append({
+            "report_id": report_id,
+            "generated_at": report.get("generated_at"),
+            "time_range": report.get("time_range"),
+            "formats": sorted(report_files.get(report_id, {}).keys()) or ["json"],
+        })
+    rows.sort(key=lambda r: r["generated_at"] or "", reverse=True)
+    return APIResponse(success=True, message=f"{len(rows)} reports", data={"reports": rows})
+
+
 @router.get("/reports/{report_id}", response_model=APIResponse)
 async def get_report(report_id: str, user: dict | None = Depends(current_user)):
     """Retrieve a generated report"""
