@@ -9,13 +9,14 @@ function VerdictBadge({ verdict }) {
   return <span style={{ fontWeight: 700, color, fontSize: 16 }}>{verdict}</span>;
 }
 
-function MiniChart({ data, color = "var(--accent)", height = 50 }) {
+function MiniChart({ data, label = "", color = "var(--accent)", height = 50 }) {
   if (!data || data.length < 2) return null;
   const max = Math.max(...data) || 1;
   const min = Math.min(...data);
   const w = 100 / data.length;
   return (
-    <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" style={{ width: "100%", height }}>
+    <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" style={{ width: "100%", height }} role="img"
+      aria-label={t("{label}: latest {latest}, lowest {min}, highest {max}", { label, latest: Number(data[data.length - 1]).toFixed(1), min: min.toFixed(1), max: max.toFixed(1) })}>
       <polyline fill="none" stroke={color} strokeWidth="1.5"
         points={data.map((v, i) => `${i * w + w / 2},${height - ((v - min) / (max - min || 1)) * (height - 4) - 2}`).join(" ")} />
     </svg>
@@ -316,7 +317,7 @@ export default function BenchmarkRunner() {
                   return vals.length > 1 ? (
                     <div key={name}>
                       <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>{name}: {vals[vals.length - 1]?.toFixed(1)}</div>
-                      <MiniChart data={vals} color={name.includes("memory") ? "var(--orange)" : name.includes("load") ? "var(--cyan)" : "var(--green)"} />
+                      <MiniChart data={vals} label={name} color={name.includes("memory") ? "var(--orange)" : name.includes("load") ? "var(--cyan)" : "var(--green)"} />
                     </div>
                   ) : null;
                 })}

@@ -38,6 +38,15 @@ would change every later commit ID, break existing clones and forks, and orphan 
 merged pull requests that refer to them. [CHANGELOG.md](CHANGELOG.md) is the readable
 record of what changed.
 
+## Interface text and translations
+
+Wrap text shown in the UI in `t()` from `frontend/src/i18n`: `t("Delete group")`, or with
+values `t("{n} containers", { n })`. Write whole sentences, not fragments joined around
+variables, so they can be translated. Add the French translation to
+`frontend/src/i18n/fr.json`; `npm test` fails when one is missing or a placeholder differs.
+New pages should pass an axe-core check (see [docs/accessibility.md](docs/accessibility.md)):
+labelled controls, `<h1>` page title, dialogs through `Modal`/`useConfirm`.
+
 ## Versions and releases
 
 Habeny uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.

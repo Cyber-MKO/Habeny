@@ -770,6 +770,7 @@
   "{from}–{to} of {total}": "{from}–{to} sur {total}",
   "{ip} · active {active} · signed in {signedIn}": "{ip} · actif {active} · connecté {signedIn}",
   "{label} succeeded": "{label} réussi",
+  "{label}: latest {latest}, lowest {min}, highest {max}": "{label} : dernière valeur {latest}, minimum {min}, maximum {max}",
   "{n} alerts": "{n} alertes",
   "{n} containers": "{n} conteneurs",
   "{n} entries": "{n} entrées",

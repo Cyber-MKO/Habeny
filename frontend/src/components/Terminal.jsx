@@ -13,6 +13,7 @@ export default function Terminal({ containerName, onClose }) {
   useEffect(() => {
     const term = new XTerm({
       cursorBlink: true,
+      screenReaderMode: true, // output readable by screen readers
       fontSize: 13,
       fontFamily: '"IBM Plex Mono", "SF Mono", "Fira Code", "Cascadia Code", monospace',
       theme: {

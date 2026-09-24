@@ -7,6 +7,45 @@ The release workflow publishes a version's section here as its release notes.
 
 ## [Unreleased]
 
+New features, so the next release is **2.2.0**. **Upgrading:** migrations v0003–v0007 run
+automatically after a backup, and the old daily activity files are imported into the new
+audit trail. v0006 (teams) can't be undone by `habeny db downgrade`; restore the backup
+taken before it instead.
+
+### Added
+- **API tokens** for scripts and CI (`Authorization: Bearer`): at most the account's
+  role, optional expiry, last use recorded; Account → API tokens and
+  `habeny token create|list|revoke`. Tokens can't change account settings.
+- **Audit trail** in the database: who, token, client IP and request ID for every action.
+  Search by action, user, result, dates and text; export to CSV or JSON Lines. It's
+  tamper-evident: a hash chain that `habeny audit verify` and Activity → Verify integrity
+  check.
+- **Monitoring:** `/healthz` and `/readyz` probes (no sign-in) and Prometheus `/metrics`.
+  Alerts for low disk space, LXC unavailable, a failed backup, a failed deployment and an
+  unreachable host, on the Monitoring page and in the header.
+- **Notifications** to Slack, webhooks (optionally HMAC-signed) and email
+  (`HABENY_SMTP_*`) when deployments, simulations and benchmarks finish and when alerts
+  start or clear.
+- **Teams** with container limits per team and per user. Members see only their team's
+  containers, simulations and reports.
+- **Several LXC hosts under one console:** register other Habeny servers (certificate
+  pinning, `habeny tls fingerprint`), switch between them from the sidebar, and see all
+  hosts' status on the Hosts page.
+- **French** interface, with a translation framework for more languages.
+
+### Changed
+- Confirmations use accessible in-page dialogs instead of the browser's `confirm()`;
+  deleting many containers asks you to type "delete".
+- Results that showed raw JSON (container details, deploy, simulation and upload
+  results, reports, profiles) are now shown as labelled values and tables.
+- Accessibility (checked with axe-core on every page): labelled controls, landmarks and
+  headings, WCAG AA contrast, visible focus, announced messages.
+- Small screens: the sidebar becomes a menu, and tables scroll within their card.
+
+### Fixed
+- A benchmark that crashed was recorded as completed.
+- Bulk operations listed all containers once per container.
+
 ## [2.1.0] - 2026-09-24
 
 The first tagged release. It covers everything since the original import (2.0.0), which was

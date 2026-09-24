@@ -75,6 +75,21 @@ OSSIM), and Habeny simulates activity in them for testing and benchmarking.
 - **Secrets at rest** (`app/core/secrets.py`): key handling, and whether any API
   response, log or export leaks a decrypted secret.
 
+- **API tokens** (`app/services/auth.py`, `app/routes/users.py`, `app/cli.py`):
+  - token entropy and hashing
+  - the role cap, including after the account is demoted
+  - expiry
+  - that tokens can't manage the account or create more tokens
+- **Relay to other hosts** (`app/routes/hosts.py`, `app/services/hosts.py`):
+  - certificate pinning, including the first-contact fingerprint flow
+  - the local-only path blocklist
+  - role and team checks on relayed HTTP and WebSocket traffic
+  - whether a user can reach hosts, or paths on them, that they shouldn't
+- **Teams** (`app/services/tenancy.py` and every route taking `current_user`): seeing or
+  acting on another team's containers, simulations or reports, and quota bypass.
+- **Audit trail integrity** (`app/services/audit.py`): forging or removing entries without
+  `habeny audit verify` noticing, short of rewriting the whole chain.
+
 ### Medium
 
 - **Input validation** (`app/core/validation.py`, `app/models/*`): container names,
@@ -86,6 +101,11 @@ OSSIM), and Habeny simulates activity in them for testing and benchmarking.
   container data, including CSV formula injection.
 - **Installer and systemd units** (`deploy/`): file permissions, sandboxing options,
   and secrets in `/etc/default/habeny`.
+- **Outbound requests** (`app/services/notify.py`, `app/services/hosts.py`): admin-set
+  webhook, Slack and host URLs can reach internal addresses (server-side request forgery
+  by an admin is accepted); check that non-admins can't set them and that responses
+  aren't reflected.
+- **Unauthenticated endpoints:** `/healthz` and `/readyz` must not leak details.
 - **Denial of service with an account:** for example, deploying or simulating enough
   to take the host down. Tell us about gaps in the limits; flooding tests are not wanted.
 

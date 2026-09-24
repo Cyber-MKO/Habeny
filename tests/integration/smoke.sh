@@ -33,6 +33,12 @@ api POST /auth/setup "{\"username\":\"admin\",\"password\":\"integration-test-pa
 [ ! -e "$DATA_DIR/setup-token" ] || fail "the setup token should be removed once used"
 api GET /auth/status | field 'd["data"]["user"]["username"]' | grep -qx admin || fail "not signed in"
 
+step "Health probes (no sign-in) and an API token for Prometheus"
+curl -sSk --fail "$BASE/healthz" | grep -q '"status":"ok"' || fail "/healthz"
+curl -sSk --fail "$BASE/readyz" | grep -q '"status":"ready"' || fail "/readyz not ready"
+PROM_TOKEN="$(api POST /users/me/tokens '{"name":"prometheus","role":"viewer"}' | field 'd["data"]["token"]')"
+[ "$(curl -sk -o /dev/null -w '%{http_code}' "$BASE/metrics")" = 401 ] || fail "/metrics without a token"
+
 step "Deploying one container (downloads the Ubuntu 22.04 image)"
 RESULT="$(api POST /agents/deploy "{\"count\":1,\"siem_type\":\"none\",\"agent_base_name\":\"$NAME\",\"parallel_mode\":\"sequential\",\"deployment_id\":\"itest-1\"}")"
 echo "$RESULT" | field 'd["message"]'
@@ -41,6 +47,12 @@ CONTAINER="$(echo "$RESULT" | field 'd["data"]["deployed_agents"][0]["agent_name
 lxc-ls --running | tr -s ' \n' '\n' | grep -qx "$CONTAINER" || fail "$CONTAINER isn't running according to lxc-ls"
 lxc-attach -n "$CONTAINER" -- cat /etc/os-release | grep -q jammy || fail "not an Ubuntu 22.04 container"
 api GET /agents/deploy/progress/itest-1 | field 'd["data"]["status"]' | grep -qx completed || fail "progress not completed"
+
+step "Metrics see the container"
+sleep 3  # past the container-state cache
+curl -sSk --fail -H "Authorization: Bearer $PROM_TOKEN" "$BASE/metrics" > /tmp/habeny-metrics.txt
+grep -q '^habeny_containers{state="running"} 1' /tmp/habeny-metrics.txt || { cat /tmp/habeny-metrics.txt >&2; fail "metrics"; }
+grep -q '^habeny_deployments_total{result="completed"} 1' /tmp/habeny-metrics.txt || fail "deployment counter"
 
 step "Container details, stop and start"
 api GET "/agents/$CONTAINER" | field 'd["data"]["lifecycle_status"]'
@@ -56,6 +68,10 @@ step "Full backup, then verify it"
 BACKUP="$(api POST /system/backups | field 'd["data"]["backup"]["name"]')"
 habeny backup verify "$DATA_DIR/backups/$BACKUP"
 habeny backup list
+
+step "Audit trail: recorded and intact"
+habeny audit verify
+habeny audit export --action container_deployment_completed | grep -q '"user": "admin"' || fail "audit entry"
 
 step "Deleting the container"
 api DELETE "/agents/$CONTAINER" >/dev/null

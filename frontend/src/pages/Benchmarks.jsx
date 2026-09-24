@@ -14,7 +14,8 @@ function MiniChart({ data, label, color = "var(--accent)", height = 60 }) {
   const w = 100 / values.length;
   return (
     <div style={{ position: "relative", height }}>
-      <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%" }}>
+      <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%" }} role="img"
+        aria-label={t("{label}: latest {latest}, lowest {min}, highest {max}", { label, latest: values[values.length - 1]?.toFixed(1), min: min.toFixed(1), max: max.toFixed(1) })}>
         <polyline
           fill="none"
           stroke={color}
