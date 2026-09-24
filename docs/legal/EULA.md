@@ -26,7 +26,7 @@ don't install or use Habeny.
 - **Open-Source Components**: third-party software included with the Software under its
   own license, listed in THIRD_PARTY_NOTICES.txt.
 - **Third-Party Agents**: SIEM agents and other software (for example from Wazuh, Elastic,
-  Atomicorp/OSSEC, LevelBlue/AlienVault or UTMStack) that the Software downloads from their
+  Atomicorp/OSSEC or UTMStack) that the Software downloads from their
   publishers onto your Server when you deploy them.
 
 ## 2. License grant
@@ -72,7 +72,7 @@ with those terms, and for having the right to connect to the SIEM systems you co
 We make no warranty about Third-Party Agents or their availability; publishers can change
 or withdraw them at any time.
 
-Product names such as Wazuh, Elastic, OSSEC, AlienVault, OSSIM and UTMStack are
+Product names such as Wazuh, Elastic, OSSEC and UTMStack are
 trademarks of their owners and are used only to identify the products the Software works
 with. The Software is not affiliated with or endorsed by them.
 

@@ -93,7 +93,7 @@ function Icon({ d }) {
   );
 }
 
-const SIEM_TYPES = ["Wazuh", "OSSEC", "OSSIM", "UTMstack", "Elastic"];
+const SIEM_TYPES = ["Wazuh", "OSSEC", "UTMstack", "Elastic"];
 
 const CAPABILITIES = [
   { title: t("Fleet"), body: t("Deploy, group, and bulk-manage containerized SIEM agents from one console.") },

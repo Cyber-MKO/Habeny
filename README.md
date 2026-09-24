@@ -12,7 +12,6 @@ to stress-test and validate your SIEM infrastructure.
 |------|-------|-------------|
 | **Wazuh** | wazuh-agent | Auto-registers with manager |
 | **OSSEC** | ossec-hids-agent | Atomicorp installer + agent-auth |
-| **OSSIM** | AlienVault agent | Config-based |
 | **UTMstack** | utmstack_agent_service | Auth key enrollment |
 | **Elastic** | elastic-agent | Fleet enrollment token |
 | **None** | — | Bare container (no agent) |

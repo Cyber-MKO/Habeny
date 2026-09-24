@@ -36,7 +36,7 @@ Maintainer: Habeny <noreply@habeny.invalid>
 Homepage: https://github.com/Cyber-MKO/Habeny
 Description: Multi-SIEM container emulation platform
  Deploys and manages LXC containers running SIEM agents (Wazuh, OSSEC, Elastic,
- UTMStack, AlienVault OSSIM) at scale, with a web UI, attack simulations,
+ UTMStack) at scale, with a web UI, attack simulations,
  benchmarks and reports. Runs as two services: an unprivileged web app and a small
  privileged helper for LXC operations.
 CONTROL

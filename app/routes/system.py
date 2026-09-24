@@ -31,7 +31,7 @@ async def root():
         data={
             "version": __version__,
             "description": "LXC-based platform for deploying containers that run SIEM agents at scale",
-            "supported_siem_types": ["wazuh", "ossec", "ossim", "utmstack", "elastic"],
+            "supported_siem_types": ["wazuh", "ossec", "utmstack", "elastic"],
             "default_os": "ubuntu_22_04",
             "max_workers": DEPLOY_WORKERS,
             "cpu_count": cpu_count(),
@@ -83,7 +83,7 @@ async def system_info():
                 "by_state": dict(containers["by_state"]),
             },
             "supported_features": {
-                "siem_types": ["wazuh", "ossec", "ossim", "utmstack", "elastic"],
+                "siem_types": ["wazuh", "ossec", "utmstack", "elastic"],
                 "os_types": ["ubuntu_22_04", "ubuntu_20_04", "debian_11"],
                 "simulation_profiles": list_simulation_profiles(),
                 "parallel_modes": ["multiprocessing", "threading", "sequential"]
