@@ -69,10 +69,10 @@ jobs:
           HABENY_WHEEL_PYTHONS: ""
       - name: Check the package
         run: |
-          deb=dist/habeny_*_all.deb
-          dpkg-deb --info $deb
-          dpkg-deb --contents $deb | grep >/dev/null './opt/habeny/static/index.html'
-          dpkg-deb --contents $deb | grep >/dev/null './lib/systemd/system/habeny.service'
+          deb="$(ls dist/habeny_*_all.deb)"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | grep >/dev/null './opt/habeny/static/index.html'
+          dpkg-deb --contents "$deb" | grep >/dev/null './lib/systemd/system/habeny.service'
           tar -tzf dist/habeny-*.tar.gz | grep >/dev/null 'static/.habeny-build'
 
   audit:
