@@ -10,4 +10,4 @@ pydantic==2.13.5
 cryptography==50.0.1      # encryption of stored SIEM auth keys
 PyJWT==2.15.0             # verifies single sign-on (OIDC) ID tokens
 reportlab==4.4.9          # PDF reports
-matplotlib==3.10.8        # report charts
+matplotlib==3.11.2        # report charts
