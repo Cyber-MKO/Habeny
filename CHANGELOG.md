@@ -7,6 +7,41 @@ The release workflow publishes a version's section here as its release notes.
 
 ## [Unreleased]
 
+**Upgrading:** options that the API accepted but that did nothing are removed (see
+"Removed"). Scripts that call `GET /api/` for platform information should use
+`GET /api/system/info` instead.
+
+### Added
+- `GET /api/reports` lists the reports you can see; the Reports page's history uses it.
+
+### Removed
+- Options that were accepted but had no effect:
+  - attack profiles `port_scan`, `sql_injection`, `xss_attack` and `ddos_attack` (never
+    implemented)
+  - the attack simulation's intensity, burst mode and custom parameters
+  - container tags in simulation targeting (containers can't be tagged)
+  - the `restart`, `freeze` and `unfreeze` bulk operations, and the bulk `force`,
+    `parallel` and `max_workers` fields
+  - log upload's "log type"
+  - the `debian_10` OS type, which silently deployed Ubuntu 22.04 instead; it's now refused
+- `GET /api/`, which duplicated `GET /api/system/info`.
+- From the interface: Deploy → Parallel mode (the default is kept), the Containers "Seq"
+  column, and Reports → "Fetch report by ID" (Report History now lists every report).
+
+### Fixed
+- **Attack simulations.** Three of the six profiles in the interface (lateral movement,
+  data exfiltration, privilege escalation) wrote nothing and still reported success. All six
+  now write log lines in the standard formats agents parse: syslog lines with a hostname in
+  `auth.log` and `syslog`, and Apache's combined format. The SSH brute force lines had a
+  timestamp format agents don't parse, and the web attack lines contained a literal
+  `$(date)`. Event counts are now the lines actually written, instead of the target rate
+  times the number of containers. Containers are written to in parallel, without blocking
+  the server. A run that couldn't write anything ends as failed, with the reason.
+- Report History showed only the reports generated in the current browser session, and its
+  View button didn't work. It now lists every report you can see.
+- The Dashboard's platform status always said "Healthy". It now says "Degraded" while a
+  critical alert is active.
+
 ## [2.2.0] - 2026-09-24
 
 **Upgrading:**
@@ -22,8 +57,6 @@ The release workflow publishes a version's section here as its release notes.
   `habeny db downgrade`; restore the backup taken before it instead.
 - Installation and operations documentation moved from the README to `docs/` (start with
   `docs/admin-guide.md`).
-- **API clean-up** of options that were accepted but did nothing: see "Removed" below. Scripts
-  that call `GET /api/` for platform information should use `GET /api/system/info`.
 
 ### Added
 - **API tokens** for scripts and CI (`Authorization: Bearer`): at most the account's
@@ -77,18 +110,6 @@ The release workflow publishes a version's section here as its release notes.
 - Small screens: the sidebar becomes a menu, and tables scroll within their card.
 
 ### Removed
-- Options that were accepted but had no effect:
-  - attack profiles `port_scan`, `sql_injection`, `xss_attack` and `ddos_attack` (never
-    implemented)
-  - the attack simulation's intensity, burst mode and custom parameters
-  - container tags in simulation targeting (containers can't be tagged)
-  - the `restart`, `freeze` and `unfreeze` bulk operations, and the bulk `force`,
-    `parallel` and `max_workers` fields
-  - log upload's "log type"
-  - the `debian_10` OS type, which silently deployed Ubuntu 22.04 instead; it's now refused
-- `GET /api/`, which duplicated `GET /api/system/info`.
-- From the interface: Deploy → Parallel mode (the default is kept), the Containers "Seq"
-  column, and Reports → "Fetch report by ID" (Report History now lists every report).
 - **OSSIM support.** AlienVault OSSIM was retired at the end of 2024, and Habeny's installer
   depended on a download that no longer exists. New deployments, manager profiles and
   config templates can't use it. Containers deployed with it earlier are still listed and
@@ -96,18 +117,6 @@ The release workflow publishes a version's section here as its release notes.
   on deploy: change its SIEM type.
 
 ### Fixed
-- **Attack simulations.** Three of the six profiles in the interface (lateral movement,
-  data exfiltration, privilege escalation) wrote nothing and still reported success. All six
-  now write log lines in the standard formats agents parse: syslog lines with a hostname in
-  `auth.log` and `syslog`, and Apache's combined format. The SSH brute force lines had a
-  timestamp format agents don't parse, and the web attack lines contained a literal
-  `$(date)`. Event counts are now the lines actually written, instead of the target rate
-  times the number of containers. Containers are written to in parallel, without blocking
-  the server. A run that couldn't write anything ends as failed, with the reason.
-- Report History showed only the reports generated in the current browser session, and its
-  View button didn't work. It now lists every report you can see (`GET /api/reports`).
-- The Dashboard's platform status always said "Healthy". It now says "Degraded" while a
-  critical alert is active.
 - A benchmark that crashed was recorded as completed.
 - Bulk operations listed all containers once per container.
 
