@@ -79,7 +79,8 @@ jobs:
         if: ${{ !inputs.dry_run }}
         # Creates the tag on this commit when it doesn't exist yet (manual runs). A tag made
         # with the workflow's token doesn't start this workflow a second time.
-        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Habeny ${TAG#v}" \
+        run: |
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Habeny ${TAG#v}" \
             --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
