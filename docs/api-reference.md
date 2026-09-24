@@ -596,10 +596,14 @@ Create a manager profile
   - `memory_limit`: string (optional), default `512MB`
   - `cpu_shares`: integer (optional), default `1024`
   - `config_template_id`: string (optional)
+  - `detection_url`: string (optional)
+  - `detection_username`: string (optional)
+  - `detection_secret`: string (optional)
+  - `detection_fingerprint`: string (optional)
 
 ### `PUT /managers/{manager_id}`
 
-Update a manager profile
+Update a manager profile. An empty detection_url or detection_fingerprint clears it.
 
 - **Role:** operator
 - **Body (JSON):**
@@ -614,10 +618,20 @@ Update a manager profile
   - `memory_limit`: string (optional)
   - `cpu_shares`: integer (optional)
   - `config_template_id`: string (optional)
+  - `detection_url`: string (optional)
+  - `detection_username`: string (optional)
+  - `detection_secret`: string (optional)
+  - `detection_fingerprint`: string (optional)
 
 ### `DELETE /managers/{manager_id}`
 
 Delete a manager profile
+
+- **Role:** operator
+
+### `POST /managers/{manager_id}/detection/test`
+
+Check the profile's detection API: reachable, credentials accepted, alerts in the last 24 hours.
 
 - **Role:** operator
 
@@ -764,10 +778,17 @@ Start an attack simulation on selected containers
     - `status`: `running` \| `stopped` \| `error` \| `starting` \| `stopping` (optional)
   - `duration`: integer, default `300`
   - `eps_target`: integer, default `100`
+  - `detection_profile_id`: string (optional)
 
 ### `POST /simulations/{simulation_id}/stop`
 
 Stop a running simulation
+
+- **Role:** operator
+
+### `POST /simulations/{simulation_id}/detection`
+
+Ask the SIEM now what it detected for a finished attack simulation (again, or for the first time).
 
 - **Role:** operator
 

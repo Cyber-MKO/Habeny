@@ -21,7 +21,10 @@ class ManagerProfileCreate(BaseModel):
     memory_limit: str | None = Field(default="512MB")
     cpu_shares: int | None = Field(default=1024, ge=2, le=10240)
     config_template_id: str | None = Field(None)
-
+    detection_url: str | None = Field(None, max_length=300, description="SIEM search API for checking detections (admins)")
+    detection_username: str | None = Field(None, max_length=200)
+    detection_secret: str | None = Field(None, max_length=2000, description="Password, or an Elasticsearch API key")
+    detection_fingerprint: str | None = Field(None, pattern=r"^([0-9A-F]{2}:){31}[0-9A-F]{2}$")
 
     @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
     @classmethod
@@ -47,7 +50,10 @@ class ManagerProfileUpdate(BaseModel):
     memory_limit: str | None = None
     cpu_shares: int | None = Field(None, ge=2, le=10240)
     config_template_id: str | None = None
-
+    detection_url: str | None = Field(None, max_length=300)
+    detection_username: str | None = Field(None, max_length=200)
+    detection_secret: str | None = Field(None, max_length=2000)
+    detection_fingerprint: str | None = Field(None, pattern=r"^(([0-9A-F]{2}:){31}[0-9A-F]{2})?$")
 
     @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
     @classmethod

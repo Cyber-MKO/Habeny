@@ -24,6 +24,7 @@ Error messages in the interface that say **"request ID …"** point to the exact
 - [Deploying containers](#deploying-containers)
 - [Agents don't show up in the SIEM](#agents-dont-show-up-in-the-siem)
 - [Simulations and log uploads](#simulations-and-log-uploads)
+- [Detection checks](#detection-checks)
 - [License](#license)
 - [Backups and upgrades](#backups-and-upgrades)
 - [Notifications and other hosts](#notifications-and-other-hosts)
@@ -148,6 +149,18 @@ Change its SIEM type.
   `..` isn't allowed.
 - **A scheduled upload stopped:** schedules end after their duration. After a restart,
   schedules resume for the time they had left.
+
+## Detection checks
+
+| Message or symptom | Cause | Fix |
+|---|---|---|
+| "The SIEM's certificate isn't from a trusted authority" | a self-signed certificate (usual for the Wazuh indexer) | check the fingerprint and **Trust this certificate** on the manager profile |
+| "presented a different certificate than the one confirmed" | the SIEM's certificate changed | if that's expected, clear the fingerprint and trust the new one; otherwise investigate |
+| "The SIEM rejected the credentials" | wrong user name, password or API key, or the account lacks read access | fix them on the manager profile; see [admin-guide.md](admin-guide.md#checking-detections) |
+| 0 of N detected, and the details show no alerts at all | the agents aren't connected, the agent doesn't watch the log file, or the SIEM hadn't indexed yet | check SIEM Stats and the agent's log; **Check now** again after a few minutes; raise `HABENY_DETECTION_DELAY_SECONDS` |
+| Alerts listed, but not counted as detected (Wazuh) | alerts fired, but not the rules the profile should trigger | see which rules fired; your ruleset may use other ids or be tuned down |
+| Elastic: events received but no alerts | no enabled detection rule matches these events | enable matching rules in Kibana (Security → Rules) |
+| "Not checked": Habeny restarted before the check | a restart during the wait | **Detections → Check now** |
 
 ## License
 

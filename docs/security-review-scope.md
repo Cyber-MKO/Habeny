@@ -100,8 +100,9 @@ host. Each container runs a SIEM agent (Wazuh, OSSEC, Elastic or UTMStack), and 
   container data, including CSV formula injection.
 - **Installer and systemd units** (`deploy/`): file permissions, sandboxing options,
   and secrets in `/etc/default/habeny`.
-- **Outbound requests** (`app/services/notify.py`, `app/services/hosts.py`): admin-set
-  webhook, Slack and host URLs can reach internal addresses (server-side request forgery
+- **Outbound requests** (`app/services/notify.py`, `app/services/hosts.py`,
+  `app/services/detection.py`): admin-set webhook, Slack, host and SIEM search URLs can
+  reach internal addresses (server-side request forgery
   by an admin is accepted); check that non-admins can't set them and that responses
   aren't reflected.
 - **Unauthenticated endpoints:** `/healthz` and `/readyz` must not leak details.

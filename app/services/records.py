@@ -72,6 +72,11 @@ class PersistentStore(dict):
                     value["status"] = INTERRUPTED
                     value["interrupted_at"] = _now()
                     interrupted.append(record_id)
+                pending = value.get("detection") if isinstance(value, dict) else None
+                if isinstance(pending, dict) and pending.get("status") in ("waiting", "checking"):
+                    # a simulation's SIEM detection check was cut off: it can be run again by hand
+                    pending.update(status="not_checked", error="Habeny restarted before the check; run it again")
+                    self.save(record_id)
             for record_id in interrupted:
                 self.save(record_id)
         if interrupted:

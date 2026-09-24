@@ -44,7 +44,10 @@ async function request(path, opts = {}) {
     // Server errors: give the ID an admin can find in the logs
     const requestId = res.headers.get("X-Request-ID");
     if (res.status >= 500 && requestId && !message.includes(requestId)) message += ` (request ID ${requestId})`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = res.status;
+    error.data = err; // the rest of the error body, e.g. a certificate fingerprint to confirm
+    throw error;
   }
   return res.json();
 }
@@ -170,4 +173,6 @@ export const api = {
   createManager: (body) => request("/managers", { method: "POST", body }),
   updateManager: (id, body) => request(`/managers/${id}`, { method: "PUT", body }),
   deleteManager: (id) => request(`/managers/${id}`, { method: "DELETE" }),
+  testDetection: (id) => request(`/managers/${id}/detection/test`, { method: "POST" }),
+  checkSimulationDetection: (id, body) => request(`/simulations/${id}/detection`, { method: "POST", body: body || {} }),
 };

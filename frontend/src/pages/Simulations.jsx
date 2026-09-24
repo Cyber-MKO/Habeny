@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner } from "../components/UI";
-import { Details } from "../components/Details";
+import { PageHeader, DataTable, Modal, Pill, Spinner } from "../components/UI";
+import { Details, RecordTable } from "../components/Details";
 import { t } from "../i18n";
 
 const SIM_COLUMNS = [
@@ -14,7 +14,65 @@ const SIM_COLUMNS = [
   { key: "eps_target", label: "EPS" },
   { key: "duration", label: t("Duration (s)") },
   { key: "events_generated", label: t("Events"), render: (r) => (r.events_generated ?? 0).toLocaleString() },
+  { key: "detection", label: t("Detected"), render: (r) => detectionLabel(r.detection) },
 ];
+
+function detectionLabel(d) {
+  if (!d) return "—";
+  if (d.status === "done") return `${d.detected}/${d.containers} (${d.detection_rate}%)`;
+  return { waiting: t("Waiting for the SIEM…"), checking: t("Checking…"), error: t("Check failed"), not_checked: t("Not checked") }[d.status] || "—";
+}
+
+// What the SIEM detected for one attack simulation, and a way to check (again)
+function DetectionModal({ sim, managers, onClose, onChecked }) {
+  const { toast } = useStore();
+  const d = sim.detection || {};
+  const [profile, setProfile] = useState(d.manager_profile_id || managers[0]?.manager_id || "");
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    try {
+      const res = await api.checkSimulationDetection(sim.simulation_id, { manager_profile_id: profile || null });
+      toast(res.message, "success");
+      onChecked();
+    } catch (err) { toast(err.message, "error"); onChecked(); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title={t("Detections: {profile}", { profile: sim.profile_id })} onClose={onClose}>
+      {d.status === "done" ? (
+        <>
+          <p className="account-help">
+            {t("{siem} at {manager} detected {detected} of {containers} containers ({rate}%), counting {basis}.", {
+              siem: d.siem, manager: d.manager_name || "", detected: d.detected, containers: d.containers,
+              rate: d.detection_rate, basis: d.basis === "expected rules" ? t("the rules this profile should trigger") : t("any alert") })}
+            {d.ttd_seconds && ` ${t("Time to detection: median {median} s, slowest {max} s.", d.ttd_seconds)}`}
+          </p>
+          {d.missed?.length > 0 && <div className="auth-error" role="status">{t("Expected rules that never fired: {rules}", { rules: d.missed.join(", ") })}</div>}
+          {d.ingestion && !d.ingestion.error && (
+            <p className="account-help">{t("Events received from the containers: {events} from {hosts} of them.", { events: d.ingestion.events, hosts: d.ingestion.hosts_reporting })}</p>
+          )}
+          <h4 className="subsection-title">{t("Per container")}</h4>
+          <RecordTable rows={(d.per_container || []).map((c) => ({ container: c.name, detected: c.detected, alerts: c.alerts, seconds_to_detection: c.ttd_seconds }))} />
+          <h4 className="subsection-title">{t("Rules that fired")}</h4>
+          {d.rules?.length ? <RecordTable rows={d.rules.map((r) => ({ rule: r.id, name: r.name, level: r.level, alerts: r.count, expected: r.expected }))} />
+            : <p className="muted">{t("No alerts for these containers in the run's time window.")}</p>}
+        </>
+      ) : (
+        <p className="account-help">{d.error || (d.status === "waiting" ? t("Waiting for the SIEM to index the run's alerts before checking.") : t("Not checked yet."))}</p>
+      )}
+      {sim.status !== "running" && (
+        <div className="btn-group" style={{ marginTop: 12 }}>
+          <label className="sr-only" htmlFor="detection-profile">{t("SIEM to ask")}</label>
+          <select id="detection-profile" className="select" value={profile} onChange={(e) => setProfile(e.target.value)}>
+            {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type})</option>)}
+          </select>
+          <button type="button" className="btn btn-primary" onClick={check} disabled={busy || !profile}>{busy ? t("Checking…") : t("Check now")}</button>
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 // Attack profiles (app/services/simulation.py): what each writes, so users can pick knowingly
 const PROFILES = [
@@ -35,6 +93,7 @@ export default function Simulations() {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState("attack");
+  const [detectionFor, setDetectionFor] = useState(null);
 
   useEffect(() => {
     api.getManagers().then((r) => setManagers(r.data?.managers || [])).catch(() => {});
@@ -42,7 +101,7 @@ export default function Simulations() {
   }, []);
 
   const [form, setForm] = useState({
-    profile_id: "auth_bruteforce", duration: 300, eps_target: 100,
+    profile_id: "auth_bruteforce", duration: 300, eps_target: 100, detection_profile_id: "",
     sel_count: 10, sel_siem: "", sel_group: "", sel_ids: "",
   });
   const [sysForm, setSysForm] = useState({
@@ -84,6 +143,7 @@ export default function Simulations() {
       const res = await api.startSimulation({
         profile_id: form.profile_id, agent_selector: buildSelector(form),
         duration: Number(form.duration), eps_target: Number(form.eps_target),
+        detection_profile_id: form.detection_profile_id || null,
       });
       setResult(res); toast(t("Simulation started"), "success"); load();
     } catch (e) { toast(e.message, "error"); }
@@ -124,7 +184,14 @@ export default function Simulations() {
     </div>
   );
 
-  const cols = [...SIM_COLUMNS, { key: "actions", label: "", render: (r) => r.status === "running" ? <button className="btn btn-sm btn-danger" onClick={() => handleStop(r.simulation_id)}>{t("Stop")}</button> : null }];
+  const detectionManagers = managers.filter((m) => m.detection_configured);
+  const cols = [...SIM_COLUMNS, { key: "actions", label: "", render: (r) => (
+    <div className="btn-group">
+      {r.status === "running" && <button className="btn btn-sm btn-danger" onClick={() => handleStop(r.simulation_id)}>{t("Stop")}</button>}
+      {r.profile_id && (r.detection || detectionManagers.length > 0) && <button className="btn btn-sm btn-secondary" onClick={() => setDetectionFor(r.simulation_id)}>{t("Detections")}</button>}
+    </div>
+  ) }];
+  const detectionSim = sims.find((s) => s.simulation_id === detectionFor);
 
   return (
     <>
@@ -145,6 +212,13 @@ export default function Simulations() {
             <div className="field"><label htmlFor="simulations-profile">{t("Profile")}</label><select id="simulations-profile" aria-describedby="simulations-profile-about" className="select" value={form.profile_id} onChange={(e) => setForm((p) => ({ ...p, profile_id: e.target.value }))}>{PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select>
               <span id="simulations-profile-about" className="auth-hint">{PROFILES.find((p) => p.id === form.profile_id)?.about}</span></div>
             <div className="field"><label htmlFor="simulations-duration-s">{t("Duration (s)")}</label><input id="simulations-duration-s" className="input" type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-detection-profile">{t("Check what the SIEM detected")}</label>
+              <select id="simulations-detection-profile" aria-describedby="simulations-detection-about" className="select" value={form.detection_profile_id} onChange={(e) => setForm((p) => ({ ...p, detection_profile_id: e.target.value }))}>
+                <option value="">{t("Don't check")}</option>
+                {detectionManagers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type})</option>)}
+              </select>
+              <span id="simulations-detection-about" className="auth-hint">{detectionManagers.length ? t("After the run, Habeny asks this SIEM which alerts fired for the targets.") : t("Set a detection API on a Wazuh or Elastic manager profile (admins) to check detections.")}</span>
+            </div>
             <div className="field"><label htmlFor="simulations-eps-target">{t("Events per second, per container")}</label><input id="simulations-eps-target" className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
           </div>
           <SelectorFields f={form} setF={setForm} />
@@ -206,6 +280,8 @@ export default function Simulations() {
         {loading ? <Spinner /> : <DataTable columns={cols} rows={sims} emptyMsg={t("No simulations")} />}
       </div>
 
+      {detectionSim && <DetectionModal sim={detectionSim} managers={detectionManagers} onClose={() => setDetectionFor(null)} onChecked={load} />}
+
       {result && (
         <div className="card result-card" role="status">
           <div className="section-title">{result.message}</div>
@@ -214,7 +290,7 @@ export default function Simulations() {
             <Details data={{
               ...result.data,
               target_agents: Array.isArray(result.data.target_agents) ? `${result.data.target_agents.length} (${result.data.target_agents.slice(0, 5).join(", ")}${result.data.target_agents.length > 5 ? ", …" : ""})` : result.data.target_agents,
-            }} hide={["custom_parameters"]} />
+            }} hide={["custom_parameters", "detection"]} />
           )}
         </div>
       )}

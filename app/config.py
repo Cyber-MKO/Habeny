@@ -182,6 +182,9 @@ SETTINGS: list[Setting] = [
     Setting("HABENY_SMTP_USER", "", "Mail server user name (empty: no login)", "Monitoring and notifications"),
     Setting("HABENY_SMTP_PASSWORD", "", "Mail server password", "Monitoring and notifications", secret=True),
     Setting("HABENY_SMTP_FROM", "", "Sender address (default: habeny@<host name>)", "Monitoring and notifications"),
+    # Simulations
+    Setting("HABENY_DETECTION_DELAY_SECONDS", "120", "After an attack simulation, wait this long for the SIEM to "
+            "index its alerts before checking what it detected (seconds)", "Simulations", _int(0, 3600)),
     # Set by the installer
     Setting("HABENY_DATA_DIR", "/var/lib/lxc-siem-platform", "Database, keys, reports and logs",
             "Installation", _path, installer=True),

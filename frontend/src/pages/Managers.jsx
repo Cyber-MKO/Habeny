@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, DataTable, Pill, Spinner, Modal } from "../components/UI";
 import { useConfirm } from "../components/Confirm";
+import { useAuth } from "../auth";
 import { Details } from "../components/Details";
 import { t } from "../i18n";
 
@@ -13,10 +14,53 @@ const EMPTY_FORM = {
   name: "", description: "", siem_type: "wazuh", siem_ip: "", siem_version: "4.14.2",
   siem_auth_key: "", os_type: "ubuntu_22_04", agent_group: "default",
   memory_limit: "512MB", cpu_shares: 1024, config_template_id: "",
+  detection_url: "", detection_username: "", detection_secret: "",
 };
+
+// SIEMs whose search API Habeny can ask what they detected (app/services/detection.py)
+const DETECTION_SIEMS = ["wazuh", "elastic"];
+
+// Test the saved detection connection; a self-signed certificate is shown for an admin to trust
+function DetectionTest({ manager, onSaved }) {
+  const { toast } = useStore();
+  const [pending, setPending] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const test = async () => {
+    setBusy(true);
+    try {
+      toast((await api.testDetection(manager.manager_id)).message, "success");
+      setPending(null);
+    } catch (err) {
+      if (err.status === 409 && err.data?.fingerprint) setPending(err.data.fingerprint);
+      else toast(err.message, "error");
+    } finally { setBusy(false); }
+  };
+  const trust = async () => {
+    try {
+      await api.updateManager(manager.manager_id, { detection_fingerprint: pending });
+      setPending(null);
+      onSaved();
+      toast(t("Certificate trusted. Testing again…"), "info");
+      await test();
+    } catch (err) { toast(err.message, "error"); }
+  };
+  return (
+    <div className="detection-test">
+      <button type="button" className="btn btn-sm btn-secondary" onClick={test} disabled={busy}>{busy ? t("Testing…") : t("Test detection connection")}</button>
+      {pending && (
+        <div className="auth-hint" role="alert">
+          {t("The SIEM's certificate isn't from a trusted authority. Trust it only if this fingerprint matches the SIEM's certificate:")}
+          <code className="fingerprint">{pending}</code>
+          <button type="button" className="btn btn-sm btn-primary" onClick={trust}>{t("Trust this certificate")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Managers() {
   const { toast } = useStore();
+  const { user } = useAuth();
   const confirm = useConfirm();
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +82,7 @@ export default function Managers() {
   const isUtm = form.siem_type === "utmstack";
   const isElastic = form.siem_type === "elastic";
   const needsAuthKey = isUtm || isElastic;
+  const canDetect = user?.is_admin && DETECTION_SIEMS.includes(form.siem_type);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -48,6 +93,9 @@ export default function Managers() {
     if (!payload.siem_auth_key) delete payload.siem_auth_key;
     if (!payload.config_template_id) delete payload.config_template_id;
     if (!payload.description) delete payload.description;
+    if (!canDetect) {
+      delete payload.detection_url; delete payload.detection_username; delete payload.detection_secret;
+    } else if (!payload.detection_secret) delete payload.detection_secret; // blank keeps the stored one
 
     try {
       if (editing) {
@@ -72,6 +120,7 @@ export default function Managers() {
       os_type: mgr.os_type || "ubuntu_22_04", agent_group: mgr.agent_group || "default",
       memory_limit: mgr.memory_limit || "512MB", cpu_shares: mgr.cpu_shares || 1024,
       config_template_id: mgr.config_template_id || "",
+      detection_url: mgr.detection_url || "", detection_username: mgr.detection_username || "", detection_secret: "",
     });
   };
 
@@ -81,7 +130,8 @@ export default function Managers() {
     catch (e) { toast(e.message, "error"); }
   };
 
-  const editingKeyHint = editing ? managers.find((m) => m.manager_id === editing)?.siem_auth_key_hint : null;
+  const editingManager = editing ? managers.find((m) => m.manager_id === editing) : null;
+  const editingKeyHint = editingManager?.siem_auth_key_hint;
 
   const cancelEdit = () => { setEditing(null); setForm({ ...EMPTY_FORM }); };
 
@@ -92,6 +142,7 @@ export default function Managers() {
     { key: "siem_auth_key_hint", label: t("Auth Key"), render: (r) => r.has_siem_auth_key ? <span style={{ fontFamily: "var(--font-mono)" }}>{r.siem_auth_key_hint}</span> : "—" },
     { key: "os_type", label: "OS" },
     { key: "agent_group", label: t("Group") },
+    { key: "detection_configured", label: t("Detection API"), render: (r) => r.detection_configured ? t("Set") : "—" },
     { key: "memory_limit", label: t("Memory") },
     { key: "created_at", label: t("Created"), render: (r) => r.created_at ? new Date(r.created_at).toLocaleDateString() : "—" },
     { key: "actions", label: t("Actions"), render: (r) => (
@@ -134,6 +185,22 @@ export default function Managers() {
           <div className="field"><label htmlFor="managers-cpu-shares">{t("CPU Shares")}</label><input id="managers-cpu-shares" className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} /></div>
           <div className="field"><label htmlFor="managers-config-template-id">{t("Config Template ID")}</label><input id="managers-config-template-id" className="input" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} /></div>
         </div>
+        {canDetect && (
+          <fieldset className="detection-fields">
+            <legend>{t("Detection API (optional)")}</legend>
+            <p className="auth-hint">
+              {form.siem_type === "wazuh"
+                ? t("The Wazuh indexer's address (usually https://<indexer>:9200) and a user that can read wazuh-alerts-*. After attack simulations, Habeny asks it which alerts fired.")
+                : t("The Elasticsearch address (usually https://<host>:9200), and a user and password or an API key that can read .alerts-security.alerts-* and logs-*.")}
+            </p>
+            <div className="form-grid">
+              <div className="field"><label htmlFor="managers-detection-url">{t("Search API URL")}</label><input id="managers-detection-url" className="input" placeholder="https://indexer:9200" value={form.detection_url} onChange={(e) => set("detection_url", e.target.value)} /></div>
+              <div className="field"><label htmlFor="managers-detection-user">{t("User name")}</label><input id="managers-detection-user" className="input" autoComplete="off" value={form.detection_username} onChange={(e) => set("detection_username", e.target.value)} placeholder={form.siem_type === "elastic" ? t("empty for an API key") : ""} /></div>
+              <div className="field"><label htmlFor="managers-detection-secret">{t("Password or API key")}</label><input id="managers-detection-secret" className="input" type="password" autoComplete="new-password" value={form.detection_secret} onChange={(e) => set("detection_secret", e.target.value)} placeholder={editingManager?.has_detection_secret ? t("Stored — leave blank to keep") : ""} /></div>
+            </div>
+            {editingManager?.detection_configured && <DetectionTest manager={editingManager} onSaved={load} />}
+          </fieldset>
+        )}
         <div className="btn-group" style={{ marginTop: 12 }}>
           <button className="btn btn-primary" type="submit">{editing ? t("Update") : t("Create")}</button>
           {editing && <button className="btn btn-secondary" type="button" onClick={cancelEdit}>{t("Cancel")}</button>}

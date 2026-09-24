@@ -18,6 +18,15 @@ function ReportView({ report, fallback }) {
       </p>
       <h4 className="subsection-title">{t("Summary")}</h4>
       <Details data={{ ...summary, simulations_in_range: (summary.simulations_in_range || []).length }} />
+      {report.detection_summary?.length > 0 && (
+        <>
+          <h4 className="subsection-title">{t("What the SIEMs detected")}</h4>
+          <RecordTable rows={report.detection_summary.map((r) => ({
+            attack_profile: r.profile, siem: r.siem, runs: r.runs,
+            detected: r.detection_rate == null ? null : `${r.detection_rate}%`,
+            median_seconds_to_detection: r.median_ttd_seconds, missed_rules: (r.missed_rules || []).join(", ") }))} />
+        </>
+      )}
       <h4 className="subsection-title">{t("Findings")}</h4>
       {findings.length
         ? (findings.every((f) => typeof f === "object") ? <RecordTable rows={findings} /> : <ul className="plain-list">{findings.map((f, i) => <li key={i}>{String(f)}</li>)}</ul>)

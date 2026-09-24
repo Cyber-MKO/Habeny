@@ -301,6 +301,7 @@ def _manager_row(row) -> dict[str, Any] | None:
         return None
     mgr = dict(row)
     mgr["siem_auth_key"] = decrypt_secret(mgr.get("siem_auth_key"))
+    mgr["detection_secret"] = decrypt_secret(mgr.get("detection_secret"))
     return mgr
 
 
@@ -325,14 +326,16 @@ def create_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict
             """
             INSERT INTO managers (manager_id, name, description, siem_type, siem_ip,
                 siem_version, siem_auth_key, os_type, agent_group, memory_limit,
-                cpu_shares, config_template_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cpu_shares, config_template_id, detection_url, detection_username,
+                detection_secret, detection_fingerprint, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (manager_id, data["name"], data.get("description"), data["siem_type"],
              data.get("siem_ip"), data.get("siem_version"), encrypt_secret(data.get("siem_auth_key")),
              data.get("os_type", "ubuntu_22_04"), data.get("agent_group", "default"),
              data.get("memory_limit", "512MB"), data.get("cpu_shares", 1024),
-             data.get("config_template_id"), now, now)
+             data.get("config_template_id"), data.get("detection_url"), data.get("detection_username"),
+             encrypt_secret(data.get("detection_secret")), data.get("detection_fingerprint"), now, now)
         )
         conn.commit()
         return {**data, "manager_id": manager_id, "created_at": now, "updated_at": now}
@@ -364,13 +367,14 @@ def update_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict
         now = utc_now()
         fields = ["name", "description", "siem_type", "siem_ip", "siem_version",
                   "siem_auth_key", "os_type", "agent_group", "memory_limit",
-                  "cpu_shares", "config_template_id"]
+                  "cpu_shares", "config_template_id", "detection_url", "detection_username",
+                  "detection_secret", "detection_fingerprint"]
         updates = []
         values = []
         for f in fields:
             if f in data:
                 updates.append(f"{f} = ?")
-                values.append(encrypt_secret(data[f]) if f == "siem_auth_key" else data[f])
+                values.append(encrypt_secret(data[f]) if f in ("siem_auth_key", "detection_secret") else data[f])
         if not updates:
             return _manager_row(existing)
         updates.append("updated_at = ?")

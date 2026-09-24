@@ -186,6 +186,80 @@ async def run_simulation(simulation_id: str, profile_id: str, agents: list[str],
             simulations_db[simulation_id]["status"] = "failed"
             simulations_db[simulation_id]["error"] = str(e)
     announce_finished(simulation_id)
+    sim = simulations_db.get(simulation_id) or {}
+    if sim.get("status") == "completed" and (sim.get("detection") or {}).get("status") == "waiting":
+        await _check_detection_later(simulation_id)
+
+
+# ── what the SIEM detected ──────────────────────────────────────────────
+
+async def _check_detection_later(simulation_id: str) -> None:
+    """Give the SIEM HABENY_DETECTION_DELAY_SECONDS to index its alerts, then check."""
+    from app import config
+    from app.services import lifecycle
+    delay = config.get("HABENY_DETECTION_DELAY_SECONDS")
+    waited = 0.0
+    while waited < delay:
+        if lifecycle.shutting_down():
+            _set_detection(simulation_id, {"status": "not_checked",
+                                           "error": "Habeny stopped before the check; run it again from Simulations"})
+            return
+        await asyncio.sleep(min(5.0, delay - waited))
+        waited += 5.0
+    await asyncio.to_thread(run_detection_check, simulation_id)
+
+
+def _set_detection(simulation_id: str, values: dict) -> None:
+    sim = simulations_db.get(simulation_id)
+    if sim is not None:
+        sim["detection"] = {**(sim.get("detection") or {}), **values}
+        simulations_db[simulation_id] = sim  # persisted store: save the change
+
+
+def run_detection_check(simulation_id: str, manager_profile_id: str | None = None) -> dict:
+    """Ask the SIEM what it detected for a finished attack simulation, and record it."""
+    from app.config import DB_PATH
+    from app.db import get_manager
+    from app.services import detection, notify
+
+    sim = simulations_db.get(simulation_id) or {}
+    profile_id = manager_profile_id or (sim.get("detection") or {}).get("manager_profile_id")
+    manager = get_manager(DB_PATH, profile_id) if profile_id else None
+    if not detection.configured(manager):
+        result = {"status": "error", "manager_profile_id": profile_id,
+                  "error": "The manager profile has no detection API set (Managers page, admins)"}
+        _set_detection(simulation_id, result)
+        return result
+    _set_detection(simulation_id, {"status": "checking", "manager_profile_id": profile_id})
+    until = utc_now().isoformat()
+    try:
+        found = detection.check(manager, sim.get("profile_id"), sim.get("target_agents") or [],
+                                sim.get("started_at"), until)
+        result = {"status": "done", "manager_profile_id": profile_id, "manager_name": manager.get("name"),
+                  "checked_at": until, "error": None, **found}
+    except detection.DetectionError as e:
+        result = {"status": "error", "manager_profile_id": profile_id, "checked_at": until, "error": str(e)}
+    _set_detection(simulation_id, result)
+    log_activity("simulation_detection_checked", {
+        "simulation_id": simulation_id, "profile": sim.get("profile_id"), "siem": manager.get("siem_type"),
+        "detection_rate": result.get("detection_rate"), "alerts": result.get("alerts"), "error": result.get("error"),
+    }, status="success" if result["status"] == "done" else "error")
+    try:
+        if result["status"] == "done":
+            notify.emit("simulation.finished",
+                        f"Detection check: {result['detected']}/{result['containers']} containers detected "
+                        f"({manager.get('siem_type')}, {sim.get('profile_id')})",
+                        "Missed expected rules: " + ", ".join(result["missed"]) if result.get("missed") else "",
+                        level="success" if result["detected"] == result["containers"] else "warning",
+                        fields={"simulation_id": simulation_id, "detection_rate": result["detection_rate"],
+                                "alerts": result["alerts"]},
+                        link="/simulations")
+        else:
+            notify.emit("simulation.finished", "Detection check failed", result["error"], level="error",
+                        fields={"simulation_id": simulation_id}, link="/simulations")
+    except Exception:
+        logger.exception("Announcing the detection result failed")
+    return result
 
 
 async def run_custom_log_simulation(

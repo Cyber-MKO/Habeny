@@ -17,6 +17,8 @@ class SimulationStartRequest(BaseModel):
     agent_selector: AgentSelector = Field(..., description="Containers to target")
     duration: int = Field(default=300, ge=1, le=86400, description="Duration in seconds")
     eps_target: int = Field(default=100, ge=1, le=10000, description="Events per second written in each container")
+    detection_profile_id: str | None = Field(None, description="Manager profile whose SIEM to ask, after the run, "
+                                               "what it detected (needs its detection API set)")
 
     model_config = ConfigDict(
         use_enum_values=True,
