@@ -44,13 +44,13 @@ Both start at boot and restart if they crash. Download a release from the
 **Debian/Ubuntu package (recommended)**
 
 ```bash
-sudo apt install ./habeny_2.1.0_all.deb
+sudo apt install ./habeny_<version>_all.deb       # e.g. habeny_2.2.0_all.deb
 ```
 
 **Release tarball** (any systemd distribution with apt)
 
 ```bash
-tar xzf habeny-2.1.0.tar.gz && cd habeny-2.1.0
+tar xzf habeny-<version>.tar.gz && cd habeny-<version>
 sudo ./deploy/install.sh
 ```
 
@@ -82,7 +82,7 @@ ran as root, is upgraded in place and its data kept.
 host, also download `habeny-wheels-<version>-cpXY-x86_64.tar.gz` for the host's Python
 (`python3 --version`: 3.10 → cp310, 3.12 → cp312, …) and extract it into the release
 directory (tarball install) or `/opt/habeny` (package install) before installing:
-`sudo mkdir -p /opt/habeny && sudo tar xzf habeny-wheels-2.1.0-cp312-x86_64.tar.gz -C /opt/habeny`.
+`sudo mkdir -p /opt/habeny && sudo tar xzf habeny-wheels-<version>-cp312-x86_64.tar.gz -C /opt/habeny`.
 
 **Why no Docker image:** Habeny creates and manages LXC containers on the host. Running
 it inside Docker would need a privileged container with access to the host's LXC and
