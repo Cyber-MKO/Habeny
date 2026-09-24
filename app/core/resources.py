@@ -4,25 +4,25 @@ Host resource monitoring and formatting helpers.
 import logging
 import os
 import re
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def get_system_resources() -> Dict[str, Any]:
+def get_system_resources() -> dict[str, Any]:
     """Get system resource information"""
     try:
         # CPU info
         cpu_count = os.cpu_count() or 1
 
         # Memory info
-        with open('/proc/meminfo', 'r') as f:
+        with open('/proc/meminfo') as f:
             meminfo = f.read()
         mem_total = int(re.search(r'MemTotal:\s+(\d+)', meminfo).group(1)) // 1024  # MB
         mem_available = int(re.search(r'MemAvailable:\s+(\d+)', meminfo).group(1)) // 1024  # MB
 
         # Load average
-        with open('/proc/loadavg', 'r') as f:
+        with open('/proc/loadavg') as f:
             load_avg = [float(x) for x in f.read().split()[:3]]
 
         # Disk info

@@ -43,17 +43,6 @@ from app.models.enums import (
     TemplateType,
 )
 from app.models.groups import GroupAgentRequest, GroupCreateRequest, GroupRenameRequest
-from app.models.legacy import (
-    AlertRule,
-    BackupRequest,
-    BatchContainerCreate,
-    ContainerCreate,
-    ContainerCreateWithWazuh,
-    NetworkTopology,
-    RestoreRequest,
-    ScalingPolicy,
-    SnapshotCreate,
-)
 from app.models.logs import LogBundleUploadRequest, LogScheduleRequest, LogUploadRequest
 from app.models.operations import (
     APIResponse,
@@ -159,15 +148,6 @@ __all__ = [
     "OSSECAgentInfo",
     "OSSIMAgentInfo",
     "SIEMStats",
-    "ContainerCreate",
-    "ContainerCreateWithWazuh",
-    "BatchContainerCreate",
-    "ScalingPolicy",
-    "AlertRule",
-    "NetworkTopology",
-    "SnapshotCreate",
-    "BackupRequest",
-    "RestoreRequest",
     "BenchmarkStartRequest",
     "BenchmarkCompareRequest",
 ]

@@ -54,7 +54,7 @@ async def create_manager_profile(profile: ManagerProfileCreate):
         if get_manager_by_name(DB_PATH, profile.name):
             raise HTTPException(status_code=400, detail=f"Manager profile '{profile.name}' already exists")
         manager_id = str(uuid.uuid4())
-        data = profile.dict()
+        data = profile.model_dump()
         mgr = create_manager(DB_PATH, manager_id, data)
         log_activity("manager_created", {"manager_id": manager_id, "name": profile.name})
         return APIResponse(success=True, message="Manager profile created", data=public_manager(mgr))
@@ -68,7 +68,7 @@ async def create_manager_profile(profile: ManagerProfileCreate):
 async def update_manager_profile(manager_id: str, profile: ManagerProfileUpdate):
     """Update a manager profile"""
     try:
-        data = {k: v for k, v in profile.dict().items() if v is not None}
+        data = {k: v for k, v in profile.model_dump().items() if v is not None}
         mgr = update_manager(DB_PATH, manager_id, data)
         if not mgr:
             raise HTTPException(status_code=404, detail="Manager profile not found")

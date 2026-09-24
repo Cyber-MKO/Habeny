@@ -44,6 +44,8 @@ async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest):
             "indefinite": schedule.indefinite,
             "status": "starting",
             "created_at": utc_now().isoformat(),
+            # kept so the schedule can resume after a restart (not shown in the API)
+            "request": log_upload.model_dump(),
         }
 
         task = asyncio.create_task(

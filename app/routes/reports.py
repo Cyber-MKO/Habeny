@@ -6,7 +6,6 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
@@ -125,6 +124,7 @@ async def generate_report(report_request: ReportGenerateRequest):
             generate_report_pdf(report_data, agents_by_status, pdf_file)
             report_files[report_id]["pdf"] = str(pdf_file)
             download_format = "pdf"
+        report_files.save(report_id)
 
         log_activity("report_generated", {"report_id": report_id})
 
@@ -164,7 +164,7 @@ async def get_report(report_id: str):
 
 
 @router.get("/reports/{report_id}/download")
-async def download_report(report_id: str, format: Optional[str] = Query(None)):
+async def download_report(report_id: str, format: str | None = Query(None)):
     """Download report in the requested format (json, csv, pdf)."""
     try:
         requested = (format or "json").lower()

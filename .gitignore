@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 frontend/node_modules/
 static/
+.coverage
+coverage.xml
+htmlcov/

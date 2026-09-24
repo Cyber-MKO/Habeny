@@ -2,6 +2,7 @@
 Multi-SIEM Container Emulation Platform — application package.
 """
 import logging
+from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,11 @@ def _initialize_storage() -> None:
     from app.services.lifecycle import recover_interrupted_deployments
     recover_interrupted_deployments()
 
+    # Jobs and schedules from before the restart (running ones become "interrupted")
+    from app.state import import_legacy_config_templates, load_persisted_state
+    load_persisted_state(DB_PATH)
+    import_legacy_config_templates(CONFIGS_DIR)
+
     from app.services.setup_token import ensure_setup_token
     ensure_setup_token()
 
@@ -50,11 +56,13 @@ def create_app():
     from fastapi.middleware.cors import CORSMiddleware
 
     from app.config import CORS_ORIGINS, DEPLOY_WORKERS, check
-    from app.version import __version__
-    from app.middleware import StripApiPrefixMiddleware, track_request_latency
+    from app.middleware import RequestContextMiddleware, StripApiPrefixMiddleware
     from app.routes import register_routes
+    from app.version import __version__
 
     check()  # stop with every configuration problem listed, before touching anything
+    from app.services import instance
+    instance.acquire()  # one Habeny per data directory
     _initialize_storage()
     from app.services import oidc
     if oidc.settings():  # fails fast on incomplete single sign-on settings
@@ -64,6 +72,7 @@ def create_app():
         title="Multi-SIEM Container Emulation Platform",
         description="LXC-based platform for deploying containers that run SIEM agents at scale",
         version=__version__,
+        lifespan=_lifespan,
     )
     logger.info(f"Initialized; up to {DEPLOY_WORKERS} containers deploy in parallel")
 
@@ -75,15 +84,33 @@ def create_app():
             allow_origins=CORS_ORIGINS,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-            allow_headers=["Content-Type"],
+            allow_headers=["Content-Type", "X-Request-ID"],
+            expose_headers=["X-Request-ID"],
         )
     app.add_middleware(StripApiPrefixMiddleware)
-    app.middleware("http")(track_request_latency)
+    app.add_middleware(RequestContextMiddleware)  # added last = outermost: sees every request
 
     register_routes(app)
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.info("Shutdown complete")
+    from app.services import lifecycle
+    from app.services.logs import interrupt_for_shutdown
+    from app.state import interrupt_running_simulations
+    lifecycle.on_shutdown(interrupt_running_simulations)
+    lifecycle.on_shutdown(interrupt_for_shutdown)
 
     return app
+
+
+@asynccontextmanager
+async def _lifespan(app):
+    """Background work that runs while the server does (not in tests' TestClient without `with`)."""
+    from app.services.logs import resume_log_schedules
+    from app.services.maintenance import maintenance
+
+    maintenance.start()  # housekeeping: see app/services/maintenance.py
+    resume_log_schedules()
+    try:
+        yield
+    finally:
+        maintenance.stop()
+        logger.info("Shutdown complete")

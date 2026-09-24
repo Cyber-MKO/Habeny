@@ -2,7 +2,6 @@
 Activity log retrieval.
 """
 import asyncio
-from typing import Optional
 
 from fastapi import APIRouter, Query
 
@@ -16,7 +15,7 @@ router = APIRouter()
 async def get_activity_logs(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    action: Optional[str] = Query(None, description="Filter by action type")
+    action: str | None = Query(None, description="Filter by action type")
 ):
     """Retrieve activity logs with filtering"""
     try:

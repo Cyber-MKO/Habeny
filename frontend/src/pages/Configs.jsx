@@ -22,7 +22,7 @@ export default function Configs() {
     e.preventDefault();
     try {
       const tags = form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
-      const res = await api.importConfig({ name: form.name, siem_type: form.siem_type, content: form.content, description: form.description || null, version: form.version || null, tags });
+      await api.importConfig({ name: form.name, siem_type: form.siem_type, content: form.content, description: form.description || null, version: form.version || null, tags });
       toast("Config imported", "success");
       setForm({ name: "", siem_type: "wazuh", content: "", description: "", version: "", tags: "" });
       load();

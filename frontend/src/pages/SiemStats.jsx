@@ -1,13 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
-import { useStore } from "../store";
 import { PageHeader, StatCard, Spinner } from "../components/UI";
 
 const SIEM_TYPES = ["wazuh", "ossec", "ossim", "utmstack", "elastic"];
 
 export default function SiemStats() {
-  const { toast } = useStore();
   const { metrics } = useMetricsSocket();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);

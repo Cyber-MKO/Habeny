@@ -4,6 +4,7 @@ name: Release
 # - Actions tab → Release → "Run workflow" (on main): tags the commit and publishes.
 #   Tick "dry run" to build the artifacts without publishing (attached to the run).
 # - Push a tag yourself: git tag v2.1.0 && git push origin v2.1.0
+# The notes are the version's section of CHANGELOG.md; see CONTRIBUTING.md.
 on:
   push:
     tags: ["v*"]
@@ -46,6 +47,10 @@ jobs:
           fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "Releasing $tag from $GITHUB_SHA"
+      - name: Release notes (from CHANGELOG.md)
+        run: |
+          deploy/release-notes.sh "${TAG#v}" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -74,6 +79,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         # Creates the tag on this commit when it doesn't exist yet (manual runs). A tag made
         # with the workflow's token doesn't start this workflow a second time.
-        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Habeny ${TAG#v}" --generate-notes
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Habeny ${TAG#v}" \
+            --notes-file "$RUNNER_TEMP/notes.md"
         env:
           GH_TOKEN: ${{ github.token }}

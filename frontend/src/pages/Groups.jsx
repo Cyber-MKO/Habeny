@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Spinner, Modal, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Spinner, Modal } from "../components/UI";
 
 export default function Groups() {
   const { toast } = useStore();

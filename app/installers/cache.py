@@ -4,7 +4,6 @@ Host-side cache of downloaded agent packages, shared by the installers.
 import logging
 import threading
 from pathlib import Path
-from typing import List
 
 from app.config import DATA_DIR
 from app.core.lxc_backend import attach_run
@@ -19,7 +18,7 @@ AGENT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _cache_lock = threading.Lock()
 
 
-def ensure_cached(filename: str, download_cmd: List[str], timeout: int = 120) -> Path:
+def ensure_cached(filename: str, download_cmd: list[str], timeout: int = 120) -> Path:
     """Download a file to the host cache if it doesn't already exist.
 
     Thread-safe: concurrent containers wait for the first download to finish

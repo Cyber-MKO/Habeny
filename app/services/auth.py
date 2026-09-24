@@ -1,6 +1,7 @@
 """
 Authentication: password hashing, sessions, the login-required dependency and login rate limiting.
 """
+import contextlib
 import hashlib
 import hmac
 import secrets
@@ -8,7 +9,7 @@ import threading
 import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import Depends, HTTPException, WebSocketException, status
@@ -16,6 +17,7 @@ from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
 from app.db import create_session, delete_session, get_session_user, touch_session
+from app.logging_config import set_request_user
 from app.services import lifecycle
 
 # scrypt parameters (~16 MiB memory per hash)
@@ -54,11 +56,11 @@ def token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def client_ip(conn: HTTPConnection) -> Optional[str]:
+def client_ip(conn: HTTPConnection) -> str | None:
     return conn.client.host if conn.client else None
 
 
-def start_session(user_id: int, conn: Optional[HTTPConnection] = None) -> str:
+def start_session(user_id: int, conn: HTTPConnection | None = None) -> str:
     """Create a session and return its token (only the hash is stored)."""
     token = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS)
@@ -91,10 +93,8 @@ def session_user(conn: HTTPConnection) -> dict[str, Any] | None:
         seen = user.pop("session_last_seen_at", None)
         now = datetime.now(timezone.utc)
         if not seen or now - datetime.fromisoformat(seen) > TOUCH_INTERVAL:
-            try:
+            with contextlib.suppress(Exception):  # "last active" is informational
                 touch_session(DB_PATH, hashed, client_ip(conn))
-            except Exception:
-                pass
         user["session_id"] = session_public_id(hashed)
     return user
 
@@ -110,6 +110,8 @@ def _same_origin(conn: HTTPConnection) -> bool:
 async def require_user(conn: HTTPConnection) -> dict[str, Any]:
     """Dependency for every protected HTTP route and WebSocket."""
     user = session_user(conn)
+    if user is not None:
+        set_request_user(user["username"])  # for this request's log lines
     if conn.scope["type"] == "websocket":
         if user is None or not _same_origin(conn):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Not authenticated")

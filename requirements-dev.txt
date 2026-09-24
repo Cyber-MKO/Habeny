@@ -1,4 +1,5 @@
 -r requirements.txt
 pytest
-httpx                     # FastAPI TestClient
+pytest-cov
+httpx2                    # FastAPI TestClient (httpx is deprecated for it)
 ruff

@@ -26,6 +26,15 @@ _lock = threading.Lock()
 INTERRUPTED = "interrupted"
 
 
+_hooks: list = []
+
+
+def on_shutdown(callback) -> None:
+    """Run `callback()` as soon as a stop begins: long-running work that isn't a deployment
+    (simulations, log schedules) winds down instead of holding the stop up."""
+    _hooks.append(callback)
+
+
 def begin_shutdown() -> None:
     global _deadline
     with _lock:
@@ -35,6 +44,11 @@ def begin_shutdown() -> None:
         _stopping.set()
     logger.warning(f"Shutting down: refusing new changes, letting running deployments finish "
                    f"(up to {SHUTDOWN_TIMEOUT}s)")
+    for hook in _hooks:
+        try:
+            hook()
+        except Exception:
+            logger.exception(f"Shutdown hook {getattr(hook, '__name__', hook)} failed")
 
 
 def shutting_down() -> bool:
@@ -50,9 +64,12 @@ def time_left() -> float:
 
 def ignore_stop_signals() -> None:
     """ProcessPool initializer: workers leave SIGINT/SIGTERM to the main process, which
-    lets them finish (Ctrl+C in a terminal reaches the whole process group)."""
+    lets them finish (Ctrl+C in a terminal reaches the whole process group). They also
+    let go of the inherited instance lock (see app/services/instance.py)."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    from app.services.instance import drop_inherited_lock
+    drop_inherited_lock()
 
 
 def recover_interrupted_deployments() -> int:

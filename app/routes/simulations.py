@@ -65,7 +65,7 @@ async def load_simulation(
         except TypeError:
             raise HTTPException(status_code=400, detail="Extra fields must be JSON serializable")
 
-        config_payload = jsonable_encoder(request.dict())
+        config_payload = jsonable_encoder(request.model_dump())
         config_payload.pop("agent_selector", None)
 
         simulation = {
@@ -243,6 +243,7 @@ async def stop_simulation(simulation_id: str):
 
         simulation["status"] = "stopped"
         simulation["stopped_at"] = utc_now().isoformat()
+        simulations_db.save(simulation_id)
 
         log_activity("simulation_stopped", {"simulation_id": simulation_id})
 

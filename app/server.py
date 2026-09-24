@@ -25,6 +25,8 @@ def serve(app) -> None:
         proxy_headers=True,
         forwarded_allow_ips=config.get("HABENY_FORWARDED_ALLOW_IPS"),
         log_level=config.get("HABENY_LOG_LEVEL"),
+        log_config=None,  # keep app.logging_config's handlers (request IDs, format, file)
+        access_log=False,  # app.middleware writes the access log, with request IDs
         # Deployments get SHUTDOWN_TIMEOUT to finish; allow a little more for their responses
         timeout_graceful_shutdown=config.SHUTDOWN_TIMEOUT + 15,
         **server_ssl_options(),

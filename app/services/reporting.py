@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import matplotlib
 
@@ -29,7 +29,7 @@ def normalize_dt(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def generate_report_csv(report_data: Dict[str, Any], report_file: Path) -> None:
+def generate_report_csv(report_data: dict[str, Any], report_file: Path) -> None:
     """Generate a CSV report file."""
     rows = [["section", "key", "value"]]
     rows.append(["report", "report_id", report_data.get("report_id")])
@@ -61,7 +61,7 @@ def generate_report_csv(report_data: Dict[str, Any], report_file: Path) -> None:
         writer.writerows(rows)
 
 
-def generate_report_pdf(report_data: Dict[str, Any], agent_status_counts: Dict[str, int], report_file: Path) -> None:
+def generate_report_pdf(report_data: dict[str, Any], agent_status_counts: dict[str, int], report_file: Path) -> None:
     """Generate a PDF report with visualizations."""
     styles = getSampleStyleSheet()
     story = []

@@ -1,4 +1,3 @@
-import React, { useState } from "react";
 
 export function StatCard({ label, value, meta, color }) {
   return (

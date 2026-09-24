@@ -35,7 +35,7 @@ async def create_syslog_config_profile(config: SyslogConfigCreate):
     """Create a syslog config profile"""
     try:
         config_id = str(uuid.uuid4())
-        result = create_syslog_config(DB_PATH, config_id, config.dict())
+        result = create_syslog_config(DB_PATH, config_id, config.model_dump())
         log_activity("syslog_config_created", {"config_id": config_id, "name": config.name})
         return APIResponse(success=True, message="Syslog config created", data=result)
     except Exception as e:
@@ -60,7 +60,7 @@ async def get_syslog_config_profile(config_id: str):
 async def update_syslog_config_profile(config_id: str, config: SyslogConfigUpdate):
     """Update a syslog config profile"""
     try:
-        data = {k: v for k, v in config.dict().items() if v is not None}
+        data = {k: v for k, v in config.model_dump().items() if v is not None}
         result = update_syslog_config(DB_PATH, config_id, data)
         if not result:
             raise HTTPException(status_code=404, detail="Syslog config not found")
@@ -106,7 +106,7 @@ async def test_syslog_connectivity(target_ip: str = Query(...), target_port: int
         return APIResponse(success=True, message=f"Connectivity test: {status}", data={
             "target_ip": target_ip, "target_port": target_port, "protocol": protocol, "status": status
         })
-    except socket.timeout:
+    except TimeoutError:
         return APIResponse(success=False, message="Connection timed out", data={
             "target_ip": target_ip, "target_port": target_port, "protocol": protocol, "status": "timeout"
         })

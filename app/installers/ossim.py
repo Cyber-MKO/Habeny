@@ -2,7 +2,7 @@
 OSSIM agent installer.
 """
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.shell import PerformanceTimer, execute_in_container_shell
 from app.core.validation import validate_container_name, validate_host
@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 def install_ossim_agent(container_name: str, ossim_server: str,
-                       config_template_id: Optional[str] = None) -> Dict[str, Any]:
+                       config_template_id: str | None = None) -> dict[str, Any]:
     """
     Install OSSIM/AlienVault agent in a container
-    
+
     Args:
         container_name: Name of the container
         ossim_server: OSSIM server IP/hostname
         config_template_id: Optional config template to apply
-    
+
     Returns:
         Dict with success status and output
     """

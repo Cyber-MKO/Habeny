@@ -112,14 +112,35 @@ SETTINGS: list[Setting] = [
     Setting("HABENY_TLS_KEY", "", "Its private key (PEM)", "Server", _str),
     Setting("HABENY_FORWARDED_ALLOW_IPS", "127.0.0.1", "Reverse proxies trusted to send X-Forwarded-Proto/-For "
             "(comma-separated IPs, or `*`)", "Server"),
-    Setting("HABENY_LOG_LEVEL", "INFO", "Log level", "Server", _choice("debug", "info", "warning", "error")),
     Setting("HABENY_SHUTDOWN_TIMEOUT", "600", "Seconds a stop/restart waits for running deployments to "
             "finish before interrupting them (the systemd unit allows up to 840)", "Server", _int(0, 840)),
+    Setting("HABENY_LOG_LEVEL", "INFO", "Log level", "Logging", _choice("debug", "info", "warning", "error")),
+    Setting("HABENY_LOG_FORMAT", "text", "`text`, or `json` (one object per line, for log collectors)", "Logging",
+            _choice("text", "json")),
+    Setting("HABENY_LOG_FILE", "", "Also write logs to this file, rotated by size (stdout always gets them; "
+            "under systemd that's the journal)", "Logging"),
+    Setting("HABENY_LOG_MAX_MB", "50", "Rotate the log file at this size (MB)", "Logging", _int(1, 10240)),
+    Setting("HABENY_LOG_BACKUPS", "5", "Rotated log files to keep", "Logging", _int(0, 100)),
     # Capacity
     Setting("HABENY_DEPLOY_WORKERS", str(_CPUS), "Containers deployed in parallel (default: CPU count)",
             "Capacity", _int(1, 256)),
     Setting("HABENY_BENCHMARK_WORKERS", str(_CPUS), "Parallel workers for benchmark runs (default: CPU count)",
             "Capacity", _int(1, 256)),
+    # Data retention and backups
+    Setting("HABENY_METRICS_SAMPLE_SECONDS", "60", "How often the system metrics shown in history charts are "
+            "saved (seconds)", "Retention and backups", _int(5, 3600)),
+    Setting("HABENY_METRICS_RETENTION_DAYS", "30", "Keep system and API-latency samples this many days "
+            "(0: forever)", "Retention and backups", _int(0, 3650)),
+    Setting("HABENY_HISTORY_RETENTION_DAYS", "365", "Keep the activity log (audit trail), deployment results "
+            "and finished jobs this many days (0: forever)", "Retention and backups", _int(0, 3650)),
+    Setting("HABENY_REPORT_RETENTION_DAYS", "0", "Delete generated report files after this many days "
+            "(0: keep)", "Retention and backups", _int(0, 3650)),
+    Setting("HABENY_BACKUP_INTERVAL_HOURS", "24", "Take a full backup this often (hours; 0: no scheduled "
+            "backups)", "Retention and backups", _int(0, 24 * 90)),
+    Setting("HABENY_BACKUP_KEEP", "14", "Full backups to keep (the oldest are deleted)", "Retention and backups",
+            _int(1, 1000)),
+    Setting("HABENY_BACKUP_DIR", "", "Where full backups go (default: `DATA_DIR/backups`). Outside the data "
+            "directory, also allow it in systemd (see README)", "Retention and backups"),
     # Accounts and access
     Setting("HABENY_SESSION_TTL_HOURS", "168", "How long a sign-in lasts (hours)", "Accounts", _int(1, 24 * 365)),
     Setting("HABENY_PASSWORD_MIN_LENGTH", "12", "Minimum password length", "Accounts", _int(8, 128)),
@@ -287,3 +308,4 @@ CORS_ORIGINS = get("HABENY_CORS_ORIGINS")
 DEPLOY_WORKERS = get("HABENY_DEPLOY_WORKERS")
 BENCHMARK_WORKERS = get("HABENY_BENCHMARK_WORKERS")
 SHUTDOWN_TIMEOUT = get("HABENY_SHUTDOWN_TIMEOUT")
+METRICS_SAMPLE_SECONDS = get("HABENY_METRICS_SAMPLE_SECONDS")

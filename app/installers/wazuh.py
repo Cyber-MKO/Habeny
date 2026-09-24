@@ -4,7 +4,7 @@ Wazuh agent installer.
 import asyncio
 import logging
 import shlex
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.shell import PerformanceTimer, execute_in_container_shell
 from app.core.validation import validate_container_name, validate_group, validate_host, validate_version
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def install_wazuh_agent(container_name: str, wazuh_manager: str, agent_group: str,
-                       version: str = "4.14.2", config_template_id: Optional[str] = None) -> Dict[str, Any]:
+                       version: str = "4.14.2", config_template_id: str | None = None) -> dict[str, Any]:
     """Install Wazuh agent in a container using a direct .deb download (cached)."""
     validate_container_name(container_name)
     validate_host(wazuh_manager)
@@ -111,7 +111,7 @@ async def install_wazuh_on_create(container_name: str, wazuh_manager: str,
                                  agent_group: str, version: str):
     """
     Background task to install Wazuh after container creation
-    
+
     Args:
         container_name: Name of the container
         wazuh_manager: Wazuh manager IP/hostname

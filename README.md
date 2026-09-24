@@ -133,10 +133,21 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_TLS_CERT` |  | Your certificate (PEM, full chain) |
 | `HABENY_TLS_KEY` |  | Its private key (PEM) |
 | `HABENY_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Reverse proxies trusted to send X-Forwarded-Proto/-For (comma-separated IPs, or `*`) |
-| `HABENY_LOG_LEVEL` | `INFO` | Log level |
 | `HABENY_SHUTDOWN_TIMEOUT` | `600` | Seconds a stop/restart waits for running deployments to finish before interrupting them (the systemd unit allows up to 840) |
+| `HABENY_LOG_LEVEL` | `INFO` | Log level |
+| `HABENY_LOG_FORMAT` | `text` | `text`, or `json` (one object per line, for log collectors) |
+| `HABENY_LOG_FILE` |  | Also write logs to this file, rotated by size (stdout always gets them; under systemd that's the journal) |
+| `HABENY_LOG_MAX_MB` | `50` | Rotate the log file at this size (MB) |
+| `HABENY_LOG_BACKUPS` | `5` | Rotated log files to keep |
 | `HABENY_DEPLOY_WORKERS` | CPU count | Containers deployed in parallel (default: CPU count) |
 | `HABENY_BENCHMARK_WORKERS` | CPU count | Parallel workers for benchmark runs (default: CPU count) |
+| `HABENY_METRICS_SAMPLE_SECONDS` | `60` | How often the system metrics shown in history charts are saved (seconds) |
+| `HABENY_METRICS_RETENTION_DAYS` | `30` | Keep system and API-latency samples this many days (0: forever) |
+| `HABENY_HISTORY_RETENTION_DAYS` | `365` | Keep the activity log (audit trail), deployment results and finished jobs this many days (0: forever) |
+| `HABENY_REPORT_RETENTION_DAYS` | `0` | Delete generated report files after this many days (0: keep) |
+| `HABENY_BACKUP_INTERVAL_HOURS` | `24` | Take a full backup this often (hours; 0: no scheduled backups) |
+| `HABENY_BACKUP_KEEP` | `14` | Full backups to keep (the oldest are deleted) |
+| `HABENY_BACKUP_DIR` |  | Where full backups go (default: `DATA_DIR/backups`). Outside the data directory, also allow it in systemd (see README) |
 | `HABENY_SESSION_TTL_HOURS` | `168` | How long a sign-in lasts (hours) |
 | `HABENY_PASSWORD_MIN_LENGTH` | `12` | Minimum password length |
 | `HABENY_CORS_ORIGINS` |  | Other browser origins allowed to call the API, comma-separated (exact `https://host:port`); empty: none |
@@ -159,8 +170,6 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_LXC_BACKEND` |  | `helper` (unprivileged app + root helper) or `direct` (app runs as root); default: direct when root, else helper *(set by the installer)* |
 | `HABENY_HELPER_SOCKET` | `/run/habeny/helper.sock` | The helper's Unix socket *(set by the installer)* |
 | `HABENY_HELPER_USER` | `habeny` | The only user (besides root) the helper accepts *(set by the installer)* |
-## Upgrading
-
 Install the newer release the same way you installed Habeny: `sudo apt install
 ./habeny_<new>_all.deb`, or run `sudo ./deploy/install.sh` from the new tarball or after
 `git pull`. The upgrade:
@@ -191,6 +200,126 @@ points to the backups), so data is never silently misread. Where migrations supp
 **Uninstalling:** `sudo apt remove habeny` stops and removes the services and the app
 (`apt purge` also removes `/etc/habeny`). The data in `/var/lib/lxc-siem-platform` is kept;
 delete it yourself if you no longer need it.
+
+## Backups
+
+Habeny takes a **full backup** every day (`HABENY_BACKUP_INTERVAL_HOURS`) and keeps the
+newest 14 (`HABENY_BACKUP_KEEP`) in `/var/lib/lxc-siem-platform/backups/`. Each is one
+`habeny-backup-<date>-<time>-<type>.tar.gz` holding:
+
+- the database (a consistent copy taken while Habeny runs)
+- `secret.key`, which decrypts the stored SIEM keys
+- reports, config templates, container metadata and the activity log
+- the TLS certificate and `habeny.conf`
+- a manifest with a checksum for every file
+
+It doesn't include the package cache, which is downloaded again when needed.
+
+```bash
+sudo habeny backup create          # one now (also: Account → Backups → Back up now)
+sudo habeny backup list
+sudo habeny backup verify FILE     # complete and undamaged?
+```
+
+Admins can also download backups from **Account → Backups**. **Keep copies off the server.**
+Either download them, or point `HABENY_BACKUP_DIR` at a mounted share. That directory is
+outside the data directory, so the sandboxed service also needs permission to write there:
+
+```bash
+sudo systemctl edit habeny         # add these two lines, save, then restart habeny
+[Service]
+ReadWritePaths=/mnt/backups/habeny
+```
+
+A backup contains the encryption key and every stored secret, so protect it like a password
+vault (the files are created `0600`).
+
+**Restoring** (the same or a new server; install Habeny first):
+
+```bash
+sudo systemctl stop habeny
+sudo habeny backup restore habeny-backup-20260924-020000-scheduled.tar.gz
+sudo systemctl start habeny
+```
+
+The restore checks every file's checksum before changing anything, and it keeps what it
+replaces (`*.before-restore`, and the old database under `backups/`). A backup's settings
+come back as `restored-habeny.conf` for you to compare with `/etc/habeny/habeny.conf`.
+A backup from a newer Habeny can't be restored into an older one.
+
+## Logs
+
+- **Server log:** stdout, which is the journal under systemd (`journalctl -u habeny -f`; the
+  journal rotates it). `HABENY_LOG_FILE` adds a file, rotated at `HABENY_LOG_MAX_MB`.
+  `HABENY_LOG_FORMAT=json` writes one JSON object per line for log collectors (Loki, ELK,
+  Splunk, ...).
+- **Request IDs:** every request gets an ID. It's returned in the `X-Request-ID` header,
+  printed on every log line the request causes, and recorded in its activity-log entry.
+  Server errors show it to the user, so "request ID 3f9a…" leads straight to the log lines:
+  `journalctl -u habeny | grep 3f9a…`. A valid `X-Request-ID` from a reverse proxy is kept,
+  which links its logs with Habeny's.
+- **Access log:** one line per request with method, path, status, duration and user.
+- **Activity log:** the audit trail of what users did, on the Activity page.
+
+## Data retention
+
+A background task prunes old data hourly, so the disk doesn't fill up over time
+(`sudo habeny prune` runs it now):
+
+| Data | Kept | Setting |
+|---|---|---|
+| System metrics (saved once a minute) and API latency samples | 30 days | `HABENY_METRICS_RETENTION_DAYS` |
+| Activity log, deployment results, finished jobs | 365 days | `HABENY_HISTORY_RETENTION_DAYS` |
+| Generated report files | forever | `HABENY_REPORT_RETENTION_DAYS` |
+| Full backups | newest 14 | `HABENY_BACKUP_KEEP` |
+| Expired sign-in sessions | removed | |
+
+`0` keeps data forever. System metrics are recorded once per `HABENY_METRICS_SAMPLE_SECONDS`
+however many dashboards are open. They used to be recorded per viewer every 5 seconds,
+about 13 MB per open dashboard per day, kept forever.
+
+Simulations, reports, deployments, log schedules and config templates are stored in the
+database, so a restart doesn't lose them. Anything that was running when Habeny stopped
+is shown as **interrupted**, and log schedules resume by themselves for the time they had
+left. Interrupted deployments and simulations aren't restarted automatically: a
+half-created container needs deleting first, and an attack simulation replayed hours
+later would muddy SIEM test results.
+
+## Scaling and limits
+
+Habeny is **one process on one machine**: SQLite (WAL mode) for data, plus in-process
+background work (deployments, simulations, schedules, maintenance). Only one Habeny can
+use a data directory. A second instance, or uvicorn with several workers, refuses to
+start with a message saying which process holds it.
+
+Measured on a 4-vCPU VM, with LXC stubbed out so the numbers are Habeny's own,
+20 concurrent clients:
+
+| | Throughput | p95 latency |
+|---|---|---|
+| Reads (e.g. `GET /groups`) | ~330 requests/s | < 200 ms |
+| Writes (e.g. creating groups) | ~230 requests/s | ~100 ms |
+| Listing 500 containers (Containers page) | ~2 s per load | the rest of the API stays responsive meanwhile |
+| Memory (web app) | ~130 MB | |
+
+What limits a host in practice:
+
+- **Containers:** the host's RAM and CPU (each container's `memory_limit`), not Habeny.
+  Habeny's own side was measured with 500 containers (above); how many a host can
+  actually run depends on its resources and the SIEM agents.
+- **The Containers page:** each running container is asked for its SIEM agent status
+  (one `lxc-attach`, 16 at a time). That's roughly 50–200 ms per container on real hosts,
+  so several seconds per page load at around 500 containers.
+- **Users:** tens of people using the UI at once is fine; writes are serialized by SQLite.
+
+**Larger installs:** today, run **one Habeny per LXC host**. Each manages its own
+containers with its own data, users and backups. A shared PostgreSQL database is the
+path for a single Habeny across hosts. It isn't supported yet; it would mean:
+
+- porting `app/db.py` and the migrations
+- moving live job state and the maintenance task to database-coordinated workers, so
+  several instances can share the work
+- replacing the single-instance lock with job leasing
 
 ## Development
 
@@ -368,7 +497,6 @@ npm run build      # outputs to ../static/
 │   └── models/              # Pydantic models by domain (import from app.models)
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
-├── index.legacy.html        # Legacy single-file frontend
 │
 ├── frontend/                # React + Vite frontend
 │   ├── src/
@@ -436,14 +564,12 @@ npm run build      # outputs to ../static/
 ## Linting
 
 ```bash
-# Python (ruff)
 pip install -r requirements-dev.txt
-ruff check .
-ruff format .
-
-# JavaScript (eslint)
-cd frontend && npx eslint src/
+ruff check .                      # Python (config: ruff.toml)
+cd frontend && npx eslint .       # JavaScript (config: frontend/eslint.config.js)
 ```
+
+CI runs both on every pull request, and both must be clean.
 
 ## Testing
 
@@ -451,13 +577,33 @@ cd frontend && npx eslint src/
 pip install -r requirements-dev.txt
 python3 -m pytest tests/ -v
 
-# Without LXC (e.g. on a laptop): use the in-memory python-lxc stand-in
-HABENY_LXC_BACKEND=direct PYTHONPATH=tests/stubs python3 -m pytest tests/
+# Without LXC (e.g. on a laptop): use the in-memory python-lxc stand-in, with coverage
+HABENY_LXC_BACKEND=direct PYTHONPATH=tests/stubs python3 -m pytest tests/ --cov=app
+
+# Frontend (Vitest + Testing Library)
+cd frontend && npm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs the tests on Python 3.10 and 3.12, the ruff
-correctness rules, a frontend build, and `pip-audit` / `npm audit` on every push and pull
-request and weekly. Dependabot (`.github/dependabot.yml`) proposes dependency updates.
+`tests/integration/smoke.sh` is an end-to-end check of an installed Habeny against real
+LXC: it creates the first admin, deploys an Ubuntu container, stops, starts and deletes it,
+takes and verifies a backup, and restarts the service. Run it as root on a disposable
+machine right after `deploy/install.sh`.
+
+CI runs on every push and pull request:
+
+- `.github/workflows/ci.yml`: the Python tests on 3.10 and 3.12, with deprecation
+  warnings as errors and a coverage floor; ruff; ESLint, the frontend tests and build;
+  shellcheck and a package build; `pip-audit` / `npm audit` (also weekly)
+- `.github/workflows/integration.yml`: installs Habeny on an Ubuntu 24.04 runner and runs
+  `tests/integration/smoke.sh` against real LXC
+
+Dependabot (`.github/dependabot.yml`) proposes dependency updates.
+
+## Contributing and releases
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers pull requests, commit messages, versioning
+(SemVer; the version lives in `app/version.py`) and how to publish a release.
+[CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 
 ## Security
 

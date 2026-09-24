@@ -498,6 +498,58 @@ function Users() {
   );
 }
 
+const formatSize = (bytes) => (bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} kB`);
+
+function Backups() {
+  const { toast } = useStore();
+  const [info, setInfo] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setInfo((await api.getBackups()).data); }
+    catch (err) { toast(err.message, "error"); setInfo({ backups: [], schedule: null }); }
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const backUpNow = async () => {
+    setBusy(true);
+    try { toast((await api.createBackup()).message, "success"); load(); }
+    catch (err) { toast(err.message, "error"); }
+    finally { setBusy(false); }
+  };
+
+  const schedule = info?.schedule;
+  const columns = [
+    { key: "created_at", label: "Taken", render: (b) => formatDate(b.created_at) },
+    { key: "label", label: "Type", render: (b) => <span className="tag">{b.label}</span> },
+    { key: "size_bytes", label: "Size", render: (b) => formatSize(b.size_bytes) },
+    { key: "download", label: "", render: (b) => (
+      <a className="btn btn-sm btn-secondary" href={api.backupDownloadUrl(b.name)} download>Download</a>
+    )},
+  ];
+  return (
+    <div className="section">
+      <div className="account-users-head">
+        <div className="section-title">Backups</div>
+        <button className="btn btn-primary btn-sm" onClick={backUpNow} disabled={busy}>
+          {busy ? "Backing up…" : "Back up now"}
+        </button>
+      </div>
+      <p className="account-help">
+        {schedule && (schedule.interval_hours > 0
+          ? `A full backup is taken every ${schedule.interval_hours} h; the newest ${schedule.keep} are kept in ${schedule.directory}. `
+          : "Scheduled backups are off (HABENY_BACKUP_INTERVAL_HOURS=0). ")}
+        Each contains the database, the key that decrypts stored secrets, reports and settings: keep downloaded
+        copies somewhere only admins can read. Restore with <code>sudo habeny backup restore FILE</code>.
+      </p>
+      {schedule?.last_scheduled_error && (
+        <div className="auth-error" role="alert">The last scheduled backup failed: {schedule.last_scheduled_error}</div>
+      )}
+      {info === null ? <Spinner /> : <DataTable columns={columns} rows={info.backups} emptyMsg="No backups yet" />}
+    </div>
+  );
+}
+
 export default function Account() {
   const { user } = useAuth();
   return (
@@ -530,6 +582,7 @@ export default function Account() {
         </div>
       </div>
       {user.is_admin && <Users />}
+      {user.is_admin && <Backups />}
     </>
   );
 }

@@ -1,13 +1,14 @@
 """
 Container deployment — worker-process deploy of a single container and live progress tracking.
 """
+import contextlib
 import logging
 import os
 import queue
 import time
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, wait
 from multiprocessing.managers import SyncManager
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.config import DB_PATH, DEPLOY_WORKERS
 from app.core.container import parse_memory_limit, setup_agent_health_check
@@ -50,8 +51,8 @@ def progress_start(deployment_id: str, count: int, siem_type: str):
 
 
 def progress_event(deployment_id: str, message: str, level: str = "info",
-                    container: Optional[str] = None, status: Optional[str] = None,
-                    error: Optional[str] = None):
+                    container: str | None = None, status: str | None = None,
+                    error: str | None = None):
     """Append an activity line and, if given, update the container's current step/status."""
     with deployment_progress_lock:
         job = deployment_progress.get(deployment_id)
@@ -79,22 +80,35 @@ def progress_finish(deployment_id: str, status: str, message: str, level: str = 
         if job:
             job["status"] = status
             job["finished_at"] = utc_now().isoformat()
+            deployment_progress.save(deployment_id)
 
 
 def _report_step(progress_queue, agent_name: str, message: str):
     """Send a step update from a deployment worker process back to the API process."""
     if progress_queue is None:
         return
-    try:
+    with contextlib.suppress(Exception):  # progress is best-effort; the result still arrives
         progress_queue.put_nowait((agent_name, message))
-    except Exception:
-        pass
 
 
-def run_deployment_workers(deployment_id: str, agent_names: List[str], deployment_dict: dict,
-                            agent_seq_ids: Dict[str, int]):
-    """Deploy containers in worker processes, streaming their step updates into
+def worker_count(parallel_mode: str, containers: int) -> int:
+    return 1 if parallel_mode == "sequential" else min(DEPLOY_WORKERS, max(1, containers))
+
+
+def _make_executor(parallel_mode: str, workers: int):
+    """multiprocessing (default): isolated worker processes. sequential: one worker process,
+    one container at a time. threading: threads in the web app (lighter, but a stop can't
+    abandon them at the deadline; they run to the end)."""
+    if parallel_mode == "threading":
+        return ThreadPoolExecutor(max_workers=workers, thread_name_prefix="deploy")
+    return ProcessPoolExecutor(max_workers=workers, initializer=lifecycle.ignore_stop_signals)
+
+
+def run_deployment_workers(deployment_id: str, agent_names: list[str], deployment_dict: dict,
+                            agent_seq_ids: dict[str, int], parallel_mode: str = "multiprocessing"):
+    """Deploy containers in parallel (see _make_executor), streaming their step updates into
     deployment_progress. Blocking; run it off the event loop."""
+    workers = worker_count(parallel_mode, len(agent_names))
     results = []
     warnings = []
     mp_manager = SyncManager()
@@ -129,7 +143,7 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
                 progress_event(deployment_id, f"Failed: {error}", level="error",
                                 container=agent_name, status="failed", error=error)
 
-        executor = ProcessPoolExecutor(max_workers=DEPLOY_WORKERS, initializer=lifecycle.ignore_stop_signals)
+        executor = _make_executor(parallel_mode, workers)
         abandoned = False
         try:
             # Hand out one container per free worker (not all at once): the executor
@@ -152,7 +166,7 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
                     if pending and lifecycle.time_left() <= 0:
                         abandoned = True
                         done, pending = set(pending), set()
-                while queued and len(pending) < DEPLOY_WORKERS:
+                while queued and len(pending) < workers:
                     name = queued.pop(0)
                     future = executor.submit(deploy_single_siem_agent, name, deployment_dict,
                                              agent_seq_ids[name], progress_queue)
@@ -180,14 +194,14 @@ def run_deployment_workers(deployment_id: str, agent_names: List[str], deploymen
     return results, warnings
 
 
-def _interrupted_result(agent_name: str, seq_id: Optional[int], started: bool) -> dict:
+def _interrupted_result(agent_name: str, seq_id: int | None, started: bool) -> dict:
     error = ("Interrupted: Habeny stopped before this container finished deploying; delete and redeploy it"
              if started else "Cancelled: Habeny stopped before this container was deployed")
     metadata = {"agent_seq_id": seq_id, "lifecycle_status": lifecycle.INTERRUPTED if started else "error"}
     return {"agent_name": agent_name, "agent_seq_id": seq_id, "success": False, "error": error, "metadata": metadata}
 
 
-def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int] = None,
+def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq_id: int | None = None,
                              progress_queue=None) -> dict:
     """Deploy a single container with a SIEM agent. Runs in a worker process.
 
@@ -196,14 +210,14 @@ def deploy_single_siem_agent(agent_name: str, deployment_config: dict, agent_seq
     locked"). What should be saved is returned as result["metadata"]; the parent
     stores it with persist_deploy_result().
     """
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
     result = _deploy_container(agent_name, deployment_config, agent_seq_id, progress_queue, metadata)
     result["metadata"] = metadata
     return result
 
 
-def _deploy_container(agent_name: str, deployment_config: dict, agent_seq_id: Optional[int],
-                      progress_queue, metadata: Dict[str, Any]) -> dict:
+def _deploy_container(agent_name: str, deployment_config: dict, agent_seq_id: int | None,
+                      progress_queue, metadata: dict[str, Any]) -> dict:
     deploy_start = time.time()
     try:
         logger.info(f"[{os.getpid()}] Deploying container: {agent_name}")
@@ -419,7 +433,7 @@ def _deploy_container(agent_name: str, deployment_config: dict, agent_seq_id: Op
         }
 
 
-def persist_deploy_result(result: dict, siem_type: Optional[str] = None) -> None:
+def persist_deploy_result(result: dict, siem_type: str | None = None) -> None:
     """Save a worker's deploy result in the parent process: container metadata and
     per-container deploy metrics. A failure here is logged; it never turns a deployed
     container into a failed one."""

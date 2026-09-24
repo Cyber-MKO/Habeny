@@ -88,3 +88,66 @@ def test_startup_marks_leftover_deployments_interrupted(app):
     write_agent_metadata("gr-0001", {"lifecycle_status": "starting"})
     assert lifecycle.recover_interrupted_deployments() >= 1
     assert read_agent_metadata("gr-0001")["lifecycle_status"] == lifecycle.INTERRUPTED
+
+
+def test_stop_interrupts_simulations_instead_of_waiting(app):
+    from app.state import simulations_db
+    simulations_db["sim-stop-test"] = {"simulation_id": "sim-stop-test", "status": "running"}
+    lifecycle._reset_for_tests()
+    try:
+        lifecycle.begin_shutdown()
+        assert simulations_db["sim-stop-test"]["status"] == "interrupted"
+        assert simulations_db["sim-stop-test"]["status_before_restart"] == "running"
+    finally:
+        lifecycle._reset_for_tests()
+        simulations_db.pop("sim-stop-test", None)
+
+
+def test_attack_simulation_honours_stop(app, monkeypatch):
+    """The loop used to ignore Stop and run for its whole duration, then report "completed"."""
+    import asyncio
+
+    from app.services import simulation
+    from app.state import simulations_db
+
+    monkeypatch.setattr(simulation, "generate_simulation_events", lambda *a: {"events": 1})
+    simulations_db["sim-attack"] = {"simulation_id": "sim-attack", "status": "running"}
+
+    async def scenario():
+        task = asyncio.create_task(simulation.run_simulation("sim-attack", "p", ["c1"], 60, 1))
+        await asyncio.sleep(1.2)
+        simulations_db["sim-attack"]["status"] = "stopped"  # what the Stop button does
+        await asyncio.wait_for(task, timeout=5)
+
+    started = time.monotonic()
+    asyncio.run(scenario())
+    assert time.monotonic() - started < 5
+    assert simulations_db["sim-attack"]["status"] == "stopped"
+    simulations_db.pop("sim-attack")
+
+
+def test_stop_interrupts_log_schedules_so_they_resume(app, monkeypatch):
+    import asyncio
+
+    from app.models import LogUploadRequest
+    from app.services import logs as log_service
+    from app.state import scheduled_log_tasks
+
+    async def fake_upload(agent_id, log_upload):
+        return {"success": True}
+
+    monkeypatch.setattr(log_service, "perform_log_upload", fake_upload)
+    monkeypatch.setattr(log_service.lxc, "list_containers", lambda *a, **k: ["c1"])
+    scheduled_log_tasks["sched-stop"] = {"schedule_id": "sched-stop", "agent_id": "c1", "status": "starting"}
+
+    async def scenario():
+        task = asyncio.create_task(log_service.run_log_schedule(
+            "sched-stop", "c1", LogUploadRequest(content="x", destination_path="/var/log/x.log"), 5, None, True))
+        scheduled_log_tasks["sched-stop"]["task"] = task
+        await asyncio.sleep(0.2)
+        log_service.interrupt_for_shutdown()
+        await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), timeout=5)
+
+    asyncio.run(scenario())
+    record = scheduled_log_tasks.pop("sched-stop")
+    assert record["status"] == "interrupted" and record["status_before_restart"] == "running"
