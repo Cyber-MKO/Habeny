@@ -4,6 +4,7 @@ Log upload to containers — upload scripts, UTMstack filebeat wiring and recurr
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.core.container import build_write_file_script
@@ -13,6 +14,7 @@ from app.core.validation import validate_container_path
 from app.models import LogUploadRequest, utc_now
 from app.services.activity import log_activity
 from app.services.agent_info import detect_siem_type, read_agent_metadata
+from app.services.records import INTERRUPTED
 from app.state import scheduled_log_tasks
 
 logger = logging.getLogger(__name__)
@@ -104,8 +106,8 @@ async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploa
                             interval_seconds: int, duration_seconds: Optional[int], indefinite: bool) -> None:
     start_time = time.time()
     scheduled_log_tasks[schedule_id]["status"] = "running"
-    scheduled_log_tasks[schedule_id]["last_run"] = None
-    scheduled_log_tasks[schedule_id]["runs"] = 0
+    scheduled_log_tasks[schedule_id].setdefault("last_run", None)  # kept when resuming after a restart
+    scheduled_log_tasks[schedule_id].setdefault("runs", 0)
 
     try:
         while True:
@@ -128,7 +130,8 @@ async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploa
 
             await asyncio.sleep(interval_seconds)
     except asyncio.CancelledError:
-        scheduled_log_tasks[schedule_id]["status"] = "stopped"
+        if scheduled_log_tasks[schedule_id].get("status") != INTERRUPTED:  # a restart: resumes afterwards
+            scheduled_log_tasks[schedule_id]["status"] = "stopped"
     except Exception as e:
         scheduled_log_tasks[schedule_id]["status"] = "error"
         scheduled_log_tasks[schedule_id]["error"] = str(e)
@@ -136,4 +139,46 @@ async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploa
 
 
 def schedule_public(schedule: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: v for k, v in schedule.items() if k != "task"}
+    return {k: v for k, v in schedule.items() if k not in ("task", "request")}
+
+
+def interrupt_for_shutdown() -> None:
+    """A stop began: interrupt running schedules (they resume at the next start)."""
+    for schedule in list(scheduled_log_tasks.values()):
+        if schedule.get("status") in ("running", "starting"):
+            schedule["status_before_restart"] = schedule["status"]
+            schedule["status"] = INTERRUPTED
+            task = schedule.get("task")
+            if task is not None and not task.done():
+                task.get_loop().call_soon_threadsafe(task.cancel)
+
+
+def resume_log_schedules() -> int:
+    """At startup: restart schedules that were running when Habeny stopped, for the time they
+    had left (indefinite ones indefinitely). Must run in the event loop."""
+    resumed = 0
+    for schedule_id, schedule in list(scheduled_log_tasks.items()):
+        if (schedule.get("status") != INTERRUPTED or "request" not in schedule
+                or schedule.get("status_before_restart") not in ("running", "starting")):
+            continue
+        remaining = None
+        if not schedule.get("indefinite"):
+            started = datetime.fromisoformat(schedule["created_at"])
+            elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+            remaining = (schedule.get("duration_seconds") or 0) - elapsed
+            if remaining <= 0:
+                schedule["status"] = "completed"
+                schedule["completed_note"] = "Its time ran out while Habeny was stopped"
+                scheduled_log_tasks.save(schedule_id)
+                continue
+        schedule["status"] = "starting"
+        schedule["resumed_at"] = utc_now().isoformat()
+        schedule["resumes"] = schedule.get("resumes", 0) + 1
+        scheduled_log_tasks.save(schedule_id)
+        schedule["task"] = asyncio.create_task(run_log_schedule(
+            schedule_id, schedule["agent_id"], LogUploadRequest(**schedule["request"]),
+            schedule["interval_seconds"], remaining, bool(schedule.get("indefinite"))))
+        resumed += 1
+    if resumed:
+        logger.info(f"Resumed {resumed} log schedule(s) after the restart")
+    return resumed

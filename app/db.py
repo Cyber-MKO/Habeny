@@ -466,14 +466,43 @@ def record_metric(db_path: Path, metric_type: str, metric_name: str,
 
 
 def record_metrics_batch(db_path: Path, rows: List[tuple]) -> None:
-    """rows: list of (metric_type, metric_name, value, tags)"""
+    """rows: list of (metric_type, metric_name, value, tags[, recorded_at]); without a time, now."""
     with _connection(db_path) as conn:
         now = utc_now()
         conn.executemany(
             "INSERT INTO metrics (metric_type, metric_name, value, tags, recorded_at) VALUES (?, ?, ?, ?, ?)",
-            [(t, n, v, tg, now) for t, n, v, tg in rows]
+            [(r[0], r[1], r[2], r[3], r[4] if len(r) > 4 else now) for r in rows]
         )
         conn.commit()
+
+
+def prune_metrics(db_path: Path, before: str, metric_types: Optional[List[str]] = None,
+                  exclude_types: Optional[List[str]] = None, batch: int = 5000) -> int:
+    """Delete metric rows recorded before `before` (ISO time), a batch at a time so writers
+    aren't blocked for long. Returns the number deleted."""
+    where, params = "recorded_at < ?", [before]
+    if metric_types:
+        where += f" AND metric_type IN ({','.join('?' * len(metric_types))})"
+        params += metric_types
+    if exclude_types:
+        where += f" AND metric_type NOT IN ({','.join('?' * len(exclude_types))})"
+        params += exclude_types
+    deleted = 0
+    while True:
+        with _connection(db_path) as conn:
+            cur = conn.execute(f"DELETE FROM metrics WHERE id IN (SELECT id FROM metrics WHERE {where} LIMIT ?)",
+                               (*params, batch))
+            conn.commit()
+        deleted += cur.rowcount
+        if cur.rowcount < batch:
+            return deleted
+
+
+def prune_expired_sessions(db_path: Path) -> int:
+    with _connection(db_path) as conn:
+        cur = conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (utc_now(),))
+        conn.commit()
+        return cur.rowcount
 
 
 def query_metrics(db_path: Path, metric_type: Optional[str] = None,

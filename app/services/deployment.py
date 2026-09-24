@@ -79,6 +79,7 @@ def progress_finish(deployment_id: str, status: str, message: str, level: str = 
         if job:
             job["status"] = status
             job["finished_at"] = utc_now().isoformat()
+            deployment_progress.save(deployment_id)
 
 
 def _report_step(progress_queue, agent_name: str, message: str):

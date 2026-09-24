@@ -17,16 +17,42 @@
 #HABENY_TLS_KEY=
 # Reverse proxies trusted to send X-Forwarded-Proto/-For (comma-separated IPs, or *)
 #HABENY_FORWARDED_ALLOW_IPS=127.0.0.1
-# Log level
-#HABENY_LOG_LEVEL=INFO
 # Seconds a stop/restart waits for running deployments to finish before interrupting them (the systemd unit allows up to 840)
 #HABENY_SHUTDOWN_TIMEOUT=600
+
+# ── Logging ─────────────────────────────────────────────────────
+# Log level
+#HABENY_LOG_LEVEL=INFO
+# text, or json (one object per line, for log collectors)
+#HABENY_LOG_FORMAT=text
+# Also write logs to this file, rotated by size (stdout always gets them; under systemd that's the journal)
+#HABENY_LOG_FILE=
+# Rotate the log file at this size (MB)
+#HABENY_LOG_MAX_MB=50
+# Rotated log files to keep
+#HABENY_LOG_BACKUPS=5
 
 # ── Capacity ────────────────────────────────────────────────────
 # Containers deployed in parallel (default: CPU count)
 #HABENY_DEPLOY_WORKERS=4
 # Parallel workers for benchmark runs (default: CPU count)
 #HABENY_BENCHMARK_WORKERS=4
+
+# ── Retention and backups ───────────────────────────────────────
+# How often the system metrics shown in history charts are saved (seconds)
+#HABENY_METRICS_SAMPLE_SECONDS=60
+# Keep system and API-latency samples this many days (0: forever)
+#HABENY_METRICS_RETENTION_DAYS=30
+# Keep the activity log (audit trail), deployment results and finished jobs this many days (0: forever)
+#HABENY_HISTORY_RETENTION_DAYS=365
+# Delete generated report files after this many days (0: keep)
+#HABENY_REPORT_RETENTION_DAYS=0
+# Take a full backup this often (hours; 0: no scheduled backups)
+#HABENY_BACKUP_INTERVAL_HOURS=24
+# Full backups to keep (the oldest are deleted)
+#HABENY_BACKUP_KEEP=14
+# Where full backups go (default: DATA_DIR/backups). Outside the data directory, also allow it in systemd (see README)
+#HABENY_BACKUP_DIR=
 
 # ── Accounts ────────────────────────────────────────────────────
 # How long a sign-in lasts (hours)

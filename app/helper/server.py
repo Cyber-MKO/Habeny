@@ -296,7 +296,10 @@ def serve(path: str = None, group: str = None) -> HelperServer:
 
 
 def main():
-    logging.basicConfig(level=os.environ.get("HABENY_HELPER_LOG_LEVEL", "INFO"), format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    from app import config
+    from app.logging_config import configure
+    # stdout only (the journal): the log file belongs to the unprivileged web app
+    configure(level=os.environ.get("HABENY_HELPER_LOG_LEVEL", "INFO"), fmt=config.get("HABENY_LOG_FORMAT"))
     if os.geteuid() != 0:
         logger.warning("The helper is not running as root; LXC operations will fail")
     serve().serve_forever()

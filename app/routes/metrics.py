@@ -3,12 +3,14 @@ Live metrics WebSocket and performance metrics endpoints.
 """
 import asyncio
 import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
-from app.config import DB_PATH
+from app.config import DB_PATH, METRICS_SAMPLE_SECONDS
 from app.core.resources import get_system_resources
 from app.db import get_metric_summary, query_metrics, record_metrics_batch
 from app.models import APIResponse, utc_now
@@ -58,17 +60,37 @@ def _collect_metrics_payload() -> dict:
         "timestamp": utc_now().isoformat(),
     }
 
-    # Persist system metrics snapshot for historical trending
-    try:
-        record_metrics_batch(DB_PATH, [
-            ("system", "memory_used_percent", sys_res.get("memory_used_percent", 0), None),
-            ("system", "cpu_load_1m", sys_res.get("load_average", [0])[0] if sys_res.get("load_average") else 0, None),
-            ("system", "disk_used_percent", sys_res.get("disk_used_percent", 0), None),
-            ("system", "containers_running", running, None),
-        ])
-    except Exception:
-        pass
+    # System snapshot for historical trending: at most once per METRICS_SAMPLE_SECONDS,
+    # however many dashboards are open
+    global _last_saved
+    if time.monotonic() - _last_saved >= METRICS_SAMPLE_SECONDS:
+        _last_saved = time.monotonic()
+        try:
+            record_metrics_batch(DB_PATH, [
+                ("system", "memory_used_percent", sys_res.get("memory_used_percent", 0), None),
+                ("system", "cpu_load_1m", sys_res.get("load_average", [0])[0] if sys_res.get("load_average") else 0, None),
+                ("system", "disk_used_percent", sys_res.get("disk_used_percent", 0), None),
+                ("system", "containers_running", running, None),
+            ])
+        except Exception as e:
+            logger.warning(f"Could not save the system metrics snapshot: {e}")
     return payload
+
+
+LIVE_INTERVAL = 5  # seconds between live updates
+_last_saved = float("-inf")
+_shared = {"at": float("-inf"), "payload": None}
+_shared_lock = threading.Lock()
+
+
+def shared_metrics_payload() -> dict:
+    """The live payload, computed once per interval and shared by every open dashboard
+    (each viewer used to collect, and save, its own). Blocking; run it in a thread."""
+    with _shared_lock:
+        if time.monotonic() - _shared["at"] >= LIVE_INTERVAL - 0.5 or _shared["payload"] is None:
+            _shared["payload"] = _collect_metrics_payload()
+            _shared["at"] = time.monotonic()
+        return _shared["payload"]
 
 
 @router.websocket("/ws/metrics")
@@ -78,7 +100,7 @@ async def metrics_stream(websocket: WebSocket):
     try:
         while True:
             try:
-                payload = await asyncio.to_thread(_collect_metrics_payload)
+                payload = await asyncio.to_thread(shared_metrics_payload)
                 await websocket.send_json(payload)
             except Exception as e:
                 logger.debug(f"Metrics collection error: {e}")
@@ -86,7 +108,7 @@ async def metrics_stream(websocket: WebSocket):
             # Wait for the next tick, but stop as soon as the client disconnects
             # (otherwise the loop outlives the connection)
             try:
-                message = await asyncio.wait_for(websocket.receive(), timeout=5)
+                message = await asyncio.wait_for(websocket.receive(), timeout=LIVE_INTERVAL)
                 if message["type"] == "websocket.disconnect":
                     break
             except asyncio.TimeoutError:

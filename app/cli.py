@@ -5,6 +5,8 @@ as the service user with the service's settings.
   habeny version
   habeny config [check|example|docs]
   habeny db status|migrate|backup|restore FILE|downgrade --to N
+  habeny backup create|list|verify FILE|restore FILE
+  habeny prune [--dry-run]
 """
 import argparse
 import os
@@ -98,7 +100,54 @@ def docs_table() -> str:
     return "\n".join(rows) + "\n"
 
 
+def cmd_backup(args) -> int:
+    from app.services import backup
+    if args.action == "create":
+        print(backup.create_backup("manual"))
+        return 0
+    if args.action == "list":
+        items = backup.list_backups()
+        print(f"Backups in {backup.backup_dir()} (scheduled every {config.get('HABENY_BACKUP_INTERVAL_HOURS')} h, "
+              f"newest {config.get('HABENY_BACKUP_KEEP')} kept):")
+        for item in items:
+            print(f"  {item['name']}  {item['size_bytes'] / 1e6:8.1f} MB")
+        if not items:
+            print("  none yet")
+        return 0
+    if args.action == "verify":
+        m = backup.verify_backup(Path(args.file))
+        print(f"OK: Habeny {m['habeny_version']}, schema v{m['schema_version']}, taken {m['created_at']} on "
+              f"{m['host']}, {len(m['files'])} files; encryption key: {m['secret_key']}")
+        return 0
+    # restore replaces data the running app is using
+    if _service_active() and not args.force:
+        print("error: Habeny is running. Stop it first (sudo systemctl stop habeny), or pass --force.",
+              file=sys.stderr)
+        return 1
+    m = backup.restore_backup(Path(args.file))
+    print(f"Restored the backup from {m['created_at']} (Habeny {m['habeny_version']}). The data it replaced is "
+          f"kept alongside (*.before-restore, and the database under backups/).")
+    if m.get("config_restored_to"):
+        print(f"Its settings are in {m['config_restored_to']}; compare with /etc/habeny/habeny.conf and copy over "
+              "what you need (as root).")
+    return 0
+
+
+def cmd_prune(args) -> int:
+    from app.services.maintenance import prune
+    removed = prune(dry_run=args.dry_run)
+    if args.dry_run:
+        print(f"Would delete {removed['activity_files']} activity log file(s) and {removed['report_files']} report "
+              "file(s); database rows past retention are counted when deleted.")
+    else:
+        print("Deleted: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in removed.items()))
+    return 0
+
+
 def _service_active() -> bool:
+    from app.services.instance import running_pid
+    if running_pid() is not None:  # a Habeny holds the data directory (service or not)
+        return True
     if not shutil.which("systemctl"):
         return False
     return subprocess.run(["systemctl", "is-active", "--quiet", "habeny"], check=False,
@@ -165,8 +214,22 @@ def main(argv=None) -> int:
     p_down.add_argument("--to", type=int, required=True)
     p_down.add_argument("--force", action="store_true", help="even if the service is running")
 
+    p_backup = sub.add_parser("backup", help="full backups of Habeny's data")
+    backup_sub = p_backup.add_subparsers(dest="action", required=True)
+    backup_sub.add_parser("create", help="take a full backup now")
+    backup_sub.add_parser("list", help="list full backups")
+    p_verify = backup_sub.add_parser("verify", help="check a backup file is complete and undamaged")
+    p_verify.add_argument("file")
+    p_brestore = backup_sub.add_parser("restore", help="restore data from a backup (stop Habeny first)")
+    p_brestore.add_argument("file")
+    p_brestore.add_argument("--force", action="store_true", help="even if the service is running")
+
+    p_prune = sub.add_parser("prune", help="delete data past its retention now (runs hourly anyway)")
+    p_prune.add_argument("--dry-run", action="store_true", help="only count old files")
+
     args = parser.parse_args(argv)
-    handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db}
+    handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
+                "prune": cmd_prune}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head

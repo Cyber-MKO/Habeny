@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from app.config import BENCHMARK_WORKERS, DB_PATH
+from app.services import lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -378,7 +379,8 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
                     "siem_auth_key": config.get("siem_auth_key", ""),
                 }
 
-                with ProcessPoolExecutor(max_workers=min(BENCHMARK_WORKERS, agents_count)) as executor:
+                with ProcessPoolExecutor(max_workers=min(BENCHMARK_WORKERS, agents_count),
+                                         initializer=lifecycle.ignore_stop_signals) as executor:
                     futures = {
                         executor.submit(deploy_single_siem_agent, name, deployment_config): name
                         for name in agent_names

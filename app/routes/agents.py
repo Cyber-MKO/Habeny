@@ -6,6 +6,7 @@ import json
 import logging
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -206,6 +207,15 @@ async def deploy_agents(
         return APIResponse(success=False, message="Container deployment failed", error=str(e))
 
 
+LIST_PARALLELISM = 16
+
+
+def _all_agent_infos() -> list:
+    names = lxc.list_containers()
+    with ThreadPoolExecutor(max_workers=min(LIST_PARALLELISM, max(1, len(names)))) as pool:
+        return list(pool.map(lambda name: get_agent_info(lxc.Container(name)), names))
+
+
 @router.get("/agents", response_model=APIResponse)
 async def list_agents(
     siem_type: Optional[str] = Query(None, description="Filter by SIEM type"),
@@ -216,21 +226,15 @@ async def list_agents(
 ):
     """List all containers with filtering and pagination"""
     try:
-        all_agents = []
-
-        for name in lxc.list_containers():
-            container = lxc.Container(name)
-            agent_info = get_agent_info(container)
-
-            # Apply filters
-            if siem_type and agent_info.get("siem_type") != siem_type:
-                continue
-            if status and agent_info.get("lifecycle_status") != status:
-                continue
-            if agent_group and agent_info.get("agent_group") != agent_group:
-                continue
-
-            all_agents.append(agent_info)
+        # Blocking (LXC calls, one lxc-attach per running container): in a thread so the rest
+        # of the API stays responsive, and container by container in parallel
+        infos = await asyncio.to_thread(_all_agent_infos)
+        all_agents = [
+            info for info in infos
+            if (not siem_type or info.get("siem_type") == siem_type)
+            and (not status or info.get("lifecycle_status") == status)
+            and (not agent_group or info.get("agent_group") == agent_group)
+        ]
 
         # Pagination
         total = len(all_agents)

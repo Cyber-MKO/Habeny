@@ -125,6 +125,7 @@ async def generate_report(report_request: ReportGenerateRequest):
             generate_report_pdf(report_data, agents_by_status, pdf_file)
             report_files[report_id]["pdf"] = str(pdf_file)
             download_format = "pdf"
+        report_files.save(report_id)
 
         log_activity("report_generated", {"report_id": report_id})
 

@@ -16,6 +16,7 @@ from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
 from app.db import create_session, delete_session, get_session_user, touch_session
+from app.logging_config import set_request_user
 from app.services import lifecycle
 
 # scrypt parameters (~16 MiB memory per hash)
@@ -110,6 +111,8 @@ def _same_origin(conn: HTTPConnection) -> bool:
 async def require_user(conn: HTTPConnection) -> dict[str, Any]:
     """Dependency for every protected HTTP route and WebSocket."""
     user = session_user(conn)
+    if user is not None:
+        set_request_user(user["username"])  # for this request's log lines
     if conn.scope["type"] == "websocket":
         if user is None or not _same_origin(conn):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Not authenticated")

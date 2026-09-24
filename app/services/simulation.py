@@ -114,6 +114,8 @@ async def run_simulation(simulation_id: str, profile_id: str, agents: List[str],
         events_generated = 0
 
         while time.time() < end_time:
+            if simulations_db.get(simulation_id, {}).get("status") != "running":
+                break  # stopped by a user, or interrupted by a restart
             # Generate events on containers
             for agent in agents:
                 try:
@@ -128,9 +130,10 @@ async def run_simulation(simulation_id: str, profile_id: str, agents: List[str],
             if simulation_id in simulations_db:
                 simulations_db[simulation_id]["events_generated"] = events_generated
 
-        # Mark as completed
+        # Mark as completed (unless it was stopped or interrupted)
         if simulation_id in simulations_db:
-            simulations_db[simulation_id]["status"] = "completed"
+            if simulations_db[simulation_id].get("status") == "running":
+                simulations_db[simulation_id]["status"] = "completed"
             simulations_db[simulation_id]["completed_at"] = utc_now().isoformat()
             simulations_db[simulation_id]["events_generated"] = events_generated
 

@@ -243,6 +243,7 @@ async def stop_simulation(simulation_id: str):
 
         simulation["status"] = "stopped"
         simulation["stopped_at"] = utc_now().isoformat()
+        simulations_db.save(simulation_id)
 
         log_activity("simulation_stopped", {"simulation_id": simulation_id})
 

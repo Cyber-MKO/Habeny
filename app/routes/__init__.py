@@ -18,6 +18,7 @@ def register_routes(app: FastAPI) -> None:
         activity,
         agents,
         auth,
+        backups,
         benchmarks,
         configs,
         console,
@@ -54,5 +55,6 @@ def register_routes(app: FastAPI) -> None:
         app.include_router(module.router, dependencies=[Depends(require_access)])
     # Account self-service (password, sessions, 2FA) for every role; admin routes check themselves
     app.include_router(users.router, dependencies=[Depends(require_user)])
+    app.include_router(backups.router)  # admins only (checked by the router)
     app.include_router(auth.router)
     static.register(app)

@@ -6,6 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.config import LOGS_DIR
+from app.logging_config import request_context
 from app.models import utc_now
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,11 @@ def log_activity(action: str, details: Dict[str, Any], status: str = "success"):
         "status": status,
         "details": details
     }
+    ctx = request_context.get()
+    if ctx:  # which request (and who) did it: search the server log for the request ID
+        activity["request_id"] = ctx["id"]
+        if ctx.get("user"):
+            activity["user"] = ctx["user"]
     # Also log to file
     log_file = LOGS_DIR / f"activity_{utc_now().strftime('%Y%m%d')}.json"
     with open(log_file, 'a') as f:

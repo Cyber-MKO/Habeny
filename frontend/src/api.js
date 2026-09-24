@@ -18,7 +18,11 @@ async function request(path, opts = {}) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || err.error || res.statusText);
+    let message = err.detail || err.error || res.statusText;
+    // Server errors: give the ID an admin can find in the logs
+    const requestId = res.headers.get("X-Request-ID");
+    if (res.status >= 500 && requestId && !message.includes(requestId)) message += ` (request ID ${requestId})`;
+    throw new Error(message);
   }
   return res.json();
 }
@@ -43,6 +47,9 @@ export const api = {
   enableTwoFactor: (body) => request("/users/me/2fa/enable", { method: "POST", body }),
   disableTwoFactor: (body) => request("/users/me/2fa/disable", { method: "POST", body }),
   newRecoveryCodes: (body) => request("/users/me/2fa/recovery-codes", { method: "POST", body }),
+  getBackups: () => request("/system/backups"),
+  createBackup: () => request("/system/backups", { method: "POST" }),
+  backupDownloadUrl: (name) => `${BASE}/system/backups/${encodeURIComponent(name)}`,
   resetUserTwoFactor: (id) => request(`/users/${id}/2fa`, { method: "DELETE" }),
   endUserSessions: (id) => request(`/users/${id}/sessions/revoke`, { method: "POST" }),
   getUsers: () => request("/users"),
