@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, JsonBlock, Pill, Spinner } from "../components/UI";
+import { PageHeader, Pill, Spinner } from "../components/UI";
+import { Details } from "../components/Details";
 
 const DEFAULTS = {
   count: 2, siem_type: "none", siem_ip: "", siem_version: "4.14.2", siem_auth_key: "",
@@ -212,19 +213,19 @@ export default function Deploy() {
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="form-grid">
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label>Manager Profile</label>
-              <select className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
+              <label htmlFor="deploy-manager-profile">Manager Profile</label>
+              <select id="deploy-manager-profile" className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
                 <option value="">— Manual configuration —</option>
                 {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type} — {m.siem_ip || "no IP"})</option>)}
               </select>
             </div>
             <div className="field">
-              <label>Container Count</label>
-              <input className="input" type="number" min={1} max={1000} value={form.count} onChange={(e) => set("count", e.target.value)} />
+              <label htmlFor="deploy-container-count">Container Count</label>
+              <input id="deploy-container-count" className="input" type="number" min={1} max={1000} value={form.count} onChange={(e) => set("count", e.target.value)} />
             </div>
             <div className="field">
-              <label>SIEM Type</label>
-              <select className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
+              <label htmlFor="deploy-siem-type">SIEM Type</label>
+              <select id="deploy-siem-type" className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
                 <option value="none">None (bare container)</option>
                 <option value="wazuh">Wazuh</option>
                 <option value="ossec">OSSEC</option>
@@ -235,20 +236,20 @@ export default function Deploy() {
             </div>
             {!isBare && (
               <div className="field">
-                <label>SIEM Manager IP</label>
-                <input className="input" placeholder="192.168.1.100" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} required />
+                <label htmlFor="deploy-siem-manager-ip">SIEM Manager IP</label>
+                <input id="deploy-siem-manager-ip" className="input" placeholder="192.168.1.100" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} required />
               </div>
             )}
             {!isBare && !needsAuthKey && (
               <div className="field">
-                <label>SIEM Version</label>
-                <input className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} />
+                <label htmlFor="deploy-siem-version">SIEM Version</label>
+                <input id="deploy-siem-version" className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} />
               </div>
             )}
             {isElastic && (
               <div className="field">
-                <label>Agent Version</label>
-                <input className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} />
+                <label htmlFor="deploy-agent-version">Agent Version</label>
+                <input id="deploy-agent-version" className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} />
               </div>
             )}
             {needsAuthKey && (
@@ -263,36 +264,36 @@ export default function Deploy() {
               </div>
             )}
             <div className="field">
-              <label>OS Type</label>
-              <select className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
+              <label htmlFor="deploy-os-type">OS Type</label>
+              <select id="deploy-os-type" className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
                 <option value="ubuntu_22_04">Ubuntu 22.04</option>
                 <option value="ubuntu_20_04">Ubuntu 20.04</option>
                 <option value="debian_11">Debian 11</option>
               </select>
             </div>
             <div className="field">
-              <label>Container Group</label>
-              <input className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} />
+              <label htmlFor="deploy-container-group">Container Group</label>
+              <input id="deploy-container-group" className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} />
             </div>
             <div className="field">
-              <label>Base Name</label>
-              <input className="input" value={form.agent_base_name} onChange={(e) => set("agent_base_name", e.target.value)} />
+              <label htmlFor="deploy-base-name">Base Name</label>
+              <input id="deploy-base-name" className="input" value={form.agent_base_name} onChange={(e) => set("agent_base_name", e.target.value)} />
             </div>
             <div className="field">
-              <label>Memory Limit</label>
-              <input className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} />
+              <label htmlFor="deploy-memory-limit">Memory Limit</label>
+              <input id="deploy-memory-limit" className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} />
             </div>
             <div className="field">
-              <label>CPU Shares</label>
-              <input className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} />
+              <label htmlFor="deploy-cpu-shares">CPU Shares</label>
+              <input id="deploy-cpu-shares" className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} />
             </div>
             <div className="field">
-              <label>Config Template ID</label>
-              <input className="input" placeholder="optional template id" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} />
+              <label htmlFor="deploy-config-template-id">Config Template ID</label>
+              <input id="deploy-config-template-id" className="input" placeholder="optional template id" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} />
             </div>
             <div className="field">
-              <label>Parallel Mode</label>
-              <select className="select" value={form.parallel_mode} onChange={(e) => set("parallel_mode", e.target.value)}>
+              <label htmlFor="deploy-parallel-mode">Parallel Mode</label>
+              <select id="deploy-parallel-mode" className="select" value={form.parallel_mode} onChange={(e) => set("parallel_mode", e.target.value)}>
                 <option value="multiprocessing">Multiprocessing</option>
                 <option value="threading">Threading</option>
                 <option value="sequential">Sequential</option>
@@ -313,8 +314,11 @@ export default function Deploy() {
 
       {result && (
         <details className="section" style={{ marginTop: 20 }}>
-          <summary className="section-title" style={{ cursor: "pointer" }}>Raw deployment result</summary>
-          <JsonBlock data={result} />
+          <summary className="section-title" style={{ cursor: "pointer" }}>Full deployment result</summary>
+          <div className="card">
+            {result.message && <p>{result.message}</p>}
+            <Details data={result.data || result} />
+          </div>
         </details>
       )}
     </>

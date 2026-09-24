@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Pill, Spinner } from "../components/UI";
+import { Details } from "../components/Details";
 
 const SIM_COLUMNS = [
   { key: "simulation_id", label: "ID", render: (r) => (r.simulation_id || "").slice(0, 8) + "…" },
@@ -110,10 +111,10 @@ export default function Simulations() {
   const SelectorFields = ({ f, setF }) => (
     <div className="form-grid" style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
       <div className="section-title" style={{ gridColumn: "1/-1", margin: 0 }}>Agent Selector</div>
-      <div className="field"><label>Count</label><input className="input" type="number" value={f.sel_count} onChange={(e) => setF((p) => ({ ...p, sel_count: e.target.value }))} /></div>
-      <div className="field"><label>SIEM</label><select className="select" value={f.sel_siem} onChange={(e) => setF((p) => ({ ...p, sel_siem: e.target.value }))}><option value="">Any</option><option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="ossim">OSSIM</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option></select></div>
-      <div className="field"><label>Group</label><input className="input" value={f.sel_group} onChange={(e) => setF((p) => ({ ...p, sel_group: e.target.value }))} /></div>
-      <div className="field"><label>Agent IDs (comma-separated)</label><input className="input" value={f.sel_ids || ""} onChange={(e) => setF((p) => ({ ...p, sel_ids: e.target.value }))} /></div>
+      <div className="field"><label htmlFor="simulations-count">Count</label><input id="simulations-count" className="input" type="number" value={f.sel_count} onChange={(e) => setF((p) => ({ ...p, sel_count: e.target.value }))} /></div>
+      <div className="field"><label htmlFor="simulations-siem">SIEM</label><select id="simulations-siem" className="select" value={f.sel_siem} onChange={(e) => setF((p) => ({ ...p, sel_siem: e.target.value }))}><option value="">Any</option><option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="ossim">OSSIM</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option></select></div>
+      <div className="field"><label htmlFor="simulations-group">Group</label><input id="simulations-group" className="input" value={f.sel_group} onChange={(e) => setF((p) => ({ ...p, sel_group: e.target.value }))} /></div>
+      <div className="field"><label htmlFor="simulations-agent-ids-comma-separated">Agent IDs (comma-separated)</label><input id="simulations-agent-ids-comma-separated" className="input" value={f.sel_ids || ""} onChange={(e) => setF((p) => ({ ...p, sel_ids: e.target.value }))} /></div>
     </div>
   );
 
@@ -135,12 +136,12 @@ export default function Simulations() {
         <form onSubmit={handleAttack} className="card" style={{ marginBottom: 20 }}>
           <div className="section-title">Attack Simulation</div>
           <div className="form-grid">
-            <div className="field"><label>Profile</label><select className="select" value={form.profile_id} onChange={(e) => setForm((p) => ({ ...p, profile_id: e.target.value }))}>{PROFILES.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
-            <div className="field"><label>Duration (s)</label><input className="input" type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))} /></div>
-            <div className="field"><label>EPS Target</label><input className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
-            <div className="field"><label>Intensity</label><select className="select" value={form.intensity} onChange={(e) => setForm((p) => ({ ...p, intensity: e.target.value }))}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+            <div className="field"><label htmlFor="simulations-profile">Profile</label><select id="simulations-profile" className="select" value={form.profile_id} onChange={(e) => setForm((p) => ({ ...p, profile_id: e.target.value }))}>{PROFILES.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div className="field"><label htmlFor="simulations-duration-s">Duration (s)</label><input id="simulations-duration-s" className="input" type="number" value={form.duration} onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-eps-target">EPS Target</label><input id="simulations-eps-target" className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-intensity">Intensity</label><select id="simulations-intensity" className="select" value={form.intensity} onChange={(e) => setForm((p) => ({ ...p, intensity: e.target.value }))}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
             <div className="field"><label className="checkbox-label"><input type="checkbox" checked={form.burst_mode} onChange={(e) => setForm((p) => ({ ...p, burst_mode: e.target.checked }))} /> Burst mode</label></div>
-            <div className="field"><label>Custom Parameters (JSON)</label><input className="input" value={form.custom_parameters} onChange={(e) => setForm((p) => ({ ...p, custom_parameters: e.target.value }))} placeholder='{}' /></div>
+            <div className="field"><label htmlFor="simulations-custom-parameters-json">Custom Parameters (JSON)</label><input id="simulations-custom-parameters-json" className="input" value={form.custom_parameters} onChange={(e) => setForm((p) => ({ ...p, custom_parameters: e.target.value }))} placeholder='{}' /></div>
           </div>
           <SelectorFields f={form} setF={setForm} />
           <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>Start Simulation</button>
@@ -151,15 +152,15 @@ export default function Simulations() {
         <form onSubmit={handleCustom} className="card" style={{ marginBottom: 20 }}>
           <div className="section-title">Custom EPS Log Simulation</div>
           <div className="form-grid">
-            <div className="field"><label>EPS</label><input className="input" type="number" value={customForm.eps} onChange={(e) => setCustomForm((p) => ({ ...p, eps: e.target.value }))} /></div>
-            <div className="field"><label>Duration (s)</label><input className="input" type="number" value={customForm.duration} onChange={(e) => setCustomForm((p) => ({ ...p, duration: e.target.value }))} /></div>
-            <div className="field"><label>File Path</label><input className="input" value={customForm.file_path} onChange={(e) => setCustomForm((p) => ({ ...p, file_path: e.target.value }))} /></div>
-            <div className="field"><label>Message</label><input className="input" value={customForm.message} onChange={(e) => setCustomForm((p) => ({ ...p, message: e.target.value }))} /></div>
-            <div className="field"><label>Source IP</label><input className="input" value={customForm.src_ip} onChange={(e) => setCustomForm((p) => ({ ...p, src_ip: e.target.value }))} /></div>
-            <div className="field"><label>Dest IP</label><input className="input" value={customForm.dest_ip} onChange={(e) => setCustomForm((p) => ({ ...p, dest_ip: e.target.value }))} /></div>
-            <div className="field"><label>Seq Start</label><input className="input" type="number" value={customForm.seq_start} onChange={(e) => setCustomForm((p) => ({ ...p, seq_start: e.target.value }))} /></div>
-            <div className="field"><label>Start Time (optional)</label><input className="input" type="datetime-local" value={customForm.start_time} onChange={(e) => setCustomForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
-            <div className="field"><label>Extra Fields (JSON)</label><input className="input" value={customForm.extra_fields} onChange={(e) => setCustomForm((p) => ({ ...p, extra_fields: e.target.value }))} placeholder='{"severity":"info"}' /></div>
+            <div className="field"><label htmlFor="simulations-eps">EPS</label><input id="simulations-eps" className="input" type="number" value={customForm.eps} onChange={(e) => setCustomForm((p) => ({ ...p, eps: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-duration-s-2">Duration (s)</label><input id="simulations-duration-s-2" className="input" type="number" value={customForm.duration} onChange={(e) => setCustomForm((p) => ({ ...p, duration: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-file-path">File Path</label><input id="simulations-file-path" className="input" value={customForm.file_path} onChange={(e) => setCustomForm((p) => ({ ...p, file_path: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-message">Message</label><input id="simulations-message" className="input" value={customForm.message} onChange={(e) => setCustomForm((p) => ({ ...p, message: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-source-ip">Source IP</label><input id="simulations-source-ip" className="input" value={customForm.src_ip} onChange={(e) => setCustomForm((p) => ({ ...p, src_ip: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-dest-ip">Dest IP</label><input id="simulations-dest-ip" className="input" value={customForm.dest_ip} onChange={(e) => setCustomForm((p) => ({ ...p, dest_ip: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-seq-start">Seq Start</label><input id="simulations-seq-start" className="input" type="number" value={customForm.seq_start} onChange={(e) => setCustomForm((p) => ({ ...p, seq_start: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-start-time-optional">Start Time (optional)</label><input id="simulations-start-time-optional" className="input" type="datetime-local" value={customForm.start_time} onChange={(e) => setCustomForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-extra-fields-json">Extra Fields (JSON)</label><input id="simulations-extra-fields-json" className="input" value={customForm.extra_fields} onChange={(e) => setCustomForm((p) => ({ ...p, extra_fields: e.target.value }))} placeholder='{"severity":"info"}' /></div>
           </div>
           <SelectorFields f={customForm} setF={setCustomForm} />
           <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>Start Custom Simulation</button>
@@ -171,8 +172,8 @@ export default function Simulations() {
           <div className="section-title">Syslog Simulation</div>
           <div className="form-grid">
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label>Use Syslog Config Profile</label>
-              <select className="select" onChange={(e) => {
+              <label htmlFor="simulations-use-syslog-config-profile">Use Syslog Config Profile</label>
+              <select id="simulations-use-syslog-config-profile" className="select" onChange={(e) => {
                 const cfg = syslogConfigs.find((x) => x.config_id === e.target.value);
                 if (cfg) setSysForm((p) => ({ ...p, target_ip: cfg.target_ip, target_port: cfg.target_port || 514, protocol: cfg.protocol || "tcp" }));
                 if (!cfg) { const m = managers.find((x) => x.manager_id === e.target.value); if (m?.siem_ip) setSysForm((p) => ({ ...p, target_ip: m.siem_ip })); }
@@ -182,15 +183,15 @@ export default function Simulations() {
                 {managers.filter((m) => m.siem_ip).map((m) => <option key={m.manager_id} value={m.manager_id}>[Manager] {m.name} ({m.siem_ip})</option>)}
               </select>
             </div>
-            <div className="field"><label>Target IP</label><input className="input" value={sysForm.target_ip} onChange={(e) => setSysForm((p) => ({ ...p, target_ip: e.target.value }))} required /></div>
-            <div className="field"><label>Port</label><input className="input" type="number" value={sysForm.target_port} onChange={(e) => setSysForm((p) => ({ ...p, target_port: e.target.value }))} /></div>
-            <div className="field"><label>Protocol</label><select className="select" value={sysForm.protocol} onChange={(e) => setSysForm((p) => ({ ...p, protocol: e.target.value }))}><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
-            <div className="field"><label>EPS</label><input className="input" type="number" value={sysForm.eps} onChange={(e) => setSysForm((p) => ({ ...p, eps: e.target.value }))} /></div>
-            <div className="field"><label>Duration (s)</label><input className="input" type="number" value={sysForm.duration} onChange={(e) => setSysForm((p) => ({ ...p, duration: e.target.value }))} /></div>
-            <div className="field"><label>Devices</label><input className="input" type="number" value={sysForm.device_count} onChange={(e) => setSysForm((p) => ({ ...p, device_count: e.target.value }))} /></div>
-            <div className="field"><label>Device Prefix</label><input className="input" value={sysForm.device_name_prefix} onChange={(e) => setSysForm((p) => ({ ...p, device_name_prefix: e.target.value }))} /></div>
-            <div className="field"><label>Device Type</label><select className="select" value={sysForm.device_type} onChange={(e) => setSysForm((p) => ({ ...p, device_type: e.target.value }))}><option value="mixed">Mixed</option><option value="router">Router</option><option value="switch">Switch</option><option value="firewall">Firewall</option><option value="ids">IDS</option></select></div>
-            <div className="field"><label>Facility</label><input className="input" type="number" min={0} max={23} value={sysForm.facility} onChange={(e) => setSysForm((p) => ({ ...p, facility: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-target-ip">Target IP</label><input id="simulations-target-ip" className="input" value={sysForm.target_ip} onChange={(e) => setSysForm((p) => ({ ...p, target_ip: e.target.value }))} required /></div>
+            <div className="field"><label htmlFor="simulations-port">Port</label><input id="simulations-port" className="input" type="number" value={sysForm.target_port} onChange={(e) => setSysForm((p) => ({ ...p, target_port: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-protocol">Protocol</label><select id="simulations-protocol" className="select" value={sysForm.protocol} onChange={(e) => setSysForm((p) => ({ ...p, protocol: e.target.value }))}><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
+            <div className="field"><label htmlFor="simulations-eps-2">EPS</label><input id="simulations-eps-2" className="input" type="number" value={sysForm.eps} onChange={(e) => setSysForm((p) => ({ ...p, eps: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-duration-s-3">Duration (s)</label><input id="simulations-duration-s-3" className="input" type="number" value={sysForm.duration} onChange={(e) => setSysForm((p) => ({ ...p, duration: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-devices">Devices</label><input id="simulations-devices" className="input" type="number" value={sysForm.device_count} onChange={(e) => setSysForm((p) => ({ ...p, device_count: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-device-prefix">Device Prefix</label><input id="simulations-device-prefix" className="input" value={sysForm.device_name_prefix} onChange={(e) => setSysForm((p) => ({ ...p, device_name_prefix: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="simulations-device-type">Device Type</label><select id="simulations-device-type" className="select" value={sysForm.device_type} onChange={(e) => setSysForm((p) => ({ ...p, device_type: e.target.value }))}><option value="mixed">Mixed</option><option value="router">Router</option><option value="switch">Switch</option><option value="firewall">Firewall</option><option value="ids">IDS</option></select></div>
+            <div className="field"><label htmlFor="simulations-facility">Facility</label><input id="simulations-facility" className="input" type="number" min={0} max={23} value={sysForm.facility} onChange={(e) => setSysForm((p) => ({ ...p, facility: e.target.value }))} /></div>
           </div>
           <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>Start Syslog</button>
         </form>
@@ -201,7 +202,18 @@ export default function Simulations() {
         {loading ? <Spinner /> : <DataTable columns={cols} rows={sims} emptyMsg="No simulations" />}
       </div>
 
-      {result && <div style={{ marginTop: 16 }}><JsonBlock data={result} /></div>}
+      {result && (
+        <div className="card result-card" role="status">
+          <div className="section-title">{result.message}</div>
+          {result.error && <div className="auth-error">{result.error}</div>}
+          {result.data && (
+            <Details data={{
+              ...result.data,
+              target_agents: Array.isArray(result.data.target_agents) ? `${result.data.target_agents.length} (${result.data.target_agents.slice(0, 5).join(", ")}${result.data.target_agents.length > 5 ? ", …" : ""})` : result.data.target_agents,
+            }} hide={["custom_parameters"]} />
+          )}
+        </div>
+      )}
     </>
   );
 }

@@ -1,7 +1,31 @@
 import { useState } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, JsonBlock, Spinner } from "../components/UI";
+import { PageHeader, Spinner } from "../components/UI";
+import { Details, RecordTable } from "../components/Details";
+
+// A generated report, readable: summary, findings and metrics
+function ReportView({ report, fallback }) {
+  if (!report) return <Details data={fallback} />;
+  const { summary = {}, findings = [], metrics = {}, time_range: range } = report;
+  return (
+    <div className="report-view">
+      <p className="account-help">
+        {range && <>From <time dateTime={range.start}>{new Date(range.start).toLocaleString()}</time> to{" "}
+          <time dateTime={range.end}>{new Date(range.end).toLocaleString()}</time>. </>}
+        Generated <time dateTime={report.generated_at}>{new Date(report.generated_at).toLocaleString()}</time>.
+      </p>
+      <h4 className="subsection-title">Summary</h4>
+      <Details data={{ ...summary, simulations_in_range: (summary.simulations_in_range || []).length }} />
+      <h4 className="subsection-title">Findings</h4>
+      {findings.length
+        ? (findings.every((f) => typeof f === "object") ? <RecordTable rows={findings} /> : <ul className="plain-list">{findings.map((f, i) => <li key={i}>{String(f)}</li>)}</ul>)
+        : <p className="muted">No findings.</p>}
+      <h4 className="subsection-title">Metrics</h4>
+      <Details data={metrics} />
+    </div>
+  );
+}
 
 export default function Reports() {
   const { toast } = useStore();
@@ -51,10 +75,10 @@ export default function Reports() {
       <form onSubmit={handleGenerate} className="card" style={{ marginBottom: 16 }}>
         <div className="section-title">Generate Report</div>
         <div className="form-grid">
-          <div className="field"><label>Start Time</label><input className="input" type="datetime-local" value={form.start_time} onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
-          <div className="field"><label>End Time</label><input className="input" type="datetime-local" value={form.end_time} onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))} /></div>
-          <div className="field"><label>Format</label><select className="select" value={form.format} onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}><option value="json">JSON</option><option value="csv">CSV</option><option value="pdf">PDF</option></select></div>
-          <div className="field"><label>Metrics (comma-separated)</label><input className="input" value={form.metrics} onChange={(e) => setForm((p) => ({ ...p, metrics: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="reports-start-time">Start Time</label><input id="reports-start-time" className="input" type="datetime-local" value={form.start_time} onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="reports-end-time">End Time</label><input id="reports-end-time" className="input" type="datetime-local" value={form.end_time} onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="reports-format">Format</label><select id="reports-format" className="select" value={form.format} onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}><option value="json">JSON</option><option value="csv">CSV</option><option value="pdf">PDF</option></select></div>
+          <div className="field"><label htmlFor="reports-metrics-comma-separated">Metrics (comma-separated)</label><input id="reports-metrics-comma-separated" className="input" value={form.metrics} onChange={(e) => setForm((p) => ({ ...p, metrics: e.target.value }))} /></div>
           <div className="field"><label className="checkbox-label"><input type="checkbox" checked={form.include_findings} onChange={(e) => setForm((p) => ({ ...p, include_findings: e.target.checked }))} /> Include findings</label></div>
           <div className="field" style={{ justifyContent: "flex-end" }}><button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Generating…" : "Generate"}</button></div>
         </div>
@@ -99,7 +123,7 @@ export default function Reports() {
             <span>Result</span>
             {reportId && <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(reportId, form.format)} target="_blank" rel="noopener noreferrer">Download {form.format.toUpperCase()}</a>}
           </div>
-          <JsonBlock data={result.data?.report || result} />
+          <ReportView report={result.data?.report} fallback={result} />
         </div>
       )}
     </>

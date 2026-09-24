@@ -112,7 +112,7 @@ export default function SystemInfo() {
       {info.templates?.length > 0 && (
         <div className="section">
           <div className="section-title">LXC Templates</div>
-          <div className="card"><pre className="json-block">{(info.templates||[]).join("\n")}</pre></div>
+          <div className="card"><ul className="plain-list">{(info.templates || []).map((t) => <li key={t}><code>{t}</code></li>)}</ul></div>
         </div>
       )}
     </>

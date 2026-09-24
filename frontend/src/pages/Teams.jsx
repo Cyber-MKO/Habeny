@@ -199,11 +199,11 @@ export default function Teams() {
         see containers that belong to no team. Admins see everything. Profiles, groups and templates are shared.
       </p>
       <section className="section" aria-labelledby="teams-list">
-        <h3 className="section-title" id="teams-list">Teams</h3>
+        <h2 className="section-title" id="teams-list">Teams</h2>
         <div className="card">{data === null ? <Spinner /> : <DataTable columns={columns} rows={teams} emptyMsg="No teams yet: everyone shares all containers." />}</div>
       </section>
       <section className="section" aria-labelledby="teams-members">
-        <h3 className="section-title" id="teams-members">Members and personal limits</h3>
+        <h2 className="section-title" id="teams-members">Members and personal limits</h2>
         <div className="card table-wrap">
           <table>
             <thead><tr><th scope="col">User</th><th scope="col">Team</th><th scope="col">Personal limit</th><th scope="col">Containers</th><th scope="col"><span className="sr-only">Save</span></th></tr></thead>
@@ -216,7 +216,7 @@ export default function Teams() {
         </div>
       </section>
       <section className="section" aria-labelledby="teams-move">
-        <h3 className="section-title" id="teams-move">Move containers between teams</h3>
+        <h2 className="section-title" id="teams-move">Move containers between teams</h2>
         {data && <MoveContainers teams={teams} onMoved={load} />}
       </section>
       {editing && <TeamModal team={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={load} />}

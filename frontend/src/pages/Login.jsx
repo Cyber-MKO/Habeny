@@ -114,14 +114,14 @@ export default function Login() {
 
   if (mfaToken) {
     return (
-      <div className="auth-page">
+      <main className="auth-page">
         <SecondFactor mfaToken={mfaToken} onCancel={(message) => { setMfaToken(null); setError(message); }} />
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="auth-page">
+    <main className="auth-page">
       <form className="auth-card" onSubmit={handleSubmit} noValidate>
         <div className="auth-brand">
           <div className="brand-wordmark">
@@ -208,6 +208,6 @@ export default function Login() {
           </>
         )}
       </form>
-    </div>
+    </main>
   );
 }

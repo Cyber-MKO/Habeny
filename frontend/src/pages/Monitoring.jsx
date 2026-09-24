@@ -51,7 +51,7 @@ export default function Monitoring() {
       </PageHeader>
 
       <section className="section" aria-labelledby="alerts-title">
-        <h3 className="section-title" id="alerts-title">Active alerts</h3>
+        <h2 className="section-title" id="alerts-title">Active alerts</h2>
         <div className="card">
           {alerts === null ? <Spinner /> : !alerts.length ? <Empty message="No active alerts. Disk space, LXC, backups and deployments are fine." /> : (
             <ul className="alert-list">
@@ -77,7 +77,7 @@ export default function Monitoring() {
       </section>
 
       <section className="section" aria-labelledby="endpoints-title">
-        <h3 className="section-title" id="endpoints-title">Endpoints for monitoring systems</h3>
+        <h2 className="section-title" id="endpoints-title">Endpoints for monitoring systems</h2>
         <div className="card">
           <dl className="details">
             <div className="details-row"><dt><code>GET /api/healthz</code></dt><dd>Liveness: 200 while the server answers. No sign-in.</dd></div>
@@ -88,14 +88,14 @@ export default function Monitoring() {
       </section>
 
       <section className="section" aria-labelledby="prom-title">
-        <h3 className="section-title" id="prom-title">Prometheus</h3>
+        <h2 className="section-title" id="prom-title">Prometheus</h2>
         <div className="card">
           <p className="account-help">
             Create a viewer <NavLink to="/account">API token</NavLink>, save it in <code>/etc/prometheus/habeny.token</code>, then scrape:
           </p>
-          <pre className="code-sample">{PROMETHEUS(origin)}</pre>
+          <pre className="code-sample" tabIndex={0} aria-label="Prometheus scrape configuration">{PROMETHEUS(origin)}</pre>
           <p className="account-help">Example alerting rules:</p>
-          <pre className="code-sample">{RULES}</pre>
+          <pre className="code-sample" tabIndex={0} aria-label="Example alerting rules">{RULES}</pre>
         </div>
       </section>
     </>

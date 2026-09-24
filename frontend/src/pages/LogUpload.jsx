@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Pill, Spinner } from "../components/UI";
+import { Details } from "../components/Details";
 
 const LOG_TYPES = ["auth", "web", "application", "system", "security", "custom"];
 
@@ -80,23 +81,23 @@ export default function LogUpload() {
       <form onSubmit={handleUpload} className="card" style={{ marginBottom: 20 }}>
         <div className="form-grid">
           <div className="field">
-            <label>Mode</label>
-            <select className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
+            <label htmlFor="log-upload-mode">Mode</label>
+            <select id="log-upload-mode" className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
               <option value="once">Send once</option>
               <option value="schedule">Send intermittently</option>
             </select>
           </div>
           <div className="field">
-            <label>Scope</label>
-            <select className="select" value={scope} onChange={(e) => setScope(e.target.value)}>
+            <label htmlFor="log-upload-scope">Scope</label>
+            <select id="log-upload-scope" className="select" value={scope} onChange={(e) => setScope(e.target.value)}>
               <option value="container">Container</option>
               <option value="group">Group</option>
             </select>
           </div>
           {scope === "container" ? (
             <div className="field">
-              <label>Container</label>
-              <select className="select" value={form.agent_id} onChange={(e) => set("agent_id", e.target.value)} required>
+              <label htmlFor="log-upload-container">Container</label>
+              <select id="log-upload-container" className="select" value={form.agent_id} onChange={(e) => set("agent_id", e.target.value)} required>
                 <option value="">— select —</option>
                 {agents.map((a) => <option key={a.agent_name} value={a.agent_name}>{a.agent_name}{a.siem_type ? ` (${a.siem_type})` : ""}</option>)}
               </select>
@@ -104,20 +105,20 @@ export default function LogUpload() {
             </div>
           ) : (
             <div className="field">
-              <label>Group</label>
-              <select className="select" value={form.group} onChange={(e) => set("group", e.target.value)} required>
+              <label htmlFor="log-upload-group">Group</label>
+              <select id="log-upload-group" className="select" value={form.group} onChange={(e) => set("group", e.target.value)} required>
                 <option value="">— select —</option>
                 {groups.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
               </select>
             </div>
           )}
           <div className="field">
-            <label>Destination Path</label>
-            <input className="input" value={form.destination_path} onChange={(e) => set("destination_path", e.target.value)} required />
+            <label htmlFor="log-upload-destination-path">Destination Path</label>
+            <input id="log-upload-destination-path" className="input" value={form.destination_path} onChange={(e) => set("destination_path", e.target.value)} required />
           </div>
           <div className="field">
-            <label>Log Type</label>
-            <select className="select" value={form.log_type} onChange={(e) => set("log_type", e.target.value)}>
+            <label htmlFor="log-upload-log-type">Log Type</label>
+            <select id="log-upload-log-type" className="select" value={form.log_type} onChange={(e) => set("log_type", e.target.value)}>
               {LOG_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -129,13 +130,13 @@ export default function LogUpload() {
         {mode === "schedule" && (
           <div className="form-grid" style={{ marginTop: 12 }}>
             <div className="field">
-              <label>Interval (seconds)</label>
-              <input className="input" type="number" min={5} value={form.interval_seconds} onChange={(e) => set("interval_seconds", e.target.value)} />
+              <label htmlFor="log-upload-interval-seconds">Interval (seconds)</label>
+              <input id="log-upload-interval-seconds" className="input" type="number" min={5} value={form.interval_seconds} onChange={(e) => set("interval_seconds", e.target.value)} />
             </div>
             {!form.indefinite && (
               <div className="field">
-                <label>Duration (seconds)</label>
-                <input className="input" type="number" min={10} value={form.duration_seconds} onChange={(e) => set("duration_seconds", e.target.value)} />
+                <label htmlFor="log-upload-duration-seconds">Duration (seconds)</label>
+                <input id="log-upload-duration-seconds" className="input" type="number" min={10} value={form.duration_seconds} onChange={(e) => set("duration_seconds", e.target.value)} />
               </div>
             )}
             <div className="field">
@@ -145,8 +146,8 @@ export default function LogUpload() {
         )}
 
         <div className="field" style={{ marginTop: 12 }}>
-          <label>Log Content</label>
-          <textarea className="textarea" value={form.content} onChange={(e) => set("content", e.target.value)} required />
+          <label htmlFor="log-upload-log-content">Log Content</label>
+          <textarea id="log-upload-log-content" className="textarea" value={form.content} onChange={(e) => set("content", e.target.value)} required />
         </div>
         <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>{mode === "once" ? "Upload" : "Start Schedule"}</button>
       </form>
@@ -169,7 +170,13 @@ export default function LogUpload() {
         </div>
       )}
 
-      {result && <div style={{ marginTop: 16 }}><JsonBlock data={result} /></div>}
+      {result && (
+        <div className="card result-card" role="status">
+          <div className="section-title">{result.message}</div>
+          {result.error && <div className="auth-error">{result.error}</div>}
+          {result.data && <Details data={result.data} hide={["request"]} />}
+        </div>
+      )}
     </>
   );
 }

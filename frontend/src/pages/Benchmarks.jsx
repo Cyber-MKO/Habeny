@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { useStore } from "../store";
-import { PageHeader, StatCard, Spinner, JsonBlock } from "../components/UI";
+import { PageHeader, StatCard, Spinner } from "../components/UI";
+import { Details } from "../components/Details";
 
 function MiniChart({ data, label, color = "var(--accent)", height = 60 }) {
   if (!data || data.length < 2) return <div className="empty" style={{ padding: 8 }}><p>Collecting data...</p></div>;
@@ -131,8 +132,8 @@ export default function Benchmarks() {
 
       {benchmarks && (
         <div className="section" style={{ marginTop: 20 }}>
-          <div className="section-title">Raw Benchmark Data</div>
-          <JsonBlock data={benchmarks} />
+          <div className="section-title">Benchmark data</div>
+          <div className="card"><Details data={benchmarks} /></div>
         </div>
       )}
     </>

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 
 export function StatCard({ label, value, meta, color }) {
@@ -28,7 +28,7 @@ export function PageHeader({ title, subtitle, children }) {
   return (
     <div className="page-header">
       <div>
-        <h2>{title}</h2>
+        <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </div>
       {children && <div className="btn-group">{children}</div>}
@@ -36,18 +36,31 @@ export function PageHeader({ title, subtitle, children }) {
   );
 }
 
-export function JsonBlock({ data }) {
-  const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-  return <pre className="json-block">{text}</pre>;
+// A container that scrolls sideways on narrow screens; while it does, it's focusable so
+// keyboard users can scroll it too
+export function ScrollArea({ className = "table-wrap", label, children }) {
+  const ref = useRef(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const check = () => setScrolls(Boolean(ref.current && ref.current.scrollWidth > ref.current.clientWidth + 1));
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [children]);
+  return (
+    <div ref={ref} className={className} {...(scrolls ? { tabIndex: 0, role: "region", "aria-label": label || "Table" } : {})}>
+      {children}
+    </div>
+  );
 }
 
-export function DataTable({ columns, rows, onRowClick, emptyMsg = "No data" }) {
+export function DataTable({ columns, rows, onRowClick, emptyMsg = "No data", label }) {
   if (!rows || !rows.length) return <Empty message={emptyMsg} />;
   return (
-    <div className="table-wrap">
+    <ScrollArea label={label}>
       <table>
         <thead>
-          <tr>{columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
+          <tr>{columns.map((c) => <th key={c.key} scope="col">{c.label || <span className="sr-only">{c.key === "actions" ? "Actions" : c.key}</span>}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
@@ -59,7 +72,7 @@ export function DataTable({ columns, rows, onRowClick, emptyMsg = "No data" }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollArea>
   );
 }
 

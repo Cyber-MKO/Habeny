@@ -444,7 +444,7 @@ function ApiTokens() {
         Let scripts and CI use the API: send <code>Authorization: Bearer &lt;token&gt;</code>. Tokens can't change
         account settings (password, two-factor, tokens). Create one per use, so you can revoke it on its own.
       </p>
-      {tokens === null ? <Spinner /> : <DataTable columns={columns} rows={tokens} emptyMsg="No API tokens yet" />}
+      {tokens === null ? <Spinner /> : <DataTable columns={columns} rows={tokens} emptyMsg="No API tokens yet" label="API tokens" />}
       {creating && <NewTokenModal onClose={() => setCreating(false)} onCreated={load} />}
     </div>
   );
@@ -637,7 +637,7 @@ function Users() {
         <div className="section-title">Users</div>
         <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>Add user</button>
       </div>
-      {users === null ? <Spinner /> : <DataTable columns={columns} rows={users} emptyMsg="No users" />}
+      {users === null ? <Spinner /> : <DataTable columns={columns} rows={users} emptyMsg="No users" label="Users" />}
       {adding && <AddUserModal onClose={() => setAdding(false)} onCreated={() => { setAdding(false); load(); }} />}
       {resetting && <ResetPasswordModal user={resetting} onClose={() => setResetting(null)} />}
     </div>
@@ -691,7 +691,7 @@ function Backups() {
       {schedule?.last_scheduled_error && (
         <div className="auth-error" role="alert">The last scheduled backup failed: {schedule.last_scheduled_error}</div>
       )}
-      {info === null ? <Spinner /> : <DataTable columns={columns} rows={info.backups} emptyMsg="No backups yet" />}
+      {info === null ? <Spinner /> : <DataTable columns={columns} rows={info.backups} emptyMsg="No backups yet" label="Backups" />}
     </div>
   );
 }

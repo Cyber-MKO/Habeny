@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Pill, Spinner, Modal } from "../components/UI";
 import Terminal from "../components/Terminal";
 import { useConfirm } from "../components/Confirm";
+import { Details } from "../components/Details";
 
 const COLUMNS = [
   { key: "agent_name", label: "Name" },
@@ -97,8 +98,8 @@ export default function Agents() {
 
       <div className="filters">
         <div className="field">
-          <label>SIEM Type</label>
-          <select className="select" value={filters.siem_type} onChange={(e) => setFilter("siem_type", e.target.value)}>
+          <label htmlFor="agents-siem-type">SIEM Type</label>
+          <select id="agents-siem-type" className="select" value={filters.siem_type} onChange={(e) => setFilter("siem_type", e.target.value)}>
             <option value="">All</option>
             <option value="none">None</option>
             <option value="wazuh">Wazuh</option>
@@ -109,23 +110,23 @@ export default function Agents() {
           </select>
         </div>
         <div className="field">
-          <label>Status</label>
-          <select className="select" value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
+          <label htmlFor="agents-status">Status</label>
+          <select id="agents-status" className="select" value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
             <option value="">All</option>
             <option value="running">Running</option>
             <option value="stopped">Stopped</option>
           </select>
         </div>
         <div className="field">
-          <label>Group</label>
-          <select className="select" value={filters.agent_group} onChange={(e) => setFilter("agent_group", e.target.value)}>
+          <label htmlFor="agents-group">Group</label>
+          <select id="agents-group" className="select" value={filters.agent_group} onChange={(e) => setFilter("agent_group", e.target.value)}>
             <option value="">All</option>
             {groups.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
           </select>
         </div>
         <div className="field">
-          <label>Limit</label>
-          <input className="input" type="number" min={1} max={1000} value={filters.limit} onChange={(e) => setFilter("limit", Number(e.target.value) || 100)} style={{ width: 80 }} />
+          <label htmlFor="agents-limit">Limit</label>
+          <input id="agents-limit" className="input" type="number" min={1} max={1000} value={filters.limit} onChange={(e) => setFilter("limit", Number(e.target.value) || 100)} style={{ width: 80 }} />
         </div>
       </div>
 
@@ -143,7 +144,7 @@ export default function Agents() {
 
       {detail && (
         <Modal title={`Container: ${detail}`} onClose={() => { setDetail(null); setDetailData(null); }}>
-          {detailData ? <JsonBlock data={detailData} /> : <Spinner />}
+          {detailData ? <Details data={detailData} /> : <Spinner />}
           <div className="btn-group" style={{ marginTop: 12 }}>
             <button className="btn btn-sm btn-primary" onClick={() => { setDetail(null); setDetailData(null); setConsoleName(detail); }}>Open Console</button>
           </div>

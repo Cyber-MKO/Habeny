@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Pill, Spinner, Modal } from "../components/UI";
 import { useConfirm } from "../components/Confirm";
+import { Details } from "../components/Details";
 
 const SIEM_TYPES = ["none", "wazuh", "ossec", "ossim", "utmstack", "elastic"];
 const OS_TYPES = ["ubuntu_22_04", "ubuntu_20_04", "debian_11"];
@@ -110,27 +111,27 @@ export default function Managers() {
       <form onSubmit={handleSave} className="card" style={{ marginBottom: 20 }}>
         <div className="section-title">{editing ? "Edit Profile" : "Create Profile"}</div>
         <div className="form-grid">
-          <div className="field"><label>Profile Name</label><input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
-          <div className="field"><label>Description</label><input className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
-          <div className="field"><label>SIEM Type</label>
-            <select className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
+          <div className="field"><label htmlFor="managers-profile-name">Profile Name</label><input id="managers-profile-name" className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
+          <div className="field"><label htmlFor="managers-description">Description</label><input id="managers-description" className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-siem-type">SIEM Type</label>
+            <select id="managers-siem-type" className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
               {SIEM_TYPES.map((t) => <option key={t} value={t}>{t === "none" ? "None (bare)" : t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
             </select>
           </div>
-          {!isBare && <div className="field"><label>Manager IP / Hostname</label><input className="input" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} /></div>}
-          {!isBare && !needsAuthKey && <div className="field"><label>SIEM Version</label><input className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} /></div>}
-          {isElastic && <div className="field"><label>Agent Version</label><input className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} /></div>}
+          {!isBare && <div className="field"><label htmlFor="managers-manager-ip-hostname">Manager IP / Hostname</label><input id="managers-manager-ip-hostname" className="input" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} /></div>}
+          {!isBare && !needsAuthKey && <div className="field"><label htmlFor="managers-siem-version">SIEM Version</label><input id="managers-siem-version" className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} /></div>}
+          {isElastic && <div className="field"><label htmlFor="managers-agent-version">Agent Version</label><input id="managers-agent-version" className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} /></div>}
           {needsAuthKey && <div className="field"><label>{isElastic ? "Enrollment Token" : "Auth Key"}</label><input className="input" type="password" autoComplete="off" value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
             placeholder={editingKeyHint ? `Stored (${editingKeyHint}) — leave blank to keep` : ""} /></div>}
-          <div className="field"><label>OS Type</label>
-            <select className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
+          <div className="field"><label htmlFor="managers-os-type">OS Type</label>
+            <select id="managers-os-type" className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
               {OS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div className="field"><label>Agent Group</label><input className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} /></div>
-          <div className="field"><label>Memory Limit</label><input className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
-          <div className="field"><label>CPU Shares</label><input className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} /></div>
-          <div className="field"><label>Config Template ID</label><input className="input" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-agent-group">Agent Group</label><input id="managers-agent-group" className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-memory-limit">Memory Limit</label><input id="managers-memory-limit" className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-cpu-shares">CPU Shares</label><input id="managers-cpu-shares" className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-config-template-id">Config Template ID</label><input id="managers-config-template-id" className="input" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} /></div>
         </div>
         <div className="btn-group" style={{ marginTop: 12 }}>
           <button className="btn btn-primary" type="submit">{editing ? "Update" : "Create"}</button>
@@ -144,7 +145,7 @@ export default function Managers() {
 
       {viewData && (
         <Modal title={`Manager: ${viewData.name}`} onClose={() => setViewData(null)}>
-          <JsonBlock data={viewData} />
+          <Details data={viewData} />
         </Modal>
       )}
     </>

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Spinner, JsonBlock, Modal } from "../components/UI";
+import { PageHeader, DataTable, Spinner, Modal } from "../components/UI";
+import { Details } from "../components/Details";
 
 export default function Configs() {
   const { toast } = useStore();
@@ -54,13 +55,13 @@ export default function Configs() {
       <form onSubmit={handleImport} className="card" style={{ marginBottom: 20 }}>
         <div className="section-title">Import Template</div>
         <div className="form-grid">
-          <div className="field"><label>Name</label><input className="input" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required /></div>
-          <div className="field"><label>SIEM Type</label><select className="select" value={form.siem_type} onChange={(e) => setForm((p) => ({ ...p, siem_type: e.target.value }))}><option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="ossim">OSSIM</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option></select></div>
-          <div className="field"><label>Version</label><input className="input" value={form.version} onChange={(e) => setForm((p) => ({ ...p, version: e.target.value }))} placeholder="1.0" /></div>
-          <div className="field"><label>Tags (comma-separated)</label><input className="input" value={form.tags} onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))} placeholder="production, high-security" /></div>
-          <div className="field"><label>Description</label><input className="input" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="configs-name">Name</label><input id="configs-name" className="input" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required /></div>
+          <div className="field"><label htmlFor="configs-siem-type">SIEM Type</label><select id="configs-siem-type" className="select" value={form.siem_type} onChange={(e) => setForm((p) => ({ ...p, siem_type: e.target.value }))}><option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="ossim">OSSIM</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option></select></div>
+          <div className="field"><label htmlFor="configs-version">Version</label><input id="configs-version" className="input" value={form.version} onChange={(e) => setForm((p) => ({ ...p, version: e.target.value }))} placeholder="1.0" /></div>
+          <div className="field"><label htmlFor="configs-tags-comma-separated">Tags (comma-separated)</label><input id="configs-tags-comma-separated" className="input" value={form.tags} onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))} placeholder="production, high-security" /></div>
+          <div className="field"><label htmlFor="configs-description">Description</label><input id="configs-description" className="input" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} /></div>
         </div>
-        <div className="field" style={{ marginTop: 12 }}><label>Content</label><textarea className="textarea" value={form.content} onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))} required /></div>
+        <div className="field" style={{ marginTop: 12 }}><label htmlFor="configs-content">Content</label><textarea id="configs-content" className="textarea" value={form.content} onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))} required /></div>
         <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>Import</button>
       </form>
 
@@ -68,7 +69,7 @@ export default function Configs() {
 
       {exportData && (
         <Modal title="Config Template" onClose={() => setExportData(null)}>
-          <JsonBlock data={exportData} />
+          <Details data={exportData.data || exportData} />
         </Modal>
       )}
     </>

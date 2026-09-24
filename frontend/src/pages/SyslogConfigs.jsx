@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Spinner, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Spinner } from "../components/UI";
 import { useConfirm } from "../components/Confirm";
+import { Details } from "../components/Details";
 
 export default function SyslogConfigs() {
   const { toast } = useStore();
@@ -134,28 +135,28 @@ export default function SyslogConfigs() {
       <form onSubmit={handleSave} className="card" style={{ marginBottom: 20 }}>
         <div className="section-title">{editing ? "Edit Syslog Config" : "Create Syslog Config"}</div>
         <div className="form-grid">
-          <div className="field"><label>Profile Name</label><input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
+          <div className="field"><label htmlFor="syslog-configs-profile-name">Profile Name</label><input id="syslog-configs-profile-name" className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
           <div className="field">
-            <label>Link to Manager Profile</label>
-            <select className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
+            <label htmlFor="syslog-configs-link-to-manager-profile">Link to Manager Profile</label>
+            <select id="syslog-configs-link-to-manager-profile" className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
               <option value="">— none —</option>
               {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_ip || "—"})</option>)}
             </select>
           </div>
-          <div className="field"><label>Target IP</label><input className="input" value={form.target_ip} onChange={(e) => set("target_ip", e.target.value)} required /></div>
-          <div className="field"><label>Port</label><input className="input" type="number" min={1} max={65535} value={form.target_port} onChange={(e) => set("target_port", e.target.value)} /></div>
+          <div className="field"><label htmlFor="syslog-configs-target-ip">Target IP</label><input id="syslog-configs-target-ip" className="input" value={form.target_ip} onChange={(e) => set("target_ip", e.target.value)} required /></div>
+          <div className="field"><label htmlFor="syslog-configs-port">Port</label><input id="syslog-configs-port" className="input" type="number" min={1} max={65535} value={form.target_port} onChange={(e) => set("target_port", e.target.value)} /></div>
           <div className="field">
-            <label>Protocol</label>
-            <select className="select" value={form.protocol} onChange={(e) => set("protocol", e.target.value)}><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+            <label htmlFor="syslog-configs-protocol">Protocol</label>
+            <select id="syslog-configs-protocol" className="select" value={form.protocol} onChange={(e) => set("protocol", e.target.value)}><option value="tcp">TCP</option><option value="udp">UDP</option></select>
           </div>
           <div className="field">
-            <label>SIEM Type</label>
-            <select className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
+            <label htmlFor="syslog-configs-siem-type">SIEM Type</label>
+            <select id="syslog-configs-siem-type" className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
               <option value="">— any —</option>
               <option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option>
             </select>
           </div>
-          <div className="field"><label>Description</label><input className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <div className="field"><label htmlFor="syslog-configs-description">Description</label><input id="syslog-configs-description" className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
         </div>
         <div className="btn-group" style={{ marginTop: 12 }}>
           <button className="btn btn-primary" type="submit">{editing ? "Update" : "Create"}</button>
@@ -164,7 +165,7 @@ export default function SyslogConfigs() {
         </div>
       </form>
 
-      {testResult && (<div className="card" style={{ marginBottom: 16 }}><div className="section-title">Test Result</div><JsonBlock data={testResult} /></div>)}
+      {testResult && (<div className="card" style={{ marginBottom: 16 }}><div className="section-title">Test Result</div><Details data={testResult.data || testResult} /></div>)}
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="section-title">Saved Syslog Configs</div>
@@ -176,14 +177,14 @@ export default function SyslogConfigs() {
           <div className="section-title">Enable UTMstack Syslog Listener (port 7014)</div>
           <p style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>Enable syslog integration on a UTMstack container so it listens for syslog on port 7014.</p>
           <div className="form-grid">
-            <div className="field"><label>Container</label>
-              <select className="select" value={enableAgent} onChange={(e) => setEnableAgent(e.target.value)}>
+            <div className="field"><label htmlFor="syslog-configs-container">Container</label>
+              <select id="syslog-configs-container" className="select" value={enableAgent} onChange={(e) => setEnableAgent(e.target.value)}>
                 <option value="">— select UTMstack container —</option>
                 {utmAgents.map((a) => <option key={a.agent_name} value={a.agent_name}>{a.agent_name}</option>)}
               </select>
             </div>
-            <div className="field"><label>Protocol</label>
-              <select className="select" value={enableProto} onChange={(e) => setEnableProto(e.target.value)}><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+            <div className="field"><label htmlFor="syslog-configs-protocol-2">Protocol</label>
+              <select id="syslog-configs-protocol-2" className="select" value={enableProto} onChange={(e) => setEnableProto(e.target.value)}><option value="tcp">TCP</option><option value="udp">UDP</option></select>
             </div>
             <div className="field" style={{ justifyContent: "flex-end" }}>
               <div className="btn-group">

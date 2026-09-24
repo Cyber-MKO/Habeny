@@ -113,8 +113,8 @@ export default function Groups() {
       <form onSubmit={handleCreate} className="card" style={{ marginBottom: 20 }}>
         <div className="section-title">Create Group</div>
         <div className="form-grid">
-          <div className="field"><label>Name</label><input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} required /></div>
-          <div className="field"><label>Description</label><input className="input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} /></div>
+          <div className="field"><label htmlFor="groups-name">Name</label><input id="groups-name" className="input" value={newName} onChange={(e) => setNewName(e.target.value)} required /></div>
+          <div className="field"><label htmlFor="groups-description">Description</label><input id="groups-description" className="input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} /></div>
           <div className="field" style={{ justifyContent: "flex-end" }}><button className="btn btn-primary" type="submit">Create</button></div>
         </div>
       </form>
@@ -126,8 +126,8 @@ export default function Groups() {
       {renameModal && (
         <Modal title={`Rename: ${renameModal}`} onClose={() => setRenameModal(null)}>
           <div className="form-grid">
-            <div className="field"><label>New Name</label><input className="input" value={renameForm.new_name} onChange={(e) => setRenameForm((p) => ({ ...p, new_name: e.target.value }))} /></div>
-            <div className="field"><label>Description</label><input className="input" value={renameForm.description} onChange={(e) => setRenameForm((p) => ({ ...p, description: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="groups-new-name">New Name</label><input id="groups-new-name" className="input" value={renameForm.new_name} onChange={(e) => setRenameForm((p) => ({ ...p, new_name: e.target.value }))} /></div>
+            <div className="field"><label htmlFor="groups-description-2">Description</label><input id="groups-description-2" className="input" value={renameForm.description} onChange={(e) => setRenameForm((p) => ({ ...p, description: e.target.value }))} /></div>
           </div>
           <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={handleRename}>Rename</button>
         </Modal>

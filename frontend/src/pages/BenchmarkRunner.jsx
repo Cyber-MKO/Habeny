@@ -173,8 +173,8 @@ export default function BenchmarkRunner() {
             <div className="section-title">Configuration</div>
             <div className="form-grid">
               <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label>Manager Profile</label>
-                <select className="select" onChange={(e) => {
+                <label htmlFor="benchmark-runner-manager-profile">Manager Profile</label>
+                <select id="benchmark-runner-manager-profile" className="select" onChange={(e) => {
                   const mgr = managers.find((m) => m.manager_id === e.target.value);
                   if (!mgr) { setLaunchConfig((p) => ({ ...p, manager_profile_id: "" })); return; }
                   setLaunchConfig((p) => ({
@@ -190,14 +190,14 @@ export default function BenchmarkRunner() {
                   {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type} — {m.siem_ip || "no IP"})</option>)}
                 </select>
               </div>
-              <div className="field"><label>Benchmark Name</label><input className="input" value={launchConfig.name} onChange={(e) => set("name", e.target.value)} placeholder="Optional" /></div>
-              <div className="field"><label>SIEM Type</label>
-                <select className="select" value={launchConfig.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
+              <div className="field"><label htmlFor="benchmark-runner-benchmark-name">Benchmark Name</label><input id="benchmark-runner-benchmark-name" className="input" value={launchConfig.name} onChange={(e) => set("name", e.target.value)} placeholder="Optional" /></div>
+              <div className="field"><label htmlFor="benchmark-runner-siem-type">SIEM Type</label>
+                <select id="benchmark-runner-siem-type" className="select" value={launchConfig.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
                   <option value="none">None (bare)</option><option value="wazuh">Wazuh</option><option value="ossec">OSSEC</option><option value="utmstack">UTMstack</option><option value="elastic">Elastic</option>
                 </select>
               </div>
               {launchConfig.siem_type !== "none" && (
-                <div className="field"><label>Manager IP / Hostname</label><input className="input" value={launchConfig.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} placeholder="192.168.1.100" /></div>
+                <div className="field"><label htmlFor="benchmark-runner-manager-ip-hostname">Manager IP / Hostname</label><input id="benchmark-runner-manager-ip-hostname" className="input" value={launchConfig.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} placeholder="192.168.1.100" /></div>
               )}
               {launchConfig.siem_type !== "none" && launchConfig.siem_type !== "utmstack" && (
                 <div className="field"><label>{launchConfig.siem_type === "elastic" ? "Agent Version" : "SIEM Version"}</label><input className="input" value={launchConfig.siem_version} onChange={(e) => set("siem_version", e.target.value)} placeholder={launchConfig.siem_type === "elastic" ? "9.0.2" : "4.14.2"} /></div>
@@ -206,8 +206,8 @@ export default function BenchmarkRunner() {
                 <div className="field"><label>{launchConfig.siem_type === "elastic" ? "Fleet Enrollment Token" : "UTMstack Auth Key"}</label><input className="input" value={launchConfig.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
                   placeholder={(() => { const m = managers.find((x) => x.manager_id === launchConfig.manager_profile_id); return m?.has_siem_auth_key ? `From profile (${m.siem_auth_key_hint}) — type to override` : ""; })()} /></div>
               )}
-              <div className="field"><label>Base Name</label><input className="input" value={launchConfig.base_name} onChange={(e) => set("base_name", e.target.value)} /></div>
-              <div className="field"><label>Memory per Container</label><input className="input" value={launchConfig.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
+              <div className="field"><label htmlFor="benchmark-runner-base-name">Base Name</label><input id="benchmark-runner-base-name" className="input" value={launchConfig.base_name} onChange={(e) => set("base_name", e.target.value)} /></div>
+              <div className="field"><label htmlFor="benchmark-runner-memory-per-container">Memory per Container</label><input id="benchmark-runner-memory-per-container" className="input" value={launchConfig.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
             </div>
           </div>
           <button className="btn btn-primary" onClick={handleLaunch} disabled={launching}>

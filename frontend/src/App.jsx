@@ -132,12 +132,13 @@ function AboutModal({ onClose }) {
 
 function Toasts() {
   const { toasts, dismissToast } = useStore();
-  if (!toasts.length) return null;
+  // Always present, so screen readers announce messages as they appear
   return (
-    <div className="toast-container">
+    <div className="toast-container" role="status" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.variant}`} onClick={() => dismissToast(t.id)}>
-          {t.message}
+        <div key={t.id} className={`toast toast-${t.variant}`}>
+          <span>{t.message}</span>
+          <button type="button" className="toast-close" onClick={() => dismissToast(t.id)} aria-label="Dismiss">✕</button>
         </div>
       ))}
     </div>
@@ -181,17 +182,17 @@ export default function App() {
   const { status, user, error, refresh } = useAuth();
 
   if (status === "loading") {
-    return <div className="auth-page"><Spinner /></div>;
+    return <main className="auth-page" aria-busy="true"><Spinner /></main>;
   }
   if (status === "error") {
     return (
-      <div className="auth-page">
+      <main className="auth-page">
         <div className="auth-card">
           <h1 className="auth-title">Can't reach the server</h1>
           <p className="auth-subtitle">{error}</p>
           <button className="btn btn-primary auth-submit" onClick={refresh}>Retry</button>
         </div>
-      </div>
+      </main>
     );
   }
   if (!user) return <Login />;
@@ -210,10 +211,21 @@ function AppShell({ user }) {
   const location = useLocation();
   const title = TITLES[location.pathname] || "Habeny";
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  // The drawer (small screens) closes when a page is chosen, and on Escape
+  useEffect(() => { setNavOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setNavOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   return (
-    <div className="layout">
-      <aside className="sidebar">
+    <div className={`layout${navOpen ? " nav-open" : ""}`}>
+      <a className="skip-link" href="#main">Skip to content</a>
+      <div className="nav-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />
+      <aside className="sidebar" id="sidebar">
         <div className="sidebar-brand">
           <div className="brand-wordmark">
             habeny<span className="brand-cursor" aria-hidden="true" />
@@ -221,7 +233,7 @@ function AppShell({ user }) {
           <p>Multi-SIEM Container Platform</p>
         </div>
         <HostSwitcher />
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Main">
           {NAV.map((group) => ({ ...group, items: group.items.filter((n) => canAccess(user, n.minRole)) }))
             .filter((group) => group.items.length)
             .map((group) => (
@@ -244,11 +256,18 @@ function AppShell({ user }) {
 
       <div className="main-area">
         <header className="header">
+          <button type="button" className="menu-btn" aria-label="Menu" aria-controls="sidebar" aria-expanded={navOpen}
+            onClick={() => setNavOpen((open) => !open)}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <span className="header-title">{title}</span>
           <div className="header-actions">
             <div className="ws-badge">
               <span className={`ws-dot${connected ? " on" : ""}`} />
-              {connected ? "Live" : "Disconnected"}
+              <span className="ws-badge-label">{connected ? "Live" : "Disconnected"}</span>
+              {!connected && <span className="sr-only">Live updates disconnected</span>}
             </div>
             <CurrentHost />
             <AlertBadge />
@@ -258,7 +277,7 @@ function AppShell({ user }) {
           </div>
         </header>
 
-        <div className="content">
+        <main className="content" id="main" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/system" element={<SystemInfo />} />
@@ -282,7 +301,7 @@ function AppShell({ user }) {
             {user.is_admin && <Route path="/notifications" element={<Notifications />} />}
             {user.is_admin && <Route path="/teams" element={<Teams />} />}
           </Routes>
-        </div>
+        </main>
       </div>
 
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
