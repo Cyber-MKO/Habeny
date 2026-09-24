@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { Modal } from "./UI";
+import { t } from "../i18n";
 
 const ConfirmCtx = createContext(null);
 
@@ -29,12 +30,12 @@ export function ConfirmProvider({ children }) {
       {children}
       {request && (
         <Modal
-          title={request.title || "Are you sure?"}
+          title={request.title || t("Are you sure?")}
           onClose={() => close(false)}
           footer={(
             <>
               <button type="button" className="btn btn-secondary" onClick={() => close(false)} data-autofocus={needsText ? undefined : ""}>
-                {request.cancelLabel || "Cancel"}
+                {request.cancelLabel || t("Cancel")}
               </button>
               <button
                 type="button"
@@ -42,7 +43,7 @@ export function ConfirmProvider({ children }) {
                 onClick={() => close(true)}
                 disabled={needsText && typed !== request.requireText}
               >
-                {request.confirmLabel || "Confirm"}
+                {request.confirmLabel || t("Confirm")}
               </button>
             </>
           )}
@@ -50,7 +51,7 @@ export function ConfirmProvider({ children }) {
           {request.message && <p className="confirm-message">{request.message}</p>}
           {needsText && (
             <div className="field">
-              <label htmlFor="confirm-text">Type <strong>{request.requireText}</strong> to confirm</label>
+              <label htmlFor="confirm-text">{t("Type “{word}” to confirm", { word: request.requireText })}</label>
               <input id="confirm-text" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
             </div>
           )}

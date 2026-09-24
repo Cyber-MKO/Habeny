@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { t } from "../i18n";
 
 
 export function StatCard({ label, value, meta, color }) {
@@ -13,14 +14,14 @@ export function StatCard({ label, value, meta, color }) {
 
 export function Pill({ status }) {
   const s = (status || "unknown").toLowerCase();
-  return <span className={`pill pill-${s}`}>{s}</span>;
+  return <span className={`pill pill-${s}`}>{t(s)}</span>;
 }
 
 export function Spinner() {
   return <div className="spinner" />;
 }
 
-export function Empty({ message = "No data" }) {
+export function Empty({ message = t("No data") }) {
   return <div className="empty"><p>{message}</p></div>;
 }
 
@@ -54,13 +55,13 @@ export function ScrollArea({ className = "table-wrap", label, children }) {
   );
 }
 
-export function DataTable({ columns, rows, onRowClick, emptyMsg = "No data", label }) {
+export function DataTable({ columns, rows, onRowClick, emptyMsg = t("No data"), label }) {
   if (!rows || !rows.length) return <Empty message={emptyMsg} />;
   return (
     <ScrollArea label={label}>
       <table>
         <thead>
-          <tr>{columns.map((c) => <th key={c.key} scope="col">{c.label || <span className="sr-only">{c.key === "actions" ? "Actions" : c.key}</span>}</th>)}</tr>
+          <tr>{columns.map((c) => <th key={c.key} scope="col">{c.label || <span className="sr-only">{c.key === "actions" ? t("Actions") : c.key}</span>}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
@@ -124,7 +125,7 @@ export function Modal({ title, onClose, children, footer, wide }) {
       <div className={`modal-content${wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
         <div className="modal-header">
           <h2 className="modal-title" id={titleId}>{title}</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("Close")}>✕</button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}

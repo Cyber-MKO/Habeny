@@ -6,16 +6,17 @@ import { PageHeader, DataTable, Pill, Spinner, Modal } from "../components/UI";
 import Terminal from "../components/Terminal";
 import { useConfirm } from "../components/Confirm";
 import { Details } from "../components/Details";
+import { t } from "../i18n";
 
 const COLUMNS = [
-  { key: "agent_name", label: "Name" },
-  { key: "agent_seq_id", label: "Seq", render: (r) => r.agent_seq_id ?? "—" },
+  { key: "agent_name", label: t("Name") },
+  { key: "agent_seq_id", label: t("Seq"), render: (r) => r.agent_seq_id ?? "—" },
   { key: "siem_type", label: "SIEM", render: (r) => r.siem_type || "—" },
-  { key: "lifecycle_status", label: "Status", render: (r) => <Pill status={r.lifecycle_status} /> },
-  { key: "siem_agent_status", label: "Agent Svc", render: (r) => r.siem_agent_running === true ? <Pill status="running" /> : r.siem_agent_running === false ? <Pill status="stopped" /> : <span style={{ color: "var(--text-muted)" }}>—</span> },
-  { key: "manager_status", label: "Manager", render: (r) => r.manager_reachable === true ? <><Pill status="connected" /> <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.manager_host ? `${r.manager_host}:${r.manager_port || ""}` : ""}</span></> : r.manager_reachable === false ? <Pill status="disconnected" /> : <span style={{ color: "var(--text-muted)" }}>—</span> },
+  { key: "lifecycle_status", label: t("Status"), render: (r) => <Pill status={r.lifecycle_status} /> },
+  { key: "siem_agent_status", label: t("Agent Svc"), render: (r) => r.siem_agent_running === true ? <Pill status="running" /> : r.siem_agent_running === false ? <Pill status="stopped" /> : <span style={{ color: "var(--text-muted)" }}>—</span> },
+  { key: "manager_status", label: t("Manager"), render: (r) => r.manager_reachable === true ? <><Pill status="connected" /> <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.manager_host ? `${r.manager_host}:${r.manager_port || ""}` : ""}</span></> : r.manager_reachable === false ? <Pill status="disconnected" /> : <span style={{ color: "var(--text-muted)" }}>—</span> },
   { key: "ip_addresses", label: "IP", render: (r) => r.ip_addresses?.[0] || "—" },
-  { key: "agent_group", label: "Group", render: (r) => r.agent_group || "—" },
+  { key: "agent_group", label: t("Group"), render: (r) => r.agent_group || "—" },
 ];
 
 export default function Agents() {
@@ -65,43 +66,43 @@ export default function Agents() {
   };
 
   const action = async (fn, label) => {
-    try { await fn(); toast(`${label} succeeded`, "success"); load(); } catch (e) { toast(e.message, "error"); }
+    try { await fn(); toast(t("{label} succeeded", { label }), "success"); load(); } catch (e) { toast(e.message, "error"); }
   };
 
   const actionsCol = {
-    key: "actions", label: "Actions",
+    key: "actions", label: t("Actions"),
     render: (r) => (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); showDetail(r); }}>Details</button>
+        <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); showDetail(r); }}>{t("Details")}</button>
         {r.lifecycle_status === "running" && (
-          <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setConsoleName(r.agent_name); }}>Console</button>
+          <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setConsoleName(r.agent_name); }}>{t("Console")}</button>
         )}
         {r.lifecycle_status === "running"
-          ? <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); action(() => api.stopAgent(r.agent_name), "Stop"); }}>Stop</button>
-          : <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); action(() => api.startAgent(r.agent_name), "Start"); }}>Start</button>
+          ? <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); action(() => api.stopAgent(r.agent_name), "Stop"); }}>{t("Stop")}</button>
+          : <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); action(() => api.startAgent(r.agent_name), "Start"); }}>{t("Start")}</button>
         }
-        <button className="btn btn-sm btn-danger" aria-label={`Delete ${r.agent_name}`} onClick={async (e) => {
+        <button className="btn btn-sm btn-danger" aria-label={t("Delete {agent_name}", { agent_name: r.agent_name })} onClick={async (e) => {
           e.stopPropagation();
-          if (await confirm({ title: `Delete ${r.agent_name}?`, message: "The container and everything in it is destroyed. This can't be undone.", confirmLabel: "Delete container", danger: true })) {
+          if (await confirm({ title: t("Delete {agent_name}?", { agent_name: r.agent_name }), message: t("The container and everything in it is destroyed. This can't be undone."), confirmLabel: t("Delete container"), danger: true })) {
             action(() => api.deleteAgent(r.agent_name), "Delete");
           }
-        }}>Delete</button>
+        }}>{t("Delete")}</button>
       </div>
     ),
   };
 
   return (
     <>
-      <PageHeader title="Containers" subtitle={`${total} containers`}>
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
+      <PageHeader title={t("Containers")} subtitle={t("{total} containers", { total })}>
+        <button className="btn btn-secondary" onClick={load}>{t("Refresh")}</button>
       </PageHeader>
 
       <div className="filters">
         <div className="field">
-          <label htmlFor="agents-siem-type">SIEM Type</label>
+          <label htmlFor="agents-siem-type">{t("SIEM Type")}</label>
           <select id="agents-siem-type" className="select" value={filters.siem_type} onChange={(e) => setFilter("siem_type", e.target.value)}>
-            <option value="">All</option>
-            <option value="none">None</option>
+            <option value="">{t("All")}</option>
+            <option value="none">{t("None")}</option>
             <option value="wazuh">Wazuh</option>
             <option value="ossec">OSSEC</option>
             <option value="ossim">OSSIM</option>
@@ -110,43 +111,43 @@ export default function Agents() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="agents-status">Status</label>
+          <label htmlFor="agents-status">{t("Status")}</label>
           <select id="agents-status" className="select" value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
-            <option value="">All</option>
-            <option value="running">Running</option>
-            <option value="stopped">Stopped</option>
+            <option value="">{t("All")}</option>
+            <option value="running">{t("Running")}</option>
+            <option value="stopped">{t("Stopped")}</option>
           </select>
         </div>
         <div className="field">
-          <label htmlFor="agents-group">Group</label>
+          <label htmlFor="agents-group">{t("Group")}</label>
           <select id="agents-group" className="select" value={filters.agent_group} onChange={(e) => setFilter("agent_group", e.target.value)}>
-            <option value="">All</option>
+            <option value="">{t("All")}</option>
             {groups.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
           </select>
         </div>
         <div className="field">
-          <label htmlFor="agents-limit">Limit</label>
+          <label htmlFor="agents-limit">{t("Limit")}</label>
           <input id="agents-limit" className="input" type="number" min={1} max={1000} value={filters.limit} onChange={(e) => setFilter("limit", Number(e.target.value) || 100)} style={{ width: 80 }} />
         </div>
       </div>
 
       <div className="card">
-        {loading ? <Spinner /> : <DataTable columns={[...COLUMNS, actionsCol]} rows={agents} emptyMsg="No containers found" />}
+        {loading ? <Spinner /> : <DataTable columns={[...COLUMNS, actionsCol]} rows={agents} emptyMsg={t("No containers found")} />}
       </div>
 
       {total > filters.limit && (
         <div className="btn-group" style={{ marginTop: 16, justifyContent: "center" }}>
-          <button className="btn btn-secondary btn-sm" disabled={filters.offset === 0} onClick={() => setFilters((p) => ({ ...p, offset: Math.max(0, p.offset - p.limit) }))}>Previous</button>
-          <span style={{ padding: "6px 12px", color: "var(--text-dim)", fontSize: 13 }}>{filters.offset + 1}–{Math.min(filters.offset + filters.limit, total)} of {total}</span>
-          <button className="btn btn-secondary btn-sm" disabled={filters.offset + filters.limit >= total} onClick={() => setFilters((p) => ({ ...p, offset: p.offset + p.limit }))}>Next</button>
+          <button className="btn btn-secondary btn-sm" disabled={filters.offset === 0} onClick={() => setFilters((p) => ({ ...p, offset: Math.max(0, p.offset - p.limit) }))}>{t("Previous")}</button>
+          <span style={{ padding: "6px 12px", color: "var(--text-dim)", fontSize: 13 }}>{filters.offset + 1}–{Math.min(filters.offset + filters.limit, total)} {t("of")} {total}</span>
+          <button className="btn btn-secondary btn-sm" disabled={filters.offset + filters.limit >= total} onClick={() => setFilters((p) => ({ ...p, offset: p.offset + p.limit }))}>{t("Next")}</button>
         </div>
       )}
 
       {detail && (
-        <Modal title={`Container: ${detail}`} onClose={() => { setDetail(null); setDetailData(null); }}>
+        <Modal title={t("Container: {detail}", { detail })} onClose={() => { setDetail(null); setDetailData(null); }}>
           {detailData ? <Details data={detailData} /> : <Spinner />}
           <div className="btn-group" style={{ marginTop: 12 }}>
-            <button className="btn btn-sm btn-primary" onClick={() => { setDetail(null); setDetailData(null); setConsoleName(detail); }}>Open Console</button>
+            <button className="btn btn-sm btn-primary" onClick={() => { setDetail(null); setDetailData(null); setConsoleName(detail); }}>{t("Open Console")}</button>
           </div>
         </Modal>
       )}

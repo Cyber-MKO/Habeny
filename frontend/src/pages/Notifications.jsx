@@ -3,16 +3,17 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { useConfirm } from "../components/Confirm";
 import { DataTable, Modal, PageHeader, Pill, Spinner } from "../components/UI";
+import { formatDateTime, t } from "../i18n";
 
 const TYPES = [
-  { value: "slack", label: "Slack", help: "An incoming-webhook URL from Slack (or a Slack-compatible chat such as Mattermost)." },
-  { value: "webhook", label: "Webhook", help: "Habeny POSTs JSON to your URL. With a secret, each request is signed (X-Habeny-Signature)." },
-  { value: "email", label: "Email", help: "Sent through the mail server set in the configuration (HABENY_SMTP_*)." },
+  { value: "slack", label: "Slack", help: t("An incoming-webhook URL from Slack (or a Slack-compatible chat such as Mattermost).") },
+  { value: "webhook", label: t("Webhook"), help: t("Habeny POSTs JSON to your URL. With a secret, each request is signed (X-Habeny-Signature).") },
+  { value: "email", label: t("Email"), help: t("Sent through the mail server set in the configuration (HABENY_SMTP_*).") },
 ];
 
 const EVENT_SHORT = {
-  "deployment.finished": "Deployments", "simulation.finished": "Simulations", "benchmark.finished": "Benchmarks",
-  "alert.firing": "Alerts", "alert.resolved": "Alerts cleared",
+  "deployment.finished": t("Deployments"), "simulation.finished": t("Simulations"), "benchmark.finished": t("Benchmarks"),
+  "alert.firing": t("Alerts"), "alert.resolved": t("Alerts cleared"),
 };
 
 const EMPTY = { name: "", type: "slack", url: "", secret: "", to: "", events: [], only_problems: false, enabled: true };
@@ -49,15 +50,15 @@ function ChannelModal({ channel, events, emailAvailable, onClose, onSaved }) {
 
   const type = TYPES.find((t) => t.value === form.type);
   return (
-    <Modal title={editing ? `Edit ${channel.name}` : "New notification channel"} onClose={onClose}>
+    <Modal title={editing ? t("Edit {name}", { name: channel.name }) : t("New notification channel")} onClose={onClose}>
       <form className="account-modal-form" onSubmit={submit} noValidate>
         {error && <div className="auth-error" role="alert">{error}</div>}
         <div className="field">
-          <label htmlFor="ch-name">Name</label>
-          <input id="ch-name" className="input" value={form.name} onChange={set("name")} maxLength={64} placeholder="e.g. #soc-alerts" />
+          <label htmlFor="ch-name">{t("Name")}</label>
+          <input id="ch-name" className="input" value={form.name} onChange={set("name")} maxLength={64} placeholder={t("e.g. #soc-alerts")} />
         </div>
         <fieldset className="field" disabled={editing}>
-          <legend>Type</legend>
+          <legend>{t("Type")}</legend>
           <div className="radio-row">
             {TYPES.map((t) => (
               <label key={t.value} className="checkbox-inline">
@@ -68,31 +69,31 @@ function ChannelModal({ channel, events, emailAvailable, onClose, onSaved }) {
           </div>
           <span className="auth-hint">
             {type.help}
-            {form.type === "email" && !emailAvailable && " Email is off until HABENY_SMTP_HOST is set."}
+            {form.type === "email" && !emailAvailable && t(" Email is off until HABENY_SMTP_HOST is set.")}
           </span>
         </fieldset>
         {form.type === "email" ? (
           <div className="field">
-            <label htmlFor="ch-to">Send to</label>
-            <input id="ch-to" className="input" value={form.to} onChange={set("to")} placeholder="soc@example.com, oncall@example.com" />
+            <label htmlFor="ch-to">{t("Send to")}</label>
+            <input id="ch-to" className="input" value={form.to} onChange={set("to")} placeholder={t("soc@example.com, oncall@example.com")} />
           </div>
         ) : (
           <div className="field">
             <label htmlFor="ch-url">URL</label>
             <input id="ch-url" className="input" type="url" value={form.url} onChange={set("url")}
-              placeholder={editing ? `${channel.config.url} (leave empty to keep)` : "https://hooks.slack.com/services/…"} />
+              placeholder={editing ? t("{url} (leave empty to keep)", { url: channel.config.url }) : "https://hooks.slack.com/services/…"} />
           </div>
         )}
         {form.type === "webhook" && (
           <div className="field">
-            <label htmlFor="ch-secret">Signing secret (optional)</label>
+            <label htmlFor="ch-secret">{t("Signing secret (optional)")}</label>
             <input id="ch-secret" className="input" type="password" autoComplete="off" value={form.secret} onChange={set("secret")}
-              placeholder={editing && channel.config.secret ? "(set; leave empty to keep)" : ""} />
+              placeholder={editing && channel.config.secret ? t("(set; leave empty to keep)") : ""} />
           </div>
         )}
         <fieldset className="field">
-          <legend>Send when</legend>
-          <span className="auth-hint">Nothing ticked: every event.</span>
+          <legend>{t("Send when")}</legend>
+          <span className="auth-hint">{t("Nothing ticked: every event.")}</span>
           {Object.entries(events).map(([name, label]) => (
             <label key={name} className="checkbox-inline">
               <input type="checkbox" checked={form.events.includes(name)} onChange={() => toggleEvent(name)} /> {label}
@@ -100,14 +101,14 @@ function ChannelModal({ channel, events, emailAvailable, onClose, onSaved }) {
           ))}
         </fieldset>
         <label className="checkbox-inline">
-          <input type="checkbox" checked={form.only_problems} onChange={set("only_problems")} /> Only problems (warnings and errors)
+          <input type="checkbox" checked={form.only_problems} onChange={set("only_problems")} /> {t("Only problems (warnings and errors)")}
         </label>
         <label className="checkbox-inline">
-          <input type="checkbox" checked={form.enabled} onChange={set("enabled")} /> Enabled
+          <input type="checkbox" checked={form.enabled} onChange={set("enabled")} /> {t("Enabled")}
         </label>
         <div className="btn-group">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy || !form.name.trim()}>{busy ? "Saving…" : "Save"}</button>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>{t("Cancel")}</button>
+          <button type="submit" className="btn btn-primary" disabled={busy || !form.name.trim()}>{busy ? t("Saving…") : t("Save")}</button>
         </div>
       </form>
     </Modal>
@@ -134,42 +135,42 @@ export default function Notifications() {
     load();
   };
   const remove = async (c) => {
-    if (!(await confirm({ title: `Delete ${c.name}?`, message: "It stops receiving notifications.", confirmLabel: "Delete channel", danger: true }))) return;
+    if (!(await confirm({ title: t("Delete {name}?", { name: c.name }), message: t("It stops receiving notifications."), confirmLabel: t("Delete channel"), danger: true }))) return;
     try { toast((await api.deleteChannel(c.id)).message, "success"); load(); }
     catch (err) { toast(err.message, "error"); }
   };
 
   const columns = [
-    { key: "name", label: "Name", render: (c) => <strong>{c.name}</strong> },
-    { key: "type", label: "Type", render: (c) => TYPES.find((t) => t.value === c.type)?.label },
-    { key: "target", label: "Destination", render: (c) => (c.type === "email" ? c.config.to.join(", ") : c.config.url) },
-    { key: "events", label: "Events", render: (c) => (c.events.length ? c.events.map((e) => EVENT_SHORT[e] || e).join(", ") : "All")
+    { key: "name", label: t("Name"), render: (c) => <strong>{c.name}</strong> },
+    { key: "type", label: t("Type"), render: (c) => TYPES.find((t) => t.value === c.type)?.label },
+    { key: "target", label: t("Destination"), render: (c) => (c.type === "email" ? c.config.to.join(", ") : c.config.url) },
+    { key: "events", label: t("Events"), render: (c) => (c.events.length ? c.events.map((e) => EVENT_SHORT[e] || e).join(", ") : "All")
       + (c.only_problems ? " (problems only)" : "") },
-    { key: "state", label: "Last delivery", render: (c) => (c.last_status
+    { key: "state", label: t("Last delivery"), render: (c) => (c.last_status
       ? (
         <>
-          <Pill status={c.last_status === "ok" ? "success" : "error"} /> {new Date(c.last_sent_at).toLocaleString()}
+          <Pill status={c.last_status === "ok" ? "success" : "error"} /> {formatDateTime(c.last_sent_at)}
           {c.last_error && <div className="cell-note">{c.last_error}</div>}
         </>
       )
-      : <span className="muted">Nothing sent yet</span>) },
-    { key: "enabled", label: "Enabled", render: (c) => (c.enabled ? "Yes" : "No") },
-    { key: "actions", label: <span className="sr-only">Actions</span>, render: (c) => (
+      : <span className="muted">{t("Nothing sent yet")}</span>) },
+    { key: "enabled", label: t("Enabled"), render: (c) => (c.enabled ? "Yes" : "No") },
+    { key: "actions", label: <span className="sr-only">{t("Actions")}</span>, render: (c) => (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={() => test(c)} aria-label={`Send a test message to ${c.name}`}>Test</button>
-        <button className="btn btn-sm btn-secondary" onClick={() => setEditing(c)} aria-label={`Edit ${c.name}`}>Edit</button>
-        <button className="btn btn-sm btn-danger" onClick={() => remove(c)} aria-label={`Delete ${c.name}`}>Delete</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => test(c)} aria-label={t("Send a test message to {name}", { name: c.name })}>{t("Test")}</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => setEditing(c)} aria-label={t("Edit {name}", { name: c.name })}>{t("Edit")}</button>
+        <button className="btn btn-sm btn-danger" onClick={() => remove(c)} aria-label={t("Delete {name}", { name: c.name })}>{t("Delete")}</button>
       </div>
     ) },
   ];
 
   return (
     <>
-      <PageHeader title="Notifications" subtitle="Where Habeny reports finished work and alerts">
-        <button className="btn btn-primary" onClick={() => setEditing("new")}>New channel</button>
+      <PageHeader title={t("Notifications")} subtitle={t("Where Habeny reports finished work and alerts")}>
+        <button className="btn btn-primary" onClick={() => setEditing("new")}>{t("New channel")}</button>
       </PageHeader>
       <div className="card">
-        {data === null ? <Spinner /> : <DataTable columns={columns} rows={data.channels} emptyMsg="No channels yet. Add Slack, a webhook or email to hear about finished deployments and alerts." />}
+        {data === null ? <Spinner /> : <DataTable columns={columns} rows={data.channels} emptyMsg={t("No channels yet. Add Slack, a webhook or email to hear about finished deployments and alerts.")} />}
       </div>
       {editing && data && (
         <ChannelModal channel={editing === "new" ? null : editing} events={data.events} emailAvailable={data.email_available}

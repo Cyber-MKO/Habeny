@@ -45,7 +45,7 @@ describe("confirmation dialog", () => {
     await user.click(screen.getByRole("button", { name: "Delete it" }));
     const go = screen.getByRole("button", { name: "Delete" });
     expect(go).toBeDisabled();
-    await user.type(screen.getByLabelText(/Type delete to confirm/), "delete");
+    await user.type(screen.getByLabelText(/Type “delete” to confirm/), "delete");
     await user.click(go);
     expect(answers).toEqual([true]);
   });

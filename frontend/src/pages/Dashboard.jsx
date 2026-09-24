@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { StatCard, PageHeader, Pill } from "../components/UI";
+import { t } from "../i18n";
 
 const ACTIVITY_REFRESH_MS = 30000;
 
@@ -38,24 +39,24 @@ export default function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Real-time platform overview">
-        {connected && <span className="live-dot" title="Live updates active" />}
+      <PageHeader title={t("Dashboard")} subtitle={t("Real-time platform overview")}>
+        {connected && <span className="live-dot" title={t("Live updates active")} />}
       </PageHeader>
 
       <div className="stats-grid">
-        <StatCard label="Total Containers" value={pending(total)} color="blue" meta={Object.entries(bySiem).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"} />
-        <StatCard label="Running" value={pending(byStatus.running)} color="green" />
-        <StatCard label="Stopped" value={pending(byStatus.stopped)} color="red" />
-        <StatCard label="Errors" value={errors} color={errors > 0 ? "red" : undefined} />
-        <StatCard label="Active Simulations" value={pending(metrics?.active_simulations ?? health?.system_info?.active_simulations)} color="orange" />
-        <StatCard label="Platform Status" value={health?.status === "healthy" || connected ? "Healthy" : health ? "Unknown" : "—"} color={health?.status === "healthy" || connected ? "green" : "red"} />
-        <StatCard label="CPU Cores" value={pending(metrics?.system?.cpu_count ?? health?.system_info?.cpu_count)} />
-        <StatCard label="WebSocket" value={connected ? "Connected" : "Disconnected"} color={connected ? "green" : "red"} />
+        <StatCard label={t("Total Containers")} value={pending(total)} color="blue" meta={Object.entries(bySiem).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—"} />
+        <StatCard label={t("Running")} value={pending(byStatus.running)} color="green" />
+        <StatCard label={t("Stopped")} value={pending(byStatus.stopped)} color="red" />
+        <StatCard label={t("Errors")} value={errors} color={errors > 0 ? "red" : undefined} />
+        <StatCard label={t("Active Simulations")} value={pending(metrics?.active_simulations ?? health?.system_info?.active_simulations)} color="orange" />
+        <StatCard label={t("Platform Status")} value={health?.status === "healthy" || connected ? "Healthy" : health ? "Unknown" : "—"} color={health?.status === "healthy" || connected ? "green" : "red"} />
+        <StatCard label={t("CPU Cores")} value={pending(metrics?.system?.cpu_count ?? health?.system_info?.cpu_count)} />
+        <StatCard label={t("WebSocket")} value={connected ? "Connected" : "Disconnected"} color={connected ? "green" : "red"} />
       </div>
 
       {bySiem && Object.keys(bySiem).length > 0 && (
         <div className="section">
-          <div className="section-title">Containers by SIEM Type</div>
+          <div className="section-title">{t("Containers by SIEM Type")}</div>
           <div className="stats-grid">
             {Object.entries(bySiem).map(([type, count]) => (
               <StatCard key={type} label={type} value={count} />
@@ -66,19 +67,19 @@ export default function Dashboard() {
 
       <div className="dashboard-split">
         <div className="card">
-          <div className="section-title">Quick Actions</div>
+          <div className="section-title">{t("Quick Actions")}</div>
           <div className="btn-group" style={{ flexWrap: "wrap" }}>
-            <Link to="/deploy" className="btn btn-primary">Deploy Containers</Link>
-            <Link to="/simulations" className="btn btn-secondary">Start Simulation</Link>
-            <Link to="/reports" className="btn btn-secondary">Generate Report</Link>
-            <Link to="/logs" className="btn btn-secondary">Upload Logs</Link>
+            <Link to="/deploy" className="btn btn-primary">{t("Deploy Containers")}</Link>
+            <Link to="/simulations" className="btn btn-secondary">{t("Start Simulation")}</Link>
+            <Link to="/reports" className="btn btn-secondary">{t("Generate Report")}</Link>
+            <Link to="/logs" className="btn btn-secondary">{t("Upload Logs")}</Link>
           </div>
         </div>
 
         <div className="card">
-          <div className="section-title">Recent Activity</div>
-          {activity === null ? <div className="empty" style={{ padding: 16 }}><p>Loading…</p></div>
-            : activity.length === 0 ? <div className="empty" style={{ padding: 16 }}><p>No recent activity</p></div> : (
+          <div className="section-title">{t("Recent Activity")}</div>
+          {activity === null ? <div className="empty" style={{ padding: 16 }}><p>{t("Loading…")}</p></div>
+            : activity.length === 0 ? <div className="empty" style={{ padding: 16 }}><p>{t("No recent activity")}</p></div> : (
             <table>
               <tbody>
                 {activity.map((a, i) => (

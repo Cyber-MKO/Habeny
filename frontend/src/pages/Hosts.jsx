@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { useHosts } from "../hosts";
 import { useConfirm } from "../components/Confirm";
 import { DataTable, Modal, PageHeader, Pill, Spinner } from "../components/UI";
+import { t } from "../i18n";
 
 function HostModal({ host, teams, onClose, onSaved }) {
   const { toast } = useStore();
@@ -34,49 +35,49 @@ function HostModal({ host, teams, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={host ? `Edit ${host.name}` : "Add a host"} onClose={onClose}>
+    <Modal title={host ? t("Edit {name}", { name: host.name }) : t("Add a host")} onClose={onClose}>
       <form className="account-modal-form" onSubmit={submit} noValidate>
         {!host && (
           <ol className="steps">
-            <li>On the other server, sign in and create an API token (Account → API tokens), operator role for full control.</li>
-            <li>Enter its address and the token here.</li>
+            <li>{t("On the other server, sign in and create an API token (Account → API tokens), operator role for full control.")}</li>
+            <li>{t("Enter its address and the token here.")}</li>
           </ol>
         )}
         {error && <div className="auth-error" role="alert">{error}</div>}
         <div className="field">
-          <label htmlFor="host-name">Name</label>
-          <input id="host-name" className="input" value={form.name} onChange={set("name")} maxLength={64} placeholder="e.g. lab-2" />
+          <label htmlFor="host-name">{t("Name")}</label>
+          <input id="host-name" className="input" value={form.name} onChange={set("name")} maxLength={64} placeholder={t("e.g. lab-2")} />
         </div>
         {!host && (
           <div className="field">
-            <label htmlFor="host-url">Address</label>
+            <label htmlFor="host-url">{t("Address")}</label>
             <input id="host-url" className="input" type="url" value={form.url} onChange={set("url")} placeholder="https://10.0.0.12:9000" />
           </div>
         )}
         <div className="field">
-          <label htmlFor="host-token">API token{host ? " (leave empty to keep)" : ""}</label>
+          <label htmlFor="host-token">{t("API token")}{host ? t(" (leave empty to keep)") : ""}</label>
           <input id="host-token" className="input" type="password" autoComplete="off" value={form.token} onChange={set("token")} placeholder="hby_…" />
         </div>
         <div className="field">
-          <label htmlFor="host-team">Available to</label>
+          <label htmlFor="host-team">{t("Available to")}</label>
           <select id="host-team" className="select" value={form.team_id} onChange={set("team_id")}>
-            <option value="">Everyone</option>
-            {teams.map((t) => <option key={t.id} value={t.id}>Team {t.name} (and admins)</option>)}
+            <option value="">{t("Everyone")}</option>
+            {teams.map((team) => <option key={team.id} value={team.id}>{t("Team {name} (and admins)", { name: team.name })}</option>)}
           </select>
         </div>
         {fingerprint && (
           <div className="auth-notice" role="alert">
             <p>
-              This host uses a certificate that isn't from a trusted authority (Habeny's self-signed one). Check that it
-              shows the same fingerprint (on that server: <code>sudo habeny tls fingerprint</code>) before trusting it:
+              {t("This host uses a certificate that isn't from a trusted authority (Habeny's self-signed one). Before trusting it, check that the host shows the same fingerprint when you run this command on it:")}{" "}
+              <code>sudo habeny tls fingerprint</code>
             </p>
             <code className="fingerprint">{fingerprint}</code>
           </div>
         )}
         <div className="btn-group">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>{t("Cancel")}</button>
           <button type="submit" className="btn btn-primary" disabled={busy || !form.name.trim() || (!host && (!form.url.trim() || !form.token.trim()))}>
-            {busy ? "Checking…" : fingerprint ? "It matches: trust and add" : host ? "Save" : "Add host"}
+            {busy ? t("Checking…") : fingerprint ? t("It matches: trust and add") : host ? t("Save") : t("Add host")}
           </button>
         </div>
       </form>
@@ -104,7 +105,7 @@ export default function Hosts() {
   }, [user.is_admin]);
 
   const remove = async (h) => {
-    if (!(await confirm({ title: `Remove ${h.name}?`, message: "This console stops managing it. The server and its containers aren't touched; revoke the token there too.", confirmLabel: "Remove host", danger: true }))) return;
+    if (!(await confirm({ title: t("Remove {name}?", { name: h.name }), message: t("This console stops managing it. The server and its containers aren't touched; revoke the token there too."), confirmLabel: t("Remove host"), danger: true }))) return;
     try {
       toast((await api.removeHost(h.id)).message, "success");
       if (hostId === h.id) selectHost(null);
@@ -113,40 +114,38 @@ export default function Hosts() {
   };
 
   const columns = [
-    { key: "name", label: "Host", render: (h) => <><strong>{h.name}</strong><div className="muted">{h.url}</div></> },
-    { key: "status", label: "Status", render: (h) => (
+    { key: "name", label: t("Host"), render: (h) => <><strong>{h.name}</strong><div className="muted">{h.url}</div></> },
+    { key: "status", label: t("Status"), render: (h) => (
       <>
         <Pill status={h.status === "ok" ? "online" : "offline"} />
         {h.error && <div className="cell-note">{h.error}</div>}
       </>
     ) },
-    { key: "version", label: "Version", render: (h) => (h.version ? `Habeny ${h.version}` : "—") },
-    { key: "containers", label: "Containers", render: (h) => (h.containers ?? "—") + (h.running != null ? ` (${h.running} running)` : "") },
-    { key: "alerts", label: "Alerts", render: (h) => (h.alerts?.length ? <span className="cell-note">{h.alerts.map((a) => a.label).join(", ")}</span> : h.status === "ok" ? "None" : "—") },
-    { key: "actions", label: <span className="sr-only">Actions</span>, render: (h) => (
+    { key: "version", label: t("Version"), render: (h) => (h.version ? `Habeny ${h.version}` : "—") },
+    { key: "containers", label: t("Containers"), render: (h) => (h.containers ?? "—") + (h.running != null ? ` (${h.running} running)` : "") },
+    { key: "alerts", label: t("Alerts"), render: (h) => (h.alerts?.length ? <span className="cell-note">{h.alerts.map((a) => a.label).join(", ")}</span> : h.status === "ok" ? "None" : "—") },
+    { key: "actions", label: <span className="sr-only">{t("Actions")}</span>, render: (h) => (
       <div className="btn-group">
         <button className="btn btn-sm btn-primary" onClick={() => selectHost(h.id)} disabled={hostId === h.id || h.status !== "ok"}>
-          {hostId === h.id ? "Working on it" : "Work on this host"}
+          {hostId === h.id ? t("Working on it") : t("Work on this host")}
         </button>
-        {user.is_admin && <button className="btn btn-sm btn-secondary" onClick={() => setEditing(h)} aria-label={`Edit ${h.name}`}>Edit</button>}
-        {user.is_admin && <button className="btn btn-sm btn-danger" onClick={() => remove(h)} aria-label={`Remove ${h.name}`}>Remove</button>}
+        {user.is_admin && <button className="btn btn-sm btn-secondary" onClick={() => setEditing(h)} aria-label={t("Edit {name}", { name: h.name })}>{t("Edit")}</button>}
+        {user.is_admin && <button className="btn btn-sm btn-danger" onClick={() => remove(h)} aria-label={t("Remove {name}", { name: h.name })}>{t("Remove")}</button>}
       </div>
     ) },
   ];
 
   return (
     <>
-      <PageHeader title="Hosts" subtitle="Other Habeny servers (LXC hosts) you can manage from this console">
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
-        {user.is_admin && <button className="btn btn-primary" onClick={() => setEditing("new")}>Add host</button>}
+      <PageHeader title={t("Hosts")} subtitle={t("Other Habeny servers (LXC hosts) you can manage from this console")}>
+        <button className="btn btn-secondary" onClick={load}>{t("Refresh")}</button>
+        {user.is_admin && <button className="btn btn-primary" onClick={() => setEditing("new")}>{t("Add host")}</button>}
       </PageHeader>
       <p className="account-help">
-        Each LXC host runs its own Habeny. Pick one here, or in the <strong>Server</strong> menu at the top of the
-        sidebar, and every page works on that host: containers, deployments, simulations, metrics and the console.
-        What you can do there is limited by the host's API token and by your own role here.
+        {t("Each LXC host runs its own Habeny. Pick one here, or in the")} <strong>{t("Server")}</strong> {t("menu at the top of the sidebar, and every page works on that host: containers, deployments, simulations, metrics and the console. What you can do there is limited by the host's API token and by your own role here.")}
       </p>
       <div className="card">
-        {hosts === null ? <Spinner /> : <DataTable columns={columns} rows={hosts} emptyMsg={user.is_admin ? "No other hosts yet. Add one to manage several LXC hosts from here." : "No other hosts have been added."} />}
+        {hosts === null ? <Spinner /> : <DataTable columns={columns} rows={hosts} emptyMsg={user.is_admin ? t("No other hosts yet. Add one to manage several LXC hosts from here.") : t("No other hosts have been added.")} />}
       </div>
       {editing && <HostModal host={editing === "new" ? null : editing} teams={teams} onClose={() => setEditing(null)} onSaved={load} />}
     </>

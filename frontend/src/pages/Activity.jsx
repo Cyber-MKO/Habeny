@@ -4,6 +4,7 @@ import { useAuth } from "../auth";
 import { useStore } from "../store";
 import { Details, humanize } from "../components/Details";
 import { PageHeader, Pill, Spinner, Empty } from "../components/UI";
+import { formatDateTime, t } from "../i18n";
 
 const PAGE_SIZES = [25, 50, 100, 250];
 const EMPTY_FILTERS = { q: "", action: "", user: "", status: "", since: "", until: "" };
@@ -60,70 +61,72 @@ export default function Activity() {
   const exportParams = activeFilters(applied);
   return (
     <>
-      <PageHeader title="Activity Log" subtitle={`${total.toLocaleString()} ${Object.keys(exportParams).length ? "matching " : ""}entries`}>
-        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "csv" })} download>Export CSV</a>
-        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "jsonl" })} download>Export JSON Lines</a>
-        {user.is_admin && <button className="btn btn-secondary" onClick={verify}>Verify integrity</button>}
+      <PageHeader title={t("Activity Log")} subtitle={Object.keys(exportParams).length
+        ? t("{n} matching entries", { n: total.toLocaleString() })
+        : t("{n} entries", { n: total.toLocaleString() })}>
+        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "csv" })} download>{t("Export CSV")}</a>
+        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "jsonl" })} download>{t("Export JSON Lines")}</a>
+        {user.is_admin && <button className="btn btn-secondary" onClick={verify}>{t("Verify integrity")}</button>}
       </PageHeader>
 
       {verification && (
         <div className={verification.data.ok ? "auth-notice" : "auth-error"} role="status">
           {verification.message}
-          {verification.data.ok && verification.data.head_hash && <> · latest hash <code>{verification.data.head_hash.slice(0, 16)}…</code></>}
+          {verification.data.ok && verification.data.head_hash && <> {t("· latest hash")} <code>{verification.data.head_hash.slice(0, 16)}…</code></>}
         </div>
       )}
 
-      <form className="filters" onSubmit={apply} role="search" aria-label="Filter the activity log">
+      <form className="filters" onSubmit={apply} role="search" aria-label={t("Filter the activity log")}>
         <div className="field">
-          <label htmlFor="act-q">Search</label>
-          <input id="act-q" className="input" type="search" placeholder="Container, group, username…" value={filters.q} onChange={set("q")} />
+          <label htmlFor="act-q">{t("Search")}</label>
+          <input id="act-q" className="input" type="search" placeholder={t("Container, group, username…")} value={filters.q} onChange={set("q")} />
         </div>
         <div className="field">
-          <label htmlFor="act-action">Action</label>
+          <label htmlFor="act-action">{t("Action")}</label>
           <select id="act-action" className="select" value={filters.action} onChange={set("action")}>
-            <option value="">Any</option>
+            <option value="">{t("Any")}</option>
             {facets.actions.map((a) => <option key={a} value={a}>{humanize(a)}</option>)}
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-user">User</label>
+          <label htmlFor="act-user">{t("User")}</label>
           <select id="act-user" className="select" value={filters.user} onChange={set("user")}>
-            <option value="">Anyone</option>
+            <option value="">{t("Anyone")}</option>
             {facets.users.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-status">Result</label>
+          <label htmlFor="act-status">{t("Result")}</label>
           <select id="act-status" className="select" value={filters.status} onChange={set("status")}>
-            <option value="">Any</option>
-            <option value="success">Success</option>
-            <option value="partial">Partial</option>
-            <option value="error">Error</option>
+            <option value="">{t("Any")}</option>
+            <option value="success">{t("Success")}</option>
+            <option value="partial">{t("Partial")}</option>
+            <option value="error">{t("Error")}</option>
           </select>
         </div>
         <div className="field">
-          <label htmlFor="act-since">From</label>
+          <label htmlFor="act-since">{t("From")}</label>
           <input id="act-since" className="input" type="date" value={filters.since} onChange={set("since")} />
         </div>
         <div className="field">
-          <label htmlFor="act-until">To</label>
+          <label htmlFor="act-until">{t("To")}</label>
           <input id="act-until" className="input" type="date" value={filters.until} onChange={set("until")} />
         </div>
         <div className="field filters-actions">
-          <button type="submit" className="btn btn-primary">Apply</button>
-          <button type="button" className="btn btn-secondary" onClick={reset}>Reset</button>
+          <button type="submit" className="btn btn-primary">{t("Apply")}</button>
+          <button type="button" className="btn btn-secondary" onClick={reset}>{t("Reset")}</button>
         </div>
       </form>
 
       <div className="card">
-        {loading ? <Spinner /> : !logs.length ? <Empty message="No matching activity" /> : (
+        {loading ? <Spinner /> : !logs.length ? <Empty message={t("No matching activity")} /> : (
           <div className="table-wrap">
             <table>
-              <caption className="sr-only">Activity log entries, newest first</caption>
+              <caption className="sr-only">{t("Activity log entries, newest first")}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Time</th><th scope="col">User</th><th scope="col">Action</th>
-                  <th scope="col">Result</th><th scope="col">Summary</th>
+                  <th scope="col">{t("Time")}</th><th scope="col">{t("User")}</th><th scope="col">{t("Action")}</th>
+                  <th scope="col">{t("Result")}</th><th scope="col">{t("Summary")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,10 +136,10 @@ export default function Activity() {
                       <td>
                         <button type="button" className="link-btn" aria-expanded={open === r.id} aria-controls={`act-${r.id}`}
                           onClick={() => setOpen(open === r.id ? null : r.id)}>
-                          {new Date(r.timestamp).toLocaleString()}
+                          {formatDateTime(r.timestamp)}
                         </button>
                       </td>
-                      <td>{r.user || <span className="muted">system</span>}{r.token && <span className="tag" title="Done with an API token">token {r.token}</span>}</td>
+                      <td>{r.user || <span className="muted">{t("system")}</span>}{r.token && <span className="tag" title={t("Done with an API token")}>{t("token")} {r.token}</span>}</td>
                       <td>{humanize(r.action)}</td>
                       <td><Pill status={r.status} /></td>
                       <td className="activity-summary">{summary(r.details) || "—"}</td>
@@ -156,14 +159,14 @@ export default function Activity() {
         )}
       </div>
 
-      <nav className="pager" aria-label="Activity pages">
-        <label htmlFor="act-size" className="muted">Per page</label>
+      <nav className="pager" aria-label={t("Activity pages")}>
+        <label htmlFor="act-size" className="muted">{t("Per page")}</label>
         <select id="act-size" className="select select-sm" value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0); }}>
           {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
-        <button className="btn btn-secondary btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</button>
-        <span className="muted">{total ? `${offset + 1}–${Math.min(offset + limit, total)} of ${total.toLocaleString()}` : "0"}</span>
-        <button className="btn btn-secondary btn-sm" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)}>Next</button>
+        <button className="btn btn-secondary btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>{t("Previous")}</button>
+        <span className="muted">{total ? t("{from}–{to} of {total}", { from: offset + 1, to: Math.min(offset + limit, total), total: total.toLocaleString() }) : "0"}</span>
+        <button className="btn btn-secondary btn-sm" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)}>{t("Next")}</button>
       </nav>
     </>
   );

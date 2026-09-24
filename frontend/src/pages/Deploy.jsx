@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, Pill, Spinner } from "../components/UI";
 import { Details } from "../components/Details";
+import { t } from "../i18n";
 
 const DEFAULTS = {
   count: 2, siem_type: "none", siem_ip: "", siem_version: "4.14.2", siem_auth_key: "",
@@ -49,14 +50,14 @@ function DeployActivity({ progress, active }) {
 
   return (
     <div className="section deploy-activity" style={{ marginTop: 20 }}>
-      <div className="section-title">Deployment Activity</div>
+      <div className="section-title">{t("Deployment Activity")}</div>
       <div className="card">
         <div className="deploy-activity-head">
           <Pill status={progress.status === "running" ? "deploying" : progress.status} />
-          <span>{completed}/{total} finished</span>
-          {inFlight > 0 && <span className="text-dim">{inFlight} in progress</span>}
-          <span className="text-green">{successful} succeeded</span>
-          {failed > 0 && <span className="text-red">{failed} failed</span>}
+          <span>{completed}/{total} {t("finished")}</span>
+          {inFlight > 0 && <span className="text-dim">{inFlight} {t("in progress")}</span>}
+          <span className="text-green">{successful} {t("succeeded")}</span>
+          {failed > 0 && <span className="text-red">{failed} {t("failed")}</span>}
           <span className="text-dim" style={{ marginLeft: "auto" }}>
             {active && <Spinner />} {formatElapsed(progress.started_at, progress.finished_at)}
           </span>
@@ -79,7 +80,7 @@ function DeployActivity({ progress, active }) {
           <div className="table-wrap" style={{ marginTop: 16 }}>
             <table>
               <thead>
-                <tr><th>Container</th><th>Status</th><th>Current step</th></tr>
+                <tr><th>{t("Container")}</th><th>{t("Status")}</th><th>{t("Current step")}</th></tr>
               </thead>
               <tbody>
                 {containers.map((c) => (
@@ -195,10 +196,10 @@ export default function Deploy() {
       // Pull the final state so the feed ends on the server's summary
       const final = await api.getDeployProgress(id).catch(() => null);
       setProgress((prev) => final?.data ? mergeProgress(prev, final.data) : finishLocal(prev, res.message, res.success));
-      toast(res.message || "Deployment complete", res.success ? "success" : "error");
+      toast(res.message || t("Deployment complete"), res.success ? "success" : "error");
     } catch (err) {
       setResult({ error: err.message });
-      setProgress((prev) => finishLocal(prev, `Deployment failed: ${err.message}`, false));
+      setProgress((prev) => finishLocal(prev, t("Deployment failed: {error}", { error: err.message }), false));
       toast(err.message, "error");
     } finally {
       setDeploying(false);
@@ -207,26 +208,26 @@ export default function Deploy() {
 
   return (
     <>
-      <PageHeader title="Deploy Containers" subtitle="Create containers and install SIEM agents at scale" />
+      <PageHeader title={t("Deploy Containers")} subtitle={t("Create containers and install SIEM agents at scale")} />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="form-grid">
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="deploy-manager-profile">Manager Profile</label>
+              <label htmlFor="deploy-manager-profile">{t("Manager Profile")}</label>
               <select id="deploy-manager-profile" className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
-                <option value="">— Manual configuration —</option>
-                {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type} — {m.siem_ip || "no IP"})</option>)}
+                <option value="">{t("— Manual configuration —")}</option>
+                {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type} — {m.siem_ip || t("no IP")})</option>)}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="deploy-container-count">Container Count</label>
+              <label htmlFor="deploy-container-count">{t("Container Count")}</label>
               <input id="deploy-container-count" className="input" type="number" min={1} max={1000} value={form.count} onChange={(e) => set("count", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-siem-type">SIEM Type</label>
+              <label htmlFor="deploy-siem-type">{t("SIEM Type")}</label>
               <select id="deploy-siem-type" className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
-                <option value="none">None (bare container)</option>
+                <option value="none">{t("None (bare container)")}</option>
                 <option value="wazuh">Wazuh</option>
                 <option value="ossec">OSSEC</option>
                 <option value="ossim">OSSIM</option>
@@ -236,77 +237,77 @@ export default function Deploy() {
             </div>
             {!isBare && (
               <div className="field">
-                <label htmlFor="deploy-siem-manager-ip">SIEM Manager IP</label>
+                <label htmlFor="deploy-siem-manager-ip">{t("SIEM Manager IP")}</label>
                 <input id="deploy-siem-manager-ip" className="input" placeholder="192.168.1.100" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} required />
               </div>
             )}
             {!isBare && !needsAuthKey && (
               <div className="field">
-                <label htmlFor="deploy-siem-version">SIEM Version</label>
+                <label htmlFor="deploy-siem-version">{t("SIEM Version")}</label>
                 <input id="deploy-siem-version" className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} />
               </div>
             )}
             {isElastic && (
               <div className="field">
-                <label htmlFor="deploy-agent-version">Agent Version</label>
+                <label htmlFor="deploy-agent-version">{t("Agent Version")}</label>
                 <input id="deploy-agent-version" className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} />
               </div>
             )}
             {needsAuthKey && (
               <div className="field">
-                <label>{isElastic ? "Enrollment Token" : "Installer Auth Key"}</label>
+                <label>{isElastic ? t("Enrollment Token") : t("Installer Auth Key")}</label>
                 <input className="input"
                   placeholder={selectedManager?.has_siem_auth_key
-                    ? `From profile (${selectedManager.siem_auth_key_hint}) — type to override`
-                    : isElastic ? "Fleet enrollment token" : "UTMstack auth key"}
+                    ? t("From profile ({siem_auth_key_hint}) — type to override", { siem_auth_key_hint: selectedManager.siem_auth_key_hint })
+                    : isElastic ? t("Fleet enrollment token") : t("UTMstack auth key")}
                   value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
                   required={!selectedManager?.has_siem_auth_key} />
               </div>
             )}
             <div className="field">
-              <label htmlFor="deploy-os-type">OS Type</label>
+              <label htmlFor="deploy-os-type">{t("OS Type")}</label>
               <select id="deploy-os-type" className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
-                <option value="ubuntu_22_04">Ubuntu 22.04</option>
-                <option value="ubuntu_20_04">Ubuntu 20.04</option>
-                <option value="debian_11">Debian 11</option>
+                <option value="ubuntu_22_04">{t("Ubuntu 22.04")}</option>
+                <option value="ubuntu_20_04">{t("Ubuntu 20.04")}</option>
+                <option value="debian_11">{t("Debian 11")}</option>
               </select>
             </div>
             <div className="field">
-              <label htmlFor="deploy-container-group">Container Group</label>
+              <label htmlFor="deploy-container-group">{t("Container Group")}</label>
               <input id="deploy-container-group" className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-base-name">Base Name</label>
+              <label htmlFor="deploy-base-name">{t("Base Name")}</label>
               <input id="deploy-base-name" className="input" value={form.agent_base_name} onChange={(e) => set("agent_base_name", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-memory-limit">Memory Limit</label>
+              <label htmlFor="deploy-memory-limit">{t("Memory Limit")}</label>
               <input id="deploy-memory-limit" className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-cpu-shares">CPU Shares</label>
+              <label htmlFor="deploy-cpu-shares">{t("CPU Shares")}</label>
               <input id="deploy-cpu-shares" className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-config-template-id">Config Template ID</label>
-              <input id="deploy-config-template-id" className="input" placeholder="optional template id" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} />
+              <label htmlFor="deploy-config-template-id">{t("Config Template ID")}</label>
+              <input id="deploy-config-template-id" className="input" placeholder={t("optional template id")} value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="deploy-parallel-mode">Parallel Mode</label>
+              <label htmlFor="deploy-parallel-mode">{t("Parallel Mode")}</label>
               <select id="deploy-parallel-mode" className="select" value={form.parallel_mode} onChange={(e) => set("parallel_mode", e.target.value)}>
-                <option value="multiprocessing">Multiprocessing</option>
-                <option value="threading">Threading</option>
-                <option value="sequential">Sequential</option>
+                <option value="multiprocessing">{t("Multiprocessing")}</option>
+                <option value="threading">{t("Threading")}</option>
+                <option value="sequential">{t("Sequential")}</option>
               </select>
             </div>
           </div>
           <div style={{ marginTop: 16, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <label className="checkbox-label"><input type="checkbox" checked={form.autostart} onChange={(e) => set("autostart", e.target.checked)} /> Auto-start</label>
-            <label className="checkbox-label"><input type="checkbox" checked={form.auto_create_group} onChange={(e) => set("auto_create_group", e.target.checked)} /> Auto-create group</label>
+            <label className="checkbox-label"><input type="checkbox" checked={form.autostart} onChange={(e) => set("autostart", e.target.checked)} /> {t("Auto-start")}</label>
+            <label className="checkbox-label"><input type="checkbox" checked={form.auto_create_group} onChange={(e) => set("auto_create_group", e.target.checked)} /> {t("Auto-create group")}</label>
           </div>
         </div>
         <button className="btn btn-primary" type="submit" disabled={deploying}>
-          {deploying ? "Deploying..." : `Deploy ${form.count} Container${form.count > 1 ? "s" : ""}`}
+          {deploying ? t("Deploying...") : (Number(form.count) === 1 ? t("Deploy 1 container") : t("Deploy {count} containers", { count: form.count }))}
         </button>
       </form>
 
@@ -314,7 +315,7 @@ export default function Deploy() {
 
       {result && (
         <details className="section" style={{ marginTop: 20 }}>
-          <summary className="section-title" style={{ cursor: "pointer" }}>Full deployment result</summary>
+          <summary className="section-title" style={{ cursor: "pointer" }}>{t("Full deployment result")}</summary>
           <div className="card">
             {result.message && <p>{result.message}</p>}
             <Details data={result.data || result} />

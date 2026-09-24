@@ -18,12 +18,12 @@ export function Value({ value }) {
   if (typeof value === "number") return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   if (typeof value === "string") {
     if (ISO_DATE.test(value) && !Number.isNaN(Date.parse(value))) {
-      return <time dateTime={value}>{new Date(value).toLocaleString()}</time>;
+      return <time dateTime={value}>{formatDateTime(value)}</time>;
     }
     return value.length > 80 || value.includes("\n") ? <code className="details-long">{value}</code> : value;
   }
   if (Array.isArray(value)) {
-    if (!value.length) return <span className="muted">none</span>;
+    if (!value.length) return <span className="muted">{t("none")}</span>;
     if (value.every((v) => !isPlainObject(v) && !Array.isArray(v))) return value.map(String).join(", ");
     if (value.every(isPlainObject)) return <RecordTable rows={value} />;
     return <ul className="plain-list">{value.map((v, i) => <li key={i}><Value value={v} /></li>)}</ul>;
@@ -38,14 +38,14 @@ export function RecordTable({ rows, limit = 50 }) {
   return (
     <div className="table-wrap details-table">
       <table>
-        <thead><tr>{keys.map((k) => <th key={k} scope="col">{humanize(k)}</th>)}</tr></thead>
+        <thead><tr>{keys.map((k) => <th key={k} scope="col">{t(humanize(k))}</th>)}</tr></thead>
         <tbody>
           {rows.slice(0, limit).map((r, i) => (
             <tr key={i}>{keys.map((k) => <td key={k}><Value value={r[k]} /></td>)}</tr>
           ))}
         </tbody>
       </table>
-      {rows.length > limit && <p className="muted">…and {rows.length - limit} more</p>}
+      {rows.length > limit && <p className="muted">{t("…and {n} more", { n: rows.length - limit })}</p>}
     </div>
   );
 }
@@ -53,15 +53,17 @@ export function RecordTable({ rows, limit = 50 }) {
 export function Details({ data, nested, hide = [] }) {
   if (!isPlainObject(data)) return <Value value={data} />;
   const entries = Object.entries(data).filter(([k]) => !hide.includes(k));
-  if (!entries.length) return <span className="muted">No details</span>;
+  if (!entries.length) return <span className="muted">{t("No details")}</span>;
   return (
     <dl className={`details${nested ? " details-nested" : ""}`}>
       {entries.map(([k, v]) => (
         <div className="details-row" key={k}>
-          <dt>{humanize(k)}</dt>
+          <dt>{t(humanize(k))}</dt>
           <dd><Value value={v} /></dd>
         </div>
       ))}
     </dl>
   );
 }
+
+import { formatDateTime, t } from "../i18n";

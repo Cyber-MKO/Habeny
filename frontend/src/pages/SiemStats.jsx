@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useMetricsSocket } from "../ws";
 import { PageHeader, StatCard, Spinner } from "../components/UI";
+import { t } from "../i18n";
 
 const SIEM_TYPES = ["wazuh", "ossec", "ossim", "utmstack", "elastic"];
 
@@ -33,8 +34,8 @@ export default function SiemStats() {
 
   return (
     <>
-      <PageHeader title="SIEM Stats" subtitle="Connectivity and agent counts per SIEM type">
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
+      <PageHeader title={t("SIEM Stats")} subtitle={t("Connectivity and agent counts per SIEM type")}>
+        <button className="btn btn-secondary" onClick={load}>{t("Refresh")}</button>
       </PageHeader>
 
       <div className="stats-grid">
@@ -50,7 +51,7 @@ export default function SiemStats() {
               label={type.charAt(0).toUpperCase() + type.slice(1)}
               value={total}
               color={total > 0 ? "blue" : undefined}
-              meta={`Connected: ${connected} · Rate: ${rate}%`}
+              meta={t("Connected: {connected} · Rate: {rate}%", { connected, rate })}
             />
           );
         })}

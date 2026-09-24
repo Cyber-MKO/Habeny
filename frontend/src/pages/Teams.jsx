@@ -3,6 +3,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { useConfirm } from "../components/Confirm";
 import { DataTable, Modal, PageHeader, Spinner } from "../components/UI";
+import { t } from "../i18n";
 
 const limitValue = (text) => (text === "" ? null : Math.max(0, Number(text)));
 
@@ -25,25 +26,25 @@ function TeamModal({ team, onClose, onSaved }) {
     } catch (err) { setError(err.message); }
   };
   return (
-    <Modal title={team ? `Edit ${team.name}` : "New team"} onClose={onClose}>
+    <Modal title={team ? t("Edit {name}", { name: team.name }) : t("New team")} onClose={onClose}>
       <form className="account-modal-form" onSubmit={submit} noValidate>
         {error && <div className="auth-error" role="alert">{error}</div>}
         <div className="field">
-          <label htmlFor="team-name">Name</label>
+          <label htmlFor="team-name">{t("Name")}</label>
           <input id="team-name" className="input" value={form.name} onChange={set("name")} maxLength={64} />
         </div>
         <div className="field">
-          <label htmlFor="team-desc">Description</label>
+          <label htmlFor="team-desc">{t("Description")}</label>
           <input id="team-desc" className="input" value={form.description} onChange={set("description")} maxLength={300} />
         </div>
         <div className="field">
-          <label htmlFor="team-limit">Container limit</label>
-          <input id="team-limit" className="input" type="number" min={0} value={form.max_containers} onChange={set("max_containers")} placeholder="No limit" />
-          <span className="auth-hint">The most containers the team's members can have in total. Empty: no limit.</span>
+          <label htmlFor="team-limit">{t("Container limit")}</label>
+          <input id="team-limit" className="input" type="number" min={0} value={form.max_containers} onChange={set("max_containers")} placeholder={t("No limit")} />
+          <span className="auth-hint">{t("The most containers the team's members can have in total. Empty: no limit.")}</span>
         </div>
         <div className="btn-group">
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={!form.name.trim()}>Save</button>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>{t("Cancel")}</button>
+          <button type="submit" className="btn btn-primary" disabled={!form.name.trim()}>{t("Save")}</button>
         </div>
       </form>
     </Modal>
@@ -65,17 +66,17 @@ function MemberRow({ user, teams, used, onSaved }) {
     <tr>
       <th scope="row">{user.username} <span className="muted">({user.role})</span></th>
       <td>
-        <select className="select" aria-label={`Team of ${user.username}`} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-          <option value="">No team</option>
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        <select className="select" aria-label={t("Team of {username}", { username: user.username })} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+          <option value="">{t("No team")}</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
         </select>
       </td>
       <td>
-        <input className="input input-narrow" type="number" min={0} aria-label={`Container limit for ${user.username}`}
-          value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="No limit" />
+        <input className="input input-narrow" type="number" min={0} aria-label={t("Container limit for {username}", { username: user.username })}
+          value={limit} onChange={(e) => setLimit(e.target.value)} placeholder={t("No limit")} />
       </td>
       <td>{used || 0}</td>
-      <td><button className="btn btn-sm btn-primary" onClick={save} disabled={!changed}>Save</button></td>
+      <td><button className="btn btn-sm btn-primary" onClick={save} disabled={!changed}>{t("Save")}</button></td>
     </tr>
   );
 }
@@ -93,7 +94,7 @@ function MoveContainers({ teams, onMoved }) {
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
-  const teamName = (id) => teams.find((t) => t.id === id)?.name || "No team";
+  const teamName = (id) => teams.find((team) => team.id === id)?.name || t("No team");
   const shown = (agents || []).filter((a) => a.agent_name.includes(filter.trim()));
   const toggle = (name) => setSelected((prev) => { const s = new Set(prev); if (s.has(name)) s.delete(name); else s.add(name); return s; });
   const move = async () => {
@@ -109,34 +110,33 @@ function MoveContainers({ teams, onMoved }) {
   return (
     <div className="card">
       <p className="account-help">
-        Containers deployed from now on belong to the deploying user's team. Move existing ones (for example, those
-        created before teams existed) here.
+        {t("Containers deployed from now on belong to the deploying user's team. Move existing ones (for example, those created before teams existed) here.")}
       </p>
       <div className="filters">
         <div className="field">
-          <label htmlFor="move-filter">Filter by name</label>
+          <label htmlFor="move-filter">{t("Filter by name")}</label>
           <input id="move-filter" className="input" type="search" value={filter} onChange={(e) => setFilter(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="move-target">Move to</label>
+          <label htmlFor="move-target">{t("Move to")}</label>
           <select id="move-target" className="select" value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">No team</option>
-            {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="">{t("No team")}</option>
+            {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
           </select>
         </div>
         <div className="field filters-actions">
-          <button className="btn btn-primary" onClick={move} disabled={!selected.size}>Move {selected.size || ""} selected</button>
+          <button className="btn btn-primary" onClick={move} disabled={!selected.size}>{t("Move")} {selected.size || ""} {t("selected")}</button>
         </div>
       </div>
       {agents === null ? <Spinner /> : (
         <div className="table-wrap table-scroll">
           <table>
-            <caption className="sr-only">Containers and their team</caption>
-            <thead><tr><th scope="col"><span className="sr-only">Select</span></th><th scope="col">Container</th><th scope="col">Team</th><th scope="col">Status</th></tr></thead>
+            <caption className="sr-only">{t("Containers and their team")}</caption>
+            <thead><tr><th scope="col"><span className="sr-only">{t("Select")}</span></th><th scope="col">{t("Container")}</th><th scope="col">{t("Team")}</th><th scope="col">{t("Status")}</th></tr></thead>
             <tbody>
               {shown.map((a) => (
                 <tr key={a.agent_name}>
-                  <td><input type="checkbox" aria-label={`Select ${a.agent_name}`} checked={selected.has(a.agent_name)} onChange={() => toggle(a.agent_name)} /></td>
+                  <td><input type="checkbox" aria-label={t("Select {agent_name}", { agent_name: a.agent_name })} checked={selected.has(a.agent_name)} onChange={() => toggle(a.agent_name)} /></td>
                   <td>{a.agent_name}</td>
                   <td>{teamName(a.team_id)}</td>
                   <td>{a.lifecycle_status}</td>
@@ -166,47 +166,46 @@ export default function Teams() {
   }, [toast]);
   useEffect(() => { load(); }, [load]);
 
-  const remove = async (t) => {
+  const remove = async (team) => {
     if (!(await confirm({
-      title: `Delete team ${t.name}?`,
-      message: `Its ${t.members} member(s) and ${t.containers} container(s) will have no team. Nothing is deleted.`,
-      confirmLabel: "Delete team", danger: true,
+      title: t("Delete team {name}?", { name: team.name }),
+      message: t("Its {members} member(s) and {containers} container(s) will have no team. Nothing is deleted.", { members: team.members, containers: team.containers }),
+      confirmLabel: t("Delete team"), danger: true,
     }))) return;
-    try { toast((await api.deleteTeam(t.id)).message, "success"); load(); }
+    try { toast((await api.deleteTeam(team.id)).message, "success"); load(); }
     catch (err) { toast(err.message, "error"); }
   };
 
   const teams = useMemo(() => data?.teams || [], [data]);
   const columns = [
-    { key: "name", label: "Team", render: (t) => <><strong>{t.name}</strong>{t.description && <div className="muted">{t.description}</div>}</> },
-    { key: "members", label: "Members" },
-    { key: "containers", label: "Containers", render: (t) => `${t.containers}${t.max_containers !== null ? ` of ${t.max_containers}` : ""}` },
-    { key: "actions", label: <span className="sr-only">Actions</span>, render: (t) => (
+    { key: "name", label: t("Team"), render: (team) => <><strong>{team.name}</strong>{team.description && <div className="muted">{team.description}</div>}</> },
+    { key: "members", label: t("Members") },
+    { key: "containers", label: t("Containers"), render: (team) => (team.max_containers !== null ? `${team.containers} of ${team.max_containers}` : `${team.containers}`) },
+    { key: "actions", label: <span className="sr-only">{t("Actions")}</span>, render: (team) => (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={() => setEditing(t)} aria-label={`Edit ${t.name}`}>Edit</button>
-        <button className="btn btn-sm btn-danger" onClick={() => remove(t)} aria-label={`Delete ${t.name}`}>Delete</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => setEditing(team)} aria-label={t("Edit {name}", { name: team.name })}>{t("Edit")}</button>
+        <button className="btn btn-sm btn-danger" onClick={() => remove(team)} aria-label={t("Delete {name}", { name: team.name })}>{t("Delete")}</button>
       </div>
     ) },
   ];
 
   return (
     <>
-      <PageHeader title="Teams" subtitle="Separate teams or customers, and cap how many containers they run">
-        <button className="btn btn-primary" onClick={() => setEditing("new")}>New team</button>
+      <PageHeader title={t("Teams")} subtitle={t("Separate teams or customers, and cap how many containers they run")}>
+        <button className="btn btn-primary" onClick={() => setEditing("new")}>{t("New team")}</button>
       </PageHeader>
       <p className="account-help">
-        Members of a team see and manage only their team's containers, simulations and reports; people without a team
-        see containers that belong to no team. Admins see everything. Profiles, groups and templates are shared.
+        {t("Members of a team see and manage only their team's containers, simulations and reports; people without a team see containers that belong to no team. Admins see everything. Profiles, groups and templates are shared.")}
       </p>
       <section className="section" aria-labelledby="teams-list">
-        <h2 className="section-title" id="teams-list">Teams</h2>
-        <div className="card">{data === null ? <Spinner /> : <DataTable columns={columns} rows={teams} emptyMsg="No teams yet: everyone shares all containers." />}</div>
+        <h2 className="section-title" id="teams-list">{t("Teams")}</h2>
+        <div className="card">{data === null ? <Spinner /> : <DataTable columns={columns} rows={teams} emptyMsg={t("No teams yet: everyone shares all containers.")} />}</div>
       </section>
       <section className="section" aria-labelledby="teams-members">
-        <h2 className="section-title" id="teams-members">Members and personal limits</h2>
+        <h2 className="section-title" id="teams-members">{t("Members and personal limits")}</h2>
         <div className="card table-wrap">
           <table>
-            <thead><tr><th scope="col">User</th><th scope="col">Team</th><th scope="col">Personal limit</th><th scope="col">Containers</th><th scope="col"><span className="sr-only">Save</span></th></tr></thead>
+            <thead><tr><th scope="col">{t("User")}</th><th scope="col">{t("Team")}</th><th scope="col">{t("Personal limit")}</th><th scope="col">{t("Containers")}</th><th scope="col"><span className="sr-only">{t("Save")}</span></th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <MemberRow key={`${u.id}-${u.team?.id}-${u.max_containers}`} user={u} teams={teams} used={data?.user_usage?.[u.id]} onSaved={load} />
@@ -216,7 +215,7 @@ export default function Teams() {
         </div>
       </section>
       <section className="section" aria-labelledby="teams-move">
-        <h2 className="section-title" id="teams-move">Move containers between teams</h2>
+        <h2 className="section-title" id="teams-move">{t("Move containers between teams")}</h2>
         {data && <MoveContainers teams={teams} onMoved={load} />}
       </section>
       {editing && <TeamModal team={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={load} />}

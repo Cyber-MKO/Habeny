@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, setApiHost } from "./api";
+import { t } from "./i18n";
 
 const STORAGE_KEY = "habeny.host";
 const HostCtx = createContext({ hosts: [], hostId: null, host: null, selectHost: () => {}, refreshHosts: () => {} });
@@ -53,10 +54,10 @@ export function HostSwitcher() {
   if (!hosts.length) return null;
   return (
     <div className="host-switcher">
-      <label htmlFor="host-switch">Server</label>
+      <label htmlFor="host-switch">{t("Server")}</label>
       <select id="host-switch" className="select" value={hostId || ""} onChange={(e) => selectHost(e.target.value)}>
-        <option value="">This server</option>
-        {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}{h.last_status === "error" ? " (unreachable)" : ""}</option>)}
+        <option value="">{t("This server")}</option>
+        {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}{h.last_status === "error" ? t(" (unreachable)") : ""}</option>)}
       </select>
     </div>
   );

@@ -3,6 +3,7 @@ import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
 import { wsUrl } from "../api";
+import { t } from "../i18n";
 
 export default function Terminal({ containerName, onClose }) {
   const termRef = useRef(null);
@@ -68,8 +69,8 @@ export default function Terminal({ containerName, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="terminal-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">Console: {containerName}</span>
-          <button className="btn btn-sm btn-danger" onClick={onClose}>Disconnect</button>
+          <span className="modal-title">{t("Console: {name}", { name: containerName })}</span>
+          <button className="btn btn-sm btn-danger" onClick={onClose}>{t("Disconnect")}</button>
         </div>
         <div className="terminal-body" ref={termRef} />
       </div>
