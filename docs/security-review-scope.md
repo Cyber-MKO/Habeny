@@ -106,6 +106,9 @@ OSSIM), and Habeny simulates activity in them for testing and benchmarking.
   by an admin is accepted); check that non-admins can't set them and that responses
   aren't reflected.
 - **Unauthenticated endpoints:** `/healthz` and `/readyz` must not leak details.
+- **Licensing** (`app/services/licensing.py`): a forged, altered or other-server license
+  file, or a non-admin, must not get a license accepted over the API. Offline bypass by
+  someone with root is out of scope (see section 9).
 - **Denial of service with an account:** for example, deploying or simulating enough
   to take the host down. Tell us about gaps in the limits; flooding tests are not wanted.
 
@@ -158,6 +161,8 @@ OSSIM), and Habeny simulates activity in them for testing and benchmarking.
 - The in-container console gives operators a root shell *inside* containers by design.
   Escaping to the host is in scope.
 - SAML and LDAP are not supported, only OIDC and local accounts.
+- The license check is offline. Someone with root on the server can defeat it (edit the
+  code, the database or `/etc/machine-id`); the EULA covers that.
 - Pending 2FA sign-in challenges and pending SSO sign-ins are kept in memory, not in the
   database. Sessions are stored in the database. The app is designed to run as a single
   process.

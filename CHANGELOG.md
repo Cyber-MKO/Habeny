@@ -32,8 +32,21 @@ taken before it instead.
   pinning, `habeny tls fingerprint`), switch between them from the sidebar, and see all
   hosts' status on the Hosts page.
 - **French** interface, with a translation framework for more languages.
+- **Per-server licenses**, checked offline: `habeny license request|install|status` and
+  Settings → License. A 30-day trial, then new deployments, simulations, benchmarks and
+  log uploads need a license; viewing and managing existing containers always work.
+  Licensing stays off in builds without a vendor public key, which includes source
+  builds from this repository.
+- `THIRD_PARTY_NOTICES.txt` in every release (and linked from About Habeny): the bundled
+  Python and npm packages with their licenses. The build fails on a copyleft or unknown
+  license.
+- Legal and privacy documents: `LICENSE`, a draft EULA, a sourced review of the SIEM
+  vendors' licenses and trademarks (`docs/legal/`), and `docs/privacy.md`, which lists
+  what Habeny stores, for how long and what it connects to.
 
 ### Changed
+- `HABENY_HISTORY_RETENTION_DAYS` now also deletes finished benchmarks and their metrics,
+  which were kept forever.
 - Confirmations use accessible in-page dialogs instead of the browser's `confirm()`;
   deleting many containers asks you to type "delete".
 - Results that showed raw JSON (container details, deploy, simulation and upload

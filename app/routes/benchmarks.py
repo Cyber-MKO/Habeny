@@ -11,7 +11,7 @@ from app.config import DB_PATH
 from app.core.lxc_backend import lxc
 from app.db import get_manager
 from app.models import APIResponse, BenchmarkCompareRequest, BenchmarkStartRequest
-from app.services import tenancy
+from app.services import licensing, tenancy
 from app.services.activity import log_activity
 from app.services.auth import current_user
 
@@ -32,6 +32,7 @@ async def start_benchmark(request: BenchmarkStartRequest,
                           background_tasks: BackgroundTasks,
                           user: dict | None = Depends(current_user)):
     """Start a benchmark execution"""
+    licensing.require()
     try:
         scenario_id = request.scenario_id
         if scenario_id not in bm_engine.SCENARIOS:

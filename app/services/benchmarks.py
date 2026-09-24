@@ -35,6 +35,22 @@ def _now():
 SECRET_CONFIG_KEYS = ("siem_auth_key",)
 
 
+def prune_finished(before: str) -> int:
+    """Delete benchmarks that finished before `before` (ISO time), with their metrics and
+    bottlenecks. Running and pending ones are kept. Returns how many were deleted."""
+    with _conn() as c:
+        ids = [r[0] for r in c.execute(
+            "SELECT benchmark_id FROM benchmarks WHERE status NOT IN ('running', 'pending') "
+            "AND COALESCE(completed_at, created_at) < ?", (before,)).fetchall()]
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            marks = ",".join("?" * len(chunk))
+            for table in ("benchmark_metrics", "benchmark_bottlenecks", "benchmarks"):
+                c.execute(f"DELETE FROM {table} WHERE benchmark_id IN ({marks})", chunk)
+        c.commit()
+    return len(ids)
+
+
 def _storable_config(config: dict) -> dict:
     """Benchmark config as persisted/returned: secrets are only kept in memory for the run."""
     return {k: v for k, v in config.items() if k not in SECRET_CONFIG_KEYS}

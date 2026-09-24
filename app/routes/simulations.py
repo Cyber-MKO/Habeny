@@ -15,7 +15,7 @@ from app.models import (
     SyslogSimulationRequest,
     utc_now,
 )
-from app.services import tenancy
+from app.services import licensing, tenancy
 from app.services.activity import log_activity
 from app.services.auth import current_user
 from app.services.simulation import (
@@ -57,6 +57,7 @@ async def load_simulation(
     user: dict | None = Depends(current_user),
 ):
     """Load custom EPS simulations using JSON log templates."""
+    licensing.require()
     try:
         simulation_id = str(uuid.uuid4())
 
@@ -118,6 +119,7 @@ async def load_simulation(
 async def start_syslog_simulation(request: SyslogSimulationRequest, background_tasks: BackgroundTasks,
                                   user: dict | None = Depends(current_user)):
     """Start a syslog simulation to a target IP/port."""
+    licensing.require()
     try:
         simulation_id = str(uuid.uuid4())
         protocol = request.protocol.value if hasattr(request.protocol, "value") else request.protocol
@@ -179,6 +181,7 @@ async def start_simulation(
     user: dict | None = Depends(current_user),
 ):
     """Start an attack simulation on selected containers"""
+    licensing.require()
     try:
         simulation_id = str(uuid.uuid4())
 

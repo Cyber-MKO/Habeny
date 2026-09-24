@@ -1,0 +1,20 @@
+Habeny
+Copyright (c) 2026 Habeny Platform. All rights reserved.
+
+This software is proprietary and confidential. It is licensed, not sold.
+
+You may install and use it only under a written license agreement with Habeny
+Platform, such as the Habeny End User License Agreement (docs/legal/EULA.md) together
+with a license file issued for your server. Without such an agreement you may not use,
+copy, modify, distribute, sublicense, or sell copies of this software, or make it
+available to third parties as a service.
+
+The software includes open-source components, each licensed under its own terms. They
+are listed, with their licenses and notices, in THIRD_PARTY_NOTICES.txt, which comes
+with every release. Nothing in this notice limits your rights under those licenses.
+
+Wazuh, Elastic, OSSEC, AlienVault, OSSIM and UTMStack are trademarks of their respective
+owners. Habeny is not affiliated with or endorsed by them.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXCEPT AS EXPRESSLY
+STATED IN YOUR LICENSE AGREEMENT.

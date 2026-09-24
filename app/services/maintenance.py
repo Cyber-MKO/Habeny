@@ -54,7 +54,7 @@ def prune(dry_run: bool = False) -> dict:
     from app.services import audit
 
     removed = {"metric_samples": 0, "history_metrics": 0, "audit_entries": 0, "activity_files": 0, "report_files": 0,
-               "expired_sessions": 0, "expired_tokens": 0, "finished_jobs": 0}
+               "expired_sessions": 0, "expired_tokens": 0, "finished_jobs": 0, "benchmarks": 0}
 
     samples_cutoff = _cutoff(config.get("HABENY_METRICS_RETENTION_DAYS"))
     history_cutoff = _cutoff(config.get("HABENY_HISTORY_RETENTION_DAYS"))
@@ -77,6 +77,8 @@ def prune(dry_run: bool = False) -> dict:
         from app.state import STORES
         removed["finished_jobs"] = sum(store.prune(history_cutoff.isoformat()) for store in STORES)
         removed["audit_entries"] = audit.prune(history_cutoff.isoformat())
+        from app.services.benchmarks import prune_finished
+        removed["benchmarks"] = prune_finished(history_cutoff.isoformat())
     for path in old_activity:
         path.unlink(missing_ok=True)
     removed["activity_files"] = len(old_activity)

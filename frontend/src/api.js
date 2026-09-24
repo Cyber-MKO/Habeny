@@ -4,10 +4,10 @@ const BASE = import.meta.env.VITE_API_URL || "/api";
 export const UNAUTHORIZED_EVENT = "habeny:unauthorized";
 
 // Another Habeny server ("host") chosen in the host switcher: its API calls and WebSockets
-// go through this server's relay. Accounts, tokens, teams, hosts, notifications and backups
-// always stay with this server.
+// go through this server's relay. Accounts, tokens, teams, hosts, notifications, backups and
+// the license always stay with this server.
 let currentHost = null;
-const LOCAL_ONLY = ["/auth", "/users", "/hosts", "/teams", "/notifications", "/system/backups"];
+const LOCAL_ONLY = ["/auth", "/users", "/hosts", "/teams", "/notifications", "/system/backups", "/license"];
 
 export function setApiHost(id) {
   currentHost = id || null;
@@ -93,6 +93,8 @@ export const api = {
 
   getHealth: () => request("/system/health"),
   getAlerts: () => request("/system/alerts"),
+  getLicense: () => request("/license"),
+  installLicense: (body) => request("/license", { method: "POST", body }),
   getChannels: () => request("/notifications/channels"),
   createChannel: (body) => request("/notifications/channels", { method: "POST", body }),
   updateChannel: (id, body) => request(`/notifications/channels/${id}`, { method: "PUT", body }),
