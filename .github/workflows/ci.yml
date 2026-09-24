@@ -50,6 +50,31 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
+  package:
+    name: Package build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: shellcheck -S warning start.sh deploy/*.sh
+      - run: npm ci && npm run build
+        working-directory: frontend
+      # The release tarball and .deb (no offline wheels, to keep it quick)
+      - run: deploy/build-release.sh dist
+        env:
+          HABENY_WHEEL_PYTHONS: ""
+      - name: Check the package
+        run: |
+          deb=dist/habeny_*_all.deb
+          dpkg-deb --info $deb
+          dpkg-deb --contents $deb | grep >/dev/null './opt/habeny/static/index.html'
+          dpkg-deb --contents $deb | grep >/dev/null './lib/systemd/system/habeny.service'
+          tar -tzf dist/habeny-*.tar.gz | grep >/dev/null 'static/.habeny-build'
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest

@@ -17,7 +17,9 @@ import subprocess
 import termios
 from typing import Optional
 
-MODE = os.environ.get("HABENY_LXC_BACKEND") or ("direct" if os.geteuid() == 0 else "helper")
+from app import config
+
+MODE = config.get("HABENY_LXC_BACKEND") or ("direct" if os.geteuid() == 0 else "helper")
 
 if MODE == "direct":
     import lxc  # noqa: F401  (python-lxc)

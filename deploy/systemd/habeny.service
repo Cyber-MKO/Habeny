@@ -13,11 +13,16 @@ WorkingDirectory=@INSTALL_DIR@
 Environment=HABENY_LXC_BACKEND=helper
 Environment=HABENY_HELPER_SOCKET=/run/habeny/helper.sock
 Environment=HABENY_DATA_DIR=@DATA_DIR@
-# Optional: your own certificate / reverse-proxy mode, listen address (see README)
-EnvironmentFile=-/etc/default/habeny
+# Settings: /etc/habeny/habeny.conf, read by the app itself (see `habeny config`)
 ExecStart=@INSTALL_DIR@/.venv/bin/python main.py
 Restart=on-failure
 RestartSec=2
+# Exit code 78 = invalid configuration: restarting won't help, see `journalctl -u habeny`
+RestartPreventExitStatus=78
+# Graceful stop: SIGTERM goes to the web app only, which lets running deployments finish
+# (HABENY_SHUTDOWN_TIMEOUT, max 14 min) and exits; then anything left is killed
+KillMode=mixed
+TimeoutStopSec=15min
 
 # Sandboxing: the web app never needs root, capabilities or write access outside its data
 NoNewPrivileges=yes

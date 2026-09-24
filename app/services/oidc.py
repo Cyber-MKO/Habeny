@@ -9,7 +9,6 @@ HABENY_OIDC_ISSUER is set.
 import base64
 import hashlib
 import json
-import os
 import re
 import secrets
 import ssl
@@ -23,6 +22,8 @@ from typing import Any, Optional
 
 import jwt
 
+from app import config
+
 HTTP_TIMEOUT = 10
 FLOW_TTL = 10 * 60  # seconds a user has to finish signing in at the IdP
 METADATA_TTL = 60 * 60
@@ -33,10 +34,6 @@ SSO_USERNAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@+-]{0,63}$")
 
 class OIDCError(Exception):
     """A sign-in that must be refused; the message is safe to show the user."""
-
-
-def _csv(name: str) -> set[str]:
-    return {v.strip() for v in os.environ.get(name, "").split(",") if v.strip()}
 
 
 @dataclass
@@ -59,27 +56,25 @@ class Settings:
 
 
 def settings() -> Optional[Settings]:
-    issuer = os.environ.get("HABENY_OIDC_ISSUER", "").strip().rstrip("/")
+    """Current SSO settings (see app/config.py), or None when SSO is off."""
+    issuer = config.get("HABENY_OIDC_ISSUER").rstrip("/")
     if not issuer:
         return None
-    client_id = os.environ.get("HABENY_OIDC_CLIENT_ID", "").strip()
+    client_id = config.get("HABENY_OIDC_CLIENT_ID")
     if not client_id:
-        raise RuntimeError("HABENY_OIDC_ISSUER is set but HABENY_OIDC_CLIENT_ID is not")
-    default_role = os.environ.get("HABENY_OIDC_DEFAULT_ROLE", "viewer").strip().lower()
-    if default_role not in ROLES:
-        raise RuntimeError("HABENY_OIDC_DEFAULT_ROLE must be viewer, operator or admin")
+        raise config.ConfigError("HABENY_OIDC_ISSUER is set but HABENY_OIDC_CLIENT_ID is not")
     return Settings(
         issuer=issuer,
         client_id=client_id,
-        client_secret=os.environ.get("HABENY_OIDC_CLIENT_SECRET", ""),
-        redirect_uri=os.environ.get("HABENY_OIDC_REDIRECT_URI", "").strip(),
-        scopes=os.environ.get("HABENY_OIDC_SCOPES", "openid profile email"),
-        username_claim=os.environ.get("HABENY_OIDC_USERNAME_CLAIM", "preferred_username"),
-        groups_claim=os.environ.get("HABENY_OIDC_GROUPS_CLAIM", "groups"),
-        role_groups={role: _csv(f"HABENY_OIDC_{role.upper()}_GROUPS") for role in ROLES},
-        default_role=default_role,
-        label=os.environ.get("HABENY_OIDC_BUTTON_LABEL", "Sign in with SSO"),
-        ca_bundle=os.environ.get("HABENY_OIDC_CA_BUNDLE", ""),
+        client_secret=config.raw("HABENY_OIDC_CLIENT_SECRET"),
+        redirect_uri=config.get("HABENY_OIDC_REDIRECT_URI"),
+        scopes=config.get("HABENY_OIDC_SCOPES"),
+        username_claim=config.get("HABENY_OIDC_USERNAME_CLAIM"),
+        groups_claim=config.get("HABENY_OIDC_GROUPS_CLAIM"),
+        role_groups={role: set(config.get(f"HABENY_OIDC_{role.upper()}_GROUPS")) for role in ROLES},
+        default_role=config.get("HABENY_OIDC_DEFAULT_ROLE"),
+        label=config.get("HABENY_OIDC_BUTTON_LABEL"),
+        ca_bundle=config.get("HABENY_OIDC_CA_BUNDLE"),
     )
 
 
@@ -90,7 +85,7 @@ def _ssl_context(cfg: Settings) -> ssl.SSLContext:
 
 
 def _http_json(cfg: Settings, url: str, data: Optional[dict] = None, headers: Optional[dict] = None) -> dict:
-    if urllib.parse.urlsplit(url).scheme != "https" and not os.environ.get("HABENY_OIDC_ALLOW_HTTP"):
+    if urllib.parse.urlsplit(url).scheme != "https" and not config.get("HABENY_OIDC_ALLOW_HTTP"):
         raise OIDCError(f"Refusing non-HTTPS identity provider URL: {url}")
     body = urllib.parse.urlencode(data).encode() if data is not None else None
     req = urllib.request.Request(url, data=body, headers={"Accept": "application/json", **(headers or {})})

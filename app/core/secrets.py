@@ -13,6 +13,7 @@ from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from app import config
 from app.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ _lock = threading.Lock()
 
 
 def _load_key() -> bytes:
-    env_key = os.environ.get("HABENY_SECRET_KEY")
+    env_key = config.raw("HABENY_SECRET_KEY")
     if env_key:
         return env_key.encode()
     try:

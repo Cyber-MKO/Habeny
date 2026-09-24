@@ -79,8 +79,8 @@ export default function SystemInfo() {
           <StatCard label="Architecture" value={s.arch || "—"} />
           <StatCard label="Root" value={s.is_root ? "Yes" : "No"} color={s.is_root ? "green" : "red"} />
           <StatCard label="CPU Count" value={s.cpu_count ?? "—"} />
-          <StatCard label="Thread Workers" value={s.worker_config?.thread_workers ?? "—"} />
-          <StatCard label="Process Workers" value={s.worker_config?.process_workers ?? "—"} />
+          <StatCard label="Deploy Workers" value={s.worker_config?.deploy_workers ?? "—"} />
+          <StatCard label="Benchmark Workers" value={s.worker_config?.benchmark_workers ?? "—"} />
         </div>
       </div>
 
