@@ -48,7 +48,17 @@ def public_user(user: dict) -> dict:
         "sso": bool(user.get("oidc_subject")),
         "created_at": user.get("created_at"),
         "last_login_at": user.get("last_login_at"),
+        "team": _team_ref(user.get("team_id")),
+        "max_containers": user.get("max_containers"),
     }
+
+
+def _team_ref(team_id: int | None) -> dict | None:
+    if team_id is None:
+        return None
+    from app.services.tenancy import get_team
+    team = get_team(team_id)
+    return {"id": team["id"], "name": team["name"]} if team else None
 
 
 def _set_session_cookie(request: Request, response: Response, token: str) -> None:

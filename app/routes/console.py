@@ -13,6 +13,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.container import validate_container_name
 from app.core.lxc_backend import lxc, open_console
+from app.services.auth import current_user
+from app.services.tenancy import can_see
 
 router = APIRouter()
 
@@ -34,7 +36,7 @@ async def console_session(websocket: WebSocket, container_name: str):
         await websocket.close(code=1008)
         return
 
-    if container_name not in lxc.list_containers():
+    if container_name not in lxc.list_containers() or not can_see(current_user(websocket), container_name):
         await websocket.send_text("ERROR: Container not found.\n")
         await websocket.close(code=1008)
         return

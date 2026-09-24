@@ -83,14 +83,15 @@ def list_simulation_profiles() -> list[str]:
     ]
 
 
-def select_agents_for_simulation(selector: AgentSelector) -> list[str]:
+def select_agents_for_simulation(selector: AgentSelector, user: dict | None = None) -> list[str]:
     """The running containers matching every criterion given (agent_ids, siem_type,
     agent_group, tags, status), then a random `count` of them if set."""
     wanted_ids = set(selector.agent_ids or [])
     siem_type = getattr(selector.siem_type, "value", selector.siem_type)
     status = getattr(selector.status, "value", selector.status)
     selected = []
-    for name in lxc.list_containers():
+    from app.services.tenancy import visible
+    for name in visible(user, lxc.list_containers()):
         if wanted_ids and name not in wanted_ids:
             continue
         if not lxc.Container(name).running:

@@ -64,9 +64,11 @@ def write_agent_metadata(agent_name: str, metadata: dict[str, Any]) -> None:
 
 
 def delete_agent_metadata(agent_name: str) -> None:
-    """Mark persisted metadata for a container as deleted."""
+    """Mark persisted metadata for a container as deleted (and forget its owner)."""
     try:
         mark_agent_deleted(DB_PATH, agent_name)
+        from app.services.tenancy import forget
+        forget([agent_name])
     except Exception as e:
         logger.warning(f"Failed to mark metadata deleted for {agent_name}: {e}")
 
@@ -103,29 +105,40 @@ def container_state_summary() -> dict[str, Any]:
         names = lxc.list_containers()
         by_state = {"RUNNING": 0, "STOPPED": 0, "FROZEN": 0, "OTHER": 0}
         running = 0
+        states = {}
         for name in names:
             state = lxc.Container(name).state
+            states[name] = state
             by_state[state if state in by_state else "OTHER"] += 1
             if state and state != "STOPPED":
                 running += 1
-        summary = {"names": list(names), "total": len(names), "by_state": by_state, "running": running}
+        summary = {"names": list(names), "total": len(names), "by_state": by_state, "running": running,
+                   "states": states}
         _scan_cache.update(at=time.monotonic(), value=summary)
         return summary
 
 
-def container_counts() -> dict[str, Any]:
+def container_counts(only: list[str] | None = None) -> dict[str, Any]:
     """Dashboard totals: running/stopped from the shared state scan and SIEM type from
-    stored metadata (one DB query), without attaching to any container. Blocking."""
+    stored metadata (one DB query), without attaching to any container. Blocking.
+    `only`: count just these (existing) containers, e.g. the ones a team can see."""
     scan = container_state_summary()
     siem_types = get_agent_siem_types(DB_PATH)
+    if only is None:
+        names, running = scan["names"], scan["running"]
+    else:
+        states = scan.get("states") or {}
+        names = list(only)
+        # The scan is cached for a few seconds: look up containers newer than it
+        running = sum(1 for n in names if (states[n] if n in states else lxc.Container(n).state) not in (None, "STOPPED"))
     by_siem: dict[str, int] = {}
-    for name in scan["names"]:
+    for name in names:
         siem_type = siem_types.get(name) or "unknown"
         by_siem[siem_type] = by_siem.get(siem_type, 0) + 1
     return {
-        "total": scan["total"],
-        "running": scan["running"],
-        "stopped": scan["total"] - scan["running"],
+        "total": len(names),
+        "running": running,
+        "stopped": len(names) - running,
         "by_siem_type": by_siem,
     }
 

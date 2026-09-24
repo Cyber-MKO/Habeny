@@ -157,6 +157,7 @@ async def require_user(conn: HTTPConnection) -> dict[str, Any]:
     """Dependency for every protected HTTP route and WebSocket."""
     user = session_user(conn)
     if user is not None:
+        conn.state.user = user  # for routes: Depends(current_user)
         set_request_user(user["username"])  # for this request's log lines
         ctx = request_context.get()
         if ctx is not None and user.get("auth") == "token":
@@ -244,6 +245,11 @@ async def require_access(conn: HTTPConnection) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, headers={"Retry-After": "60"},
                             detail="Habeny is restarting. Try again in a minute.")
     return user
+
+
+def current_user(conn: HTTPConnection) -> dict[str, Any] | None:
+    """The signed-in user of this request (set by the router-wide access check)."""
+    return getattr(conn.state, "user", None)
 
 
 async def require_session(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:

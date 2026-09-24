@@ -33,6 +33,7 @@ def register_routes(app: FastAPI) -> None:
         static,
         syslog_configs,
         system,
+        teams,
         users,
     )
     from app.services.auth import require_access, require_user
@@ -60,5 +61,6 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(users.router, dependencies=[Depends(require_user)])
     app.include_router(backups.router)  # admins only (checked by the router)
     app.include_router(monitoring.admin_router)  # notification channels: admins only
+    app.include_router(teams.router)  # teams and limits: admins only
     app.include_router(auth.router)
     static.register(app)

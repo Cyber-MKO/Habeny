@@ -963,3 +963,5 @@ fieldset.field legend { font-size: 12px; font-weight: 500; color: var(--text-dim
 .alert-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .header-alerts { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--red-soft); color: var(--red); text-decoration: none; }
 .header-alerts.warning { background: var(--orange-soft); color: var(--orange); }
+.input-narrow { width: 110px; }
+.table-scroll { max-height: 420px; overflow-y: auto; }

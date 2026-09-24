@@ -306,7 +306,7 @@ def detect_bottlenecks(benchmark_id: str, phase: int, metrics: dict):
 active_benchmarks: dict[str, dict] = {}
 
 
-async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
+async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict, owner: dict | None = None):
     """Execute a full multi-phase benchmark."""
     scenario = SCENARIOS.get(scenario_id)
     if not scenario:
@@ -367,6 +367,10 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
                 from app.services.deployment import deploy_single_siem_agent, persist_deploy_result
 
                 agent_names = [f"{base_name}-p{i}-{j:04d}" for j in range(1, agents_count + 1)]
+                from app.core.lxc_backend import lxc
+                from app.services import tenancy
+                existing = set(lxc.list_containers())
+                tenancy.record([n for n in agent_names if n not in existing], owner)
                 deployment_config = {
                     "siem_type": siem_type, "siem_ip": siem_ip,
                     "os_type": config.get("os_type", "ubuntu_22_04"),

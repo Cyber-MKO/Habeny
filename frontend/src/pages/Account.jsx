@@ -708,6 +708,7 @@ export default function Account() {
         <div className="account-me">
           Signed in as <strong>{user.username}</strong>
           <Pill status={user.role} />
+          {user.team && <span className="tag">team {user.team.name}</span>}
         </div>
         <div className="account-grid">
           {user.sso ? (

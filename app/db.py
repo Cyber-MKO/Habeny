@@ -600,7 +600,8 @@ def get_user_by_id(db_path: Path, user_id: int) -> dict[str, Any] | None:
 def list_users(db_path: Path) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at FROM users"
+            "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at, team_id,"
+            " max_containers FROM users"
             " ORDER BY username COLLATE NOCASE"
         ).fetchall()
         return [_user_row(r) for r in rows]
@@ -802,7 +803,7 @@ def get_session_user(db_path: Path, token_hash: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.oidc_subject, u.created_at, u.last_login_at,
-                   s.last_seen_at AS session_last_seen_at
+                   u.team_id, u.max_containers, s.last_seen_at AS session_last_seen_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?
             """,
@@ -851,7 +852,7 @@ def get_api_token_user(db_path: Path, token_hash: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.oidc_subject, u.created_at,
-                   u.last_login_at, t.id AS token_id, t.name AS token_name, t.role AS token_role,
+                   u.last_login_at, u.team_id, u.max_containers, t.id AS token_id, t.name AS token_name, t.role AS token_role,
                    t.last_used_at AS token_last_used_at
             FROM api_tokens t JOIN users u ON u.id = t.user_id
             WHERE t.token_hash = ? AND (t.expires_at IS NULL OR t.expires_at > ?)

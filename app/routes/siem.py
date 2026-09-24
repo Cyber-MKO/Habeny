@@ -3,23 +3,25 @@ Per-SIEM aggregate stats.
 """
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.lxc_backend import lxc
 from app.models import APIResponse
+from app.services import tenancy
 from app.services.agent_info import (
     check_siem_connectivity,
     detect_siem_type,
     get_agent_info,
     write_agent_metadata,
 )
+from app.services.auth import current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.get("/siem/{siem_type}/stats", response_model=APIResponse)
-async def get_siem_stats(siem_type: str):
+async def get_siem_stats(siem_type: str, user: dict | None = Depends(current_user)):
     """Get statistics for a specific SIEM type"""
     try:
         if siem_type not in ["wazuh", "ossec", "ossim", "utmstack", "elastic"]:
@@ -30,7 +32,7 @@ async def get_siem_stats(siem_type: str):
         agent_count = 0
         connected_count = 0
 
-        for name in lxc.list_containers():
+        for name in tenancy.visible(user, lxc.list_containers()):
             try:
                 container = lxc.Container(name)
                 agent_info = get_agent_info(container)
