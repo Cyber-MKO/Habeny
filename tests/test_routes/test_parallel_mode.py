@@ -59,9 +59,14 @@ def test_worker_count():
     assert dep.worker_count("multiprocessing", 10_000) == dep.DEPLOY_WORKERS
 
 
-def test_route_passes_the_mode(client):
-    resp = client.post("/agents/deploy", json={"count": 1, "siem_type": "none", "agent_base_name": "pmroute",
-                                               "parallel_mode": "sequential", "deployment_id": "pm-route-1"})
+def test_route_passes_the_mode(app, client):
+    from app.core.common import check_root
+    app.dependency_overrides[check_root] = lambda: True  # CI runs unprivileged
+    try:
+        resp = client.post("/agents/deploy", json={"count": 1, "siem_type": "none", "agent_base_name": "pmroute",
+                                                   "parallel_mode": "sequential", "deployment_id": "pm-route-1"})
+    finally:
+        app.dependency_overrides.pop(check_root, None)
     assert resp.status_code == 200, resp.text
     events = client.get("/agents/deploy/progress/pm-route-1").json()["data"]["events"]
     assert any("Launching 1 deployment worker (sequential)" in e["message"] for e in events)

@@ -28,6 +28,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      # The runner image's package index can be older than the mirror
+      - run: sudo apt-get update -q
       - name: Install Habeny
         run: sudo deploy/install.sh
       # Docker on the runner sets the FORWARD policy to DROP, which cuts containers off
