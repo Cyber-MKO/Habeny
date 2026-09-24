@@ -354,10 +354,11 @@ async def bulk_agent_operation(
             raise HTTPException(status_code=400, detail=f"Invalid operation: {operation}")
 
         results = []
+        existing = set(lxc.list_containers())  # once, not per container
 
         for agent_id in request.container_names:
             try:
-                if agent_id not in lxc.list_containers():
+                if agent_id not in existing:
                     results.append({"agent_id": agent_id, "success": False, "error": "Not found"})
                     continue
 
@@ -383,7 +384,8 @@ async def bulk_agent_operation(
         successful = sum(1 for r in results if r["success"])
         log_activity(f"bulk_{operation}", {
             "total": len(request.container_names),
-            "successful": successful
+            "successful": successful,
+            "containers": request.container_names[:200],
         })
 
         return APIResponse(

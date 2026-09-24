@@ -58,3 +58,9 @@ class UserUpdateRequest(BaseModel):
 class PasswordResetRequest(BaseModel):
     """An admin setting a new password for another user."""
     new_password: str = Field(..., min_length=8, max_length=256)
+
+
+class ApiTokenCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64, pattern=r"^[\w .:@/-]+$")
+    role: Literal["viewer", "operator", "admin"] | None = None  # default: your role
+    expires_in_days: int | None = Field(90, ge=1, le=3650)  # None: never expires

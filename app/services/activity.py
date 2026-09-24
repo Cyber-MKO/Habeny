@@ -25,6 +25,8 @@ def log_activity(action: str, details: dict[str, Any], status: str = "success"):
         activity["request_id"] = ctx["id"]
         if ctx.get("user"):
             activity["user"] = ctx["user"]
+        if ctx.get("token"):
+            activity["token"] = ctx["token"]  # done with this API token
     # Also log to file
     log_file = LOGS_DIR / f"activity_{utc_now().strftime('%Y%m%d')}.json"
     with open(log_file, 'a') as f:

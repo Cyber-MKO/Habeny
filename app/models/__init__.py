@@ -13,6 +13,7 @@ from app.models.agents import (
     SIEMConnectivity,
 )
 from app.models.auth import (
+    ApiTokenCreateRequest,
     LoginRequest,
     PasswordChangeRequest,
     PasswordConfirmRequest,
@@ -78,6 +79,7 @@ from app.models.simulations import (
 )
 
 __all__ = [
+    "ApiTokenCreateRequest",
     "LoginRequest",
     "SetupRequest",
     "PasswordChangeRequest",

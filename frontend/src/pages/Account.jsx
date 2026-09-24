@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { useStore } from "../store";
 import { DataTable, Modal, PageHeader, Pill, Spinner } from "../components/UI";
+import { useConfirm } from "../components/Confirm";
 
 const MIN_PASSWORD = 12; // server also rejects common passwords and ones containing the username
 
@@ -258,6 +259,7 @@ function describeAgent(ua) {
 
 function Sessions() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [sessions, setSessions] = useState(null);
   const load = useCallback(async () => {
     try { setSessions((await api.getMySessions()).data.sessions); }
@@ -270,7 +272,7 @@ function Sessions() {
     catch (err) { toast(err.message, "error"); }
   };
   const endOthers = async () => {
-    if (!confirm("Sign out every other browser and device?")) return;
+    if (!(await confirm({ title: "Sign out other sessions?", message: "Every other browser and device signed in to your account will be signed out.", confirmLabel: "Sign out others" }))) return;
     try { toast((await api.endMyOtherSessions()).message, "success"); load(); }
     catch (err) { toast(err.message, "error"); }
   };
@@ -300,6 +302,150 @@ function Sessions() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+const EXPIRY_CHOICES = [
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "365", label: "1 year" },
+  { value: "never", label: "Never" },
+];
+
+function NewTokenModal({ onClose, onCreated }) {
+  const { user } = useAuth();
+  const [form, setForm] = useState({ name: "", role: user.role, expires: "90" });
+  const [created, setCreated] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const allowed = ROLES.slice(0, ROLES.findIndex((r) => r.value === user.role) + 1);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await api.createMyToken({
+        name: form.name.trim(), role: form.role,
+        expires_in_days: form.expires === "never" ? null : Number(form.expires),
+      });
+      setCreated(res.data);
+      onCreated();
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+
+  if (created) {
+    const origin = window.location.origin;
+    return (
+      <Modal title="Token created" onClose={onClose}>
+        <div className="auth-notice">Copy the token now. It isn't stored and won't be shown again.</div>
+        <div className="token-box">
+          <code aria-label="API token">{created.token}</code>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard?.writeText(created.token)}>Copy</button>
+        </div>
+        <p className="account-help">Send it in the <code>Authorization</code> header, for example:</p>
+        <pre className="code-sample">{`curl -H "Authorization: Bearer $HABENY_TOKEN" ${origin}/api/agents`}</pre>
+        <div className="btn-group"><button type="button" className="btn btn-primary" onClick={onClose} data-autofocus="">Done</button></div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal title="New API token" onClose={onClose}>
+      <form className="account-modal-form" onSubmit={submit} noValidate>
+        <p className="account-help">
+          For scripts, CI pipelines, Prometheus and other Habeny consoles. A token acts as you, with at most your role.
+        </p>
+        {error && <div className="auth-error" role="alert">{error}</div>}
+        <div className="field">
+          <label htmlFor="token-name">Name</label>
+          <input id="token-name" className="input" value={form.name} onChange={set("name")} maxLength={64} placeholder="e.g. nightly-deploy" />
+          <span className="auth-hint">What uses it, so you know what breaks if you revoke it.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="token-role">Role</label>
+          <select id="token-role" className="select" value={form.role} onChange={set("role")}>
+            {allowed.map((r) => <option key={r.value} value={r.value}>{r.label}: {r.help}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="token-expiry">Expires after</label>
+          <select id="token-expiry" className="select" value={form.expires} onChange={set("expires")}>
+            {EXPIRY_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        <div className="btn-group">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn btn-primary" disabled={busy || !form.name.trim()}>{busy ? "Creating…" : "Create token"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function tokenState(t) {
+  if (t.expires_at && new Date(t.expires_at) < new Date()) return "expired";
+  return t.last_used_at ? "used" : "unused";
+}
+
+function ApiTokens() {
+  const { user } = useAuth();
+  const { toast } = useStore();
+  const confirm = useConfirm();
+  const [tokens, setTokens] = useState(null);
+  const [everyone, setEveryone] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setTokens((await (everyone ? api.getAllTokens() : api.getMyTokens())).data.tokens); }
+    catch (err) { toast(err.message, "error"); setTokens([]); }
+  }, [toast, everyone]);
+  useEffect(() => { load(); }, [load]);
+
+  const revoke = async (t) => {
+    const theirs = t.user_id !== user.id;
+    if (!(await confirm({
+      title: `Revoke ${t.name}?`,
+      message: `Anything using this token${theirs ? ` (${t.username}'s)` : ""} stops working immediately.`,
+      confirmLabel: "Revoke token", danger: true,
+    }))) return;
+    try { toast((await (theirs ? api.revokeToken(t.id) : api.revokeMyToken(t.id))).message, "success"); load(); }
+    catch (err) { toast(err.message, "error"); }
+  };
+
+  const columns = [
+    ...(everyone ? [{ key: "username", label: "User" }] : []),
+    { key: "name", label: "Name", render: (t) => <><strong>{t.name}</strong> <code className="muted">{t.prefix}…</code></> },
+    { key: "role", label: "Role", render: (t) => <Pill status={t.role} /> },
+    { key: "expires_at", label: "Expires", render: (t) => (t.expires_at ? formatDate(t.expires_at) : "Never") },
+    { key: "last_used_at", label: "Last used", render: (t) => (t.last_used_at ? `${formatDate(t.last_used_at)}${t.last_used_ip ? ` from ${t.last_used_ip}` : ""}` : "Never") },
+    { key: "state", label: "State", render: (t) => <Pill status={tokenState(t)} /> },
+    { key: "actions", label: <span className="sr-only">Actions</span>, render: (t) => (
+      <button className="btn btn-sm btn-danger" onClick={() => revoke(t)} aria-label={`Revoke ${t.name}`}>Revoke</button>
+    ) },
+  ];
+
+  return (
+    <div className="card account-card account-wide">
+      <div className="account-users-head">
+        <div className="section-title">API tokens</div>
+        <div className="btn-group">
+          {user.is_admin && (
+            <label className="checkbox-inline">
+              <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} /> Everyone's tokens
+            </label>
+          )}
+          <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>New token</button>
+        </div>
+      </div>
+      <p className="account-help">
+        Let scripts and CI use the API: send <code>Authorization: Bearer &lt;token&gt;</code>. Tokens can't change
+        account settings (password, two-factor, tokens). Create one per use, so you can revoke it on its own.
+      </p>
+      {tokens === null ? <Spinner /> : <DataTable columns={columns} rows={tokens} emptyMsg="No API tokens yet" />}
+      {creating && <NewTokenModal onClose={() => setCreating(false)} onCreated={load} />}
     </div>
   );
 }
@@ -414,6 +560,7 @@ function ResetPasswordModal({ user, onClose }) {
 function Users() {
   const { user: me } = useAuth();
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [users, setUsers] = useState(null);
   const [adding, setAdding] = useState(false);
   const [resetting, setResetting] = useState(null);
@@ -435,20 +582,19 @@ function Users() {
   };
 
   const signOutEverywhere = async (u) => {
-    if (!confirm(`Sign "${u.username}" out of every browser and device?`)) return;
+    if (!(await confirm({ title: `Sign ${u.username} out everywhere?`, message: "They'll be signed out of every browser and device. Their API tokens keep working.", confirmLabel: "Sign out" }))) return;
     try { toast((await api.endUserSessions(u.id)).message, "success"); }
     catch (err) { toast(err.message, "error"); }
   };
 
   const resetTwoFactor = async (u) => {
-    if (!confirm(`Turn off two-factor authentication for "${u.username}"? Use this when they've lost `
-      + "their authenticator and recovery codes. They'll be signed out and can set it up again.")) return;
+    if (!(await confirm({ title: `Reset two-factor for ${u.username}?`, message: "Use this when they've lost their authenticator and recovery codes. They'll be signed out and can set it up again.", confirmLabel: "Reset two-factor", danger: true }))) return;
     try { toast((await api.resetUserTwoFactor(u.id)).message, "success"); load(); }
     catch (err) { toast(err.message, "error"); }
   };
 
   const remove = async (u) => {
-    if (!confirm(`Delete user "${u.username}"? They'll be signed out immediately.`)) return;
+    if (!(await confirm({ title: `Delete ${u.username}?`, message: "They'll be signed out immediately and their API tokens stop working.", confirmLabel: "Delete user", danger: true }))) return;
     try {
       const res = await api.deleteUser(u.id);
       toast(res.message, "success");
@@ -581,6 +727,7 @@ export default function Account() {
           <Sessions />
         </div>
       </div>
+      <div className="section"><ApiTokens /></div>
       {user.is_admin && <Users />}
       {user.is_admin && <Backups />}
     </>

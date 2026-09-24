@@ -4,6 +4,7 @@ import { useMetricsSocket } from "../ws";
 import { useStore } from "../store";
 import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
 import Terminal from "../components/Terminal";
+import { useConfirm } from "../components/Confirm";
 
 const COLUMNS = [
   { key: "agent_name", label: "Name" },
@@ -18,6 +19,7 @@ const COLUMNS = [
 
 export default function Agents() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const { metrics } = useMetricsSocket();
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,12 @@ export default function Agents() {
           ? <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); action(() => api.stopAgent(r.agent_name), "Stop"); }}>Stop</button>
           : <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); action(() => api.startAgent(r.agent_name), "Start"); }}>Start</button>
         }
-        <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); if (confirm("Delete?")) action(() => api.deleteAgent(r.agent_name), "Delete"); }}>Del</button>
+        <button className="btn btn-sm btn-danger" aria-label={`Delete ${r.agent_name}`} onClick={async (e) => {
+          e.stopPropagation();
+          if (await confirm({ title: `Delete ${r.agent_name}?`, message: "The container and everything in it is destroyed. This can't be undone.", confirmLabel: "Delete container", danger: true })) {
+            action(() => api.deleteAgent(r.agent_name), "Delete");
+          }
+        }}>Delete</button>
       </div>
     ),
   };

@@ -84,7 +84,7 @@ def create_app():
             allow_origins=CORS_ORIGINS,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-            allow_headers=["Content-Type", "X-Request-ID"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
             expose_headers=["X-Request-ID"],
         )
     app.add_middleware(StripApiPrefixMiddleware)

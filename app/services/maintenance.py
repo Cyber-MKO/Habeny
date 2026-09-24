@@ -48,10 +48,10 @@ def _mtime(path: Path) -> datetime:
 
 def prune(dry_run: bool = False) -> dict:
     """Delete data past its retention. Returns what was (or, dry run, would be) removed."""
-    from app.db import prune_expired_sessions, prune_metrics
+    from app.db import delete_expired_api_tokens, prune_expired_sessions, prune_metrics
 
     removed = {"metric_samples": 0, "history_metrics": 0, "activity_files": 0, "report_files": 0,
-               "expired_sessions": 0, "finished_jobs": 0}
+               "expired_sessions": 0, "expired_tokens": 0, "finished_jobs": 0}
 
     samples_cutoff = _cutoff(config.get("HABENY_METRICS_RETENTION_DAYS"))
     history_cutoff = _cutoff(config.get("HABENY_HISTORY_RETENTION_DAYS"))
@@ -79,6 +79,7 @@ def prune(dry_run: bool = False) -> dict:
         path.unlink(missing_ok=True)
     removed["report_files"] = len(old_reports)
     removed["expired_sessions"] = prune_expired_sessions(DB_PATH)
+    removed["expired_tokens"] = delete_expired_api_tokens(DB_PATH)
     if any(removed.values()):
         logger.info("Pruned old data: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in removed.items() if v),
                     extra={"fields": {"pruned": removed}})

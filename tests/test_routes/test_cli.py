@@ -92,3 +92,20 @@ def test_prune(capsys, app):
     assert code == 0 and out.startswith("Would delete")
     code, out, _ = run(capsys, "prune")
     assert code == 0 and out.startswith("Deleted:")
+
+
+def test_token_commands(capsys, data):
+    from app.db import create_user
+    from app.services.auth import hash_password
+    create_user(config.DB_PATH, "robot", hash_password("robot-password-1"), "operator")
+
+    code, out, err = run(capsys, "token", "create", "robot", "deploy-bot", "--expires-days", "7")
+    assert code == 0 and out.strip().startswith("hby_") and "operator token 'deploy-bot'" in err
+    assert run(capsys, "token", "create", "robot", "x", "--role", "admin")[0] == 1  # above the account's role
+    assert run(capsys, "token", "create", "nobody", "x")[0] == 1
+
+    code, out, _ = run(capsys, "token", "list")
+    assert code == 0 and "deploy-bot" in out and "robot" in out and out.strip().split()[0] == "1"
+    assert run(capsys, "token", "revoke", "1")[0] == 0
+    assert "No API tokens" in run(capsys, "token", "list")[1]
+    assert run(capsys, "token", "revoke", "1")[0] == 1

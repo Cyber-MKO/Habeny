@@ -1,3 +1,5 @@
+import { useEffect, useId, useRef } from "react";
+
 
 export function StatCard({ label, value, meta, color }) {
   return (
@@ -61,15 +63,58 @@ export function DataTable({ columns, rows, onRowClick, emptyMsg = "No data" }) {
   );
 }
 
-export function Modal({ title, onClose, children }) {
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Keeps keyboard focus inside a dialog: focus moves in on open, Tab cycles, Escape closes,
+// and focus returns to whatever opened it
+export function useFocusTrap(ref, onEscape) {
+  const escape = useRef(onEscape);
+  useEffect(() => { escape.current = onEscape; });
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+    const previous = document.activeElement;
+    const items = () => [...node.querySelectorAll(FOCUSABLE)].filter((el) => !el.closest("[hidden]"));
+    const first = node.querySelector("[data-autofocus]") || node.querySelector("input, select, textarea") || items()[0] || node;
+    first.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        escape.current?.();
+      } else if (e.key === "Tab") {
+        const list = items();
+        if (!list.length) return e.preventDefault();
+        const [head, tail] = [list[0], list[list.length - 1]];
+        if (e.shiftKey && (document.activeElement === head || document.activeElement === node)) {
+          e.preventDefault();
+          tail.focus();
+        } else if (!e.shiftKey && document.activeElement === tail) {
+          e.preventDefault();
+          head.focus();
+        }
+      }
+    };
+    node.addEventListener("keydown", onKey);
+    return () => {
+      node.removeEventListener("keydown", onKey);
+      if (previous && typeof previous.focus === "function") previous.focus();
+    };
+  }, [ref]);
+}
+
+export function Modal({ title, onClose, children, footer, wide }) {
+  const ref = useRef(null);
+  const titleId = useId();
+  useFocusTrap(ref, onClose);
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`modal-content${wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
         <div className="modal-header">
-          <span className="modal-title">{title}</span>
-          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <h2 className="modal-title" id={titleId}>{title}</h2>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
       </div>
     </div>
   );

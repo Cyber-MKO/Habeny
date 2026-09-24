@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, DataTable, Spinner, Modal } from "../components/UI";
+import { useConfirm } from "../components/Confirm";
 
 export default function Groups() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [groups, setGroups] = useState([]);
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ export default function Groups() {
   };
 
   const handleDelete = async (name) => {
-    if (!confirm(`Delete group "${name}"?`)) return;
+    if (!(await confirm({ title: `Delete group ${name}?`, message: "Its containers stay; they're just no longer in this group.", confirmLabel: "Delete group", danger: true }))) return;
     try { await api.deleteGroup(name); toast("Group deleted", "success"); load(); } catch (e) { toast(e.message, "error"); }
   };
 

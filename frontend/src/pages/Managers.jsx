@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
+import { useConfirm } from "../components/Confirm";
 
 const SIEM_TYPES = ["none", "wazuh", "ossec", "ossim", "utmstack", "elastic"];
 const OS_TYPES = ["ubuntu_22_04", "ubuntu_20_04", "debian_11"];
@@ -14,6 +15,7 @@ const EMPTY_FORM = {
 
 export default function Managers() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -72,7 +74,7 @@ export default function Managers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this manager profile?")) return;
+    if (!(await confirm({ title: "Delete this manager profile?", message: "Containers already deployed with it aren't affected.", confirmLabel: "Delete profile", danger: true }))) return;
     try { await api.deleteManager(id); toast("Deleted", "success"); load(); }
     catch (e) { toast(e.message, "error"); }
   };

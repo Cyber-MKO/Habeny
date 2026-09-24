@@ -617,7 +617,10 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
 }
-.modal-title { font-weight: 600; font-size: 15px; letter-spacing: -0.2px; }
+.modal-title { font-weight: 600; font-size: 15px; letter-spacing: -0.2px; margin: 0; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.modal-content.modal-wide { max-width: 860px; }
+.confirm-message { margin: 0 0 12px; line-height: 1.5; white-space: pre-line; }
 .modal-close {
   display: inline-flex;
   align-items: center;
@@ -919,3 +922,17 @@ a.auth-submit { display: inline-flex; text-decoration: none; margin-top: 0; }
   background: var(--bg-elevated);
 }
 .auth-hint code { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); word-break: break-all; }
+
+/* ── Accessibility helpers ─────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.plain-list { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+.bulk-result .section-title { margin-bottom: 4px; }
+.account-card.account-wide { max-width: none; }
+.checkbox-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.muted { color: var(--text-muted); }
+.token-box { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 12px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
+.token-box code { flex: 1; word-break: break-all; font-family: var(--font-mono); font-size: 13px; }
+.code-sample { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; overflow-x: auto; white-space: pre; }

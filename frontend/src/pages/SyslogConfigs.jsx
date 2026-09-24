@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, DataTable, Spinner, JsonBlock } from "../components/UI";
+import { useConfirm } from "../components/Confirm";
 
 export default function SyslogConfigs() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [configs, setConfigs] = useState([]);
   const [managers, setManagers] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -73,7 +75,7 @@ export default function SyslogConfigs() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this syslog config?")) return;
+    if (!(await confirm({ title: "Delete this syslog config?", confirmLabel: "Delete config", danger: true }))) return;
     try { await api.deleteSyslogConfig(id); toast("Deleted", "success"); load(); }
     catch (e) { toast(e.message, "error"); }
   };
