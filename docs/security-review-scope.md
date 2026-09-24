@@ -7,8 +7,7 @@ what to test, and what we expect back.
 ## 1. What Habeny is
 
 Habeny is a web application that creates and manages many LXC containers on one Linux
-host. Each container runs a SIEM agent (Wazuh, OSSEC, Elastic, UTMStack, AlienVault
-OSSIM), and Habeny simulates activity in them for testing and benchmarking.
+host. Each container runs a SIEM agent (Wazuh, OSSEC, Elastic or UTMStack), and Habeny simulates activity in them for testing and benchmarking.
 
 - **Backend:** Python 3.10+, FastAPI and uvicorn, SQLite. It runs as the unprivileged
   `habeny` user under systemd.

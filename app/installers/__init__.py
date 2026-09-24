@@ -7,7 +7,6 @@ from typing import Any
 
 from app.installers.elastic import install_elastic_agent
 from app.installers.ossec import install_ossec_agent
-from app.installers.ossim import install_ossim_agent
 from app.installers.utmstack import install_utmstack_agent
 from app.installers.wazuh import install_wazuh_agent
 
@@ -22,7 +21,7 @@ def install_siem_batch(container_names: list[str], siem_type: str, siem_server: 
 
     Args:
         container_names: List of container names
-        siem_type: Type of SIEM (wazuh, ossec, ossim)
+        siem_type: Type of SIEM (wazuh, ossec, utmstack, elastic)
         siem_server: SIEM server IP/hostname
         agent_group: Agent group (for Wazuh)
         version: SIEM version (for Wazuh)
@@ -39,7 +38,6 @@ def install_siem_batch(container_names: list[str], siem_type: str, siem_server: 
     installers = {
         "wazuh": lambda name: install_wazuh_agent(name, siem_server, agent_group, version),
         "ossec": lambda name: install_ossec_agent(name, siem_server),
-        "ossim": lambda name: install_ossim_agent(name, siem_server),
         "utmstack": lambda name: install_utmstack_agent(name, siem_server, agent_group),
         "elastic": lambda name: install_elastic_agent(name, siem_server, agent_group),
     }

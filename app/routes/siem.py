@@ -24,7 +24,7 @@ router = APIRouter()
 async def get_siem_stats(siem_type: str, user: dict | None = Depends(current_user)):
     """Get statistics for a specific SIEM type"""
     try:
-        if siem_type not in ["wazuh", "ossec", "ossim", "utmstack", "elastic"]:
+        if siem_type not in ["wazuh", "ossec", "utmstack", "elastic"]:
             raise HTTPException(status_code=400, detail=f"Invalid SIEM type: {siem_type}")
         requested_type = siem_type
 

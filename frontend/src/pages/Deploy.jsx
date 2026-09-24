@@ -230,7 +230,6 @@ export default function Deploy() {
                 <option value="none">{t("None (bare container)")}</option>
                 <option value="wazuh">Wazuh</option>
                 <option value="ossec">OSSEC</option>
-                <option value="ossim">OSSIM</option>
                 <option value="utmstack">UTMstack</option>
                 <option value="elastic">Elastic</option>
               </select>

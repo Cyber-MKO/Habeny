@@ -68,7 +68,7 @@ from app.models.reports import (
     ReportMetrics,
     ReportSummary,
 )
-from app.models.siem import OSSECAgentInfo, OSSIMAgentInfo, SIEMStats, WazuhAgentInfo
+from app.models.siem import OSSECAgentInfo, SIEMStats, WazuhAgentInfo
 from app.models.simulations import (
     CustomLogSimulationRequest,
     SimulationInfo,
@@ -148,7 +148,6 @@ __all__ = [
     "SystemStats",
     "WazuhAgentInfo",
     "OSSECAgentInfo",
-    "OSSIMAgentInfo",
     "SIEMStats",
     "BenchmarkStartRequest",
     "BenchmarkCompareRequest",

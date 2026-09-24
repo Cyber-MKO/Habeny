@@ -256,6 +256,7 @@ def detect_siem_type(container_name: str) -> str | None:
             "echo wazuh; "
             "elif [ -f /var/ossec/bin/ossec-control ] || [ -f /var/ossec/bin/ossec-agentd ]; then "
             "echo ossec; "
+            # OSSIM: deploying it was removed in 2.2; containers made before still show as OSSIM
             "elif [ -f /usr/share/ossim/agent/agent.py ]; then "
             "echo ossim; "
             "elif [ -f /opt/utmstack-linux-agent/utmstack_agent_service ]; then "

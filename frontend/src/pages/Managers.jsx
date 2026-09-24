@@ -6,7 +6,7 @@ import { useConfirm } from "../components/Confirm";
 import { Details } from "../components/Details";
 import { t } from "../i18n";
 
-const SIEM_TYPES = ["none", "wazuh", "ossec", "ossim", "utmstack", "elastic"];
+const SIEM_TYPES = ["none", "wazuh", "ossec", "utmstack", "elastic"];
 const OS_TYPES = ["ubuntu_22_04", "ubuntu_20_04", "debian_11"];
 
 const EMPTY_FORM = {

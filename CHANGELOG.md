@@ -55,6 +55,13 @@ taken before it instead.
   headings, WCAG AA contrast, visible focus, announced messages.
 - Small screens: the sidebar becomes a menu, and tables scroll within their card.
 
+### Removed
+- **OSSIM support.** AlienVault OSSIM was retired at the end of 2024, and Habeny's installer
+  depended on a download that no longer exists. New deployments, manager profiles and
+  config templates can't use it. Containers deployed with it earlier are still listed and
+  can be stopped and deleted. A manager profile that names OSSIM now gets a clear error
+  on deploy: change its SIEM type.
+
 ### Fixed
 - A benchmark that crashed was recorded as completed.
 - Bulk operations listed all containers once per container.

@@ -13,7 +13,7 @@ The software includes open-source components, each licensed under its own terms.
 are listed, with their licenses and notices, in THIRD_PARTY_NOTICES.txt, which comes
 with every release. Nothing in this notice limits your rights under those licenses.
 
-Wazuh, Elastic, OSSEC, AlienVault, OSSIM and UTMStack are trademarks of their respective
+Wazuh, Elastic, OSSEC and UTMStack are trademarks of their respective
 owners. Habeny is not affiliated with or endorsed by them.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXCEPT AS EXPRESSLY

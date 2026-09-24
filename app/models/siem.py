@@ -30,15 +30,6 @@ class OSSECAgentInfo(BaseModel):
     last_keep_alive: datetime | None = None
 
 
-class OSSIMAgentInfo(BaseModel):
-    """OSSIM-specific agent information"""
-    agent_id: str
-    sensor_id: str
-    ip_address: str
-    status: str
-    version: str
-
-
 class SIEMStats(BaseModel):
     """SIEM-specific statistics"""
     siem_type: SIEMType

@@ -55,7 +55,7 @@ Habeny connects only to:
 
 | Destination | When | Configured by |
 |---|---|---|
-| Agent download servers: packages.wazuh.com, artifacts.elastic.co, updates.atomicorp.com, github.com (OSSIM), and the OS image and package mirrors the containers use | deploying agents | the SIEM type chosen (see [legal/siem-vendors.md](legal/siem-vendors.md)) |
+| Agent download servers: packages.wazuh.com, artifacts.elastic.co, updates.atomicorp.com, and the OS image and package mirrors the containers use | deploying agents | the SIEM type chosen (see [legal/siem-vendors.md](legal/siem-vendors.md)) |
 | SIEM managers, the UTMStack server, Elastic Fleet | the agents enroll and send events; simulations send traffic | manager profiles, deploy and simulation forms |
 | Syslog targets | syslog simulations | the simulation form |
 | OpenID Connect provider | SSO sign-in | `HABENY_OIDC_*` |

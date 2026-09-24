@@ -24,9 +24,8 @@
   trademark policy with specific rules; the others don't publish "compatible with"
   guidelines. Get counsel's sign-off before using any vendor name in advertising, product
   names, domain names or comparisons.
-- **OSSIM is retired** (end of life 31 December 2024) and Habeny's OSSIM installer
-  downloads from a GitHub repository that may no longer serve the agent. Consider removing
-  OSSIM support, or at least not marketing it.
+- **OSSIM support was removed** in Habeny 2.2: the product was retired on 31 December
+  2024. Don't list it in marketing.
 
 ## What Habeny downloads, and from where
 
@@ -35,7 +34,6 @@
 | Wazuh | `https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/…deb` | `app/installers/wazuh.py` | host cache `DATA_DIR/agent-cache`, then each container |
 | Elastic | `https://artifacts.elastic.co/downloads/beats/elastic-agent/…deb` | `app/installers/elastic.py` | host cache, then each container |
 | OSSEC | Atomicorp's repository installer `https://updates.atomicorp.com/installers/atomic`, then its packages | `app/installers/ossec.py` | inside each container |
-| OSSIM | `https://github.com/AlienVault-OTX/OSSIM/raw/master/ossim-agent/ossim-agent.deb` | `app/installers/ossim.py` | inside each container |
 | UTMStack | the customer's own UTMStack server, `https://<server>:9001/private/dependencies/agent/…` | `app/installers/utmstack.py` | host cache, then each container |
 
 The host cache is a download cache on the customer's server. It's excluded from Habeny's
@@ -89,9 +87,10 @@ backups and never leaves that server.
   trademark notices be kept.
 - **Status:** retired by LevelBlue effective 31 December 2024
   ([announcements](https://success.alienvault.com/s/topic/0TO0Z000000oRSsWAM/ossim-product-announcements)).
-  Habeny's download source (a file in a GitHub repository) may already be gone.
-- **Name:** AlienVault and OSSIM are trademarks, now of LevelBlue. Advertising support
-  for a retired product can mislead; recommend dropping it from marketing.
+  **Habeny no longer deploys it** (removed in 2.2). Containers deployed with it earlier are
+  still recognised so they can be managed and deleted.
+- **Name:** AlienVault and OSSIM are trademarks, now of LevelBlue. Don't mention them in
+  marketing.
 
 ### UTMStack
 
@@ -122,4 +121,3 @@ backups and never leaves that server.
    material (text only, a "works with" list, comparisons)? Do we need written permission
    from Wazuh under its brand policy?
 3. Does Atomicorp's repository installer bring in anything under non-GPL terms?
-4. Should OSSIM support be removed now that the product is retired?

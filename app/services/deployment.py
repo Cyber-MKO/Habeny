@@ -18,7 +18,6 @@ from app.core.os_images import get_os_config
 from app.db import record_metric
 from app.installers.elastic import install_elastic_agent
 from app.installers.ossec import install_ossec_agent
-from app.installers.ossim import install_ossim_agent
 from app.installers.utmstack import install_utmstack_agent
 from app.installers.wazuh import install_wazuh_agent
 from app.models import utc_now
@@ -337,12 +336,6 @@ def _deploy_container(agent_name: str, deployment_config: dict, agent_seq_id: in
             )
         elif siem_type == "ossec":
             install_result = install_ossec_agent(
-                agent_name,
-                deployment_config["siem_ip"],
-                deployment_config.get("config_template_id")
-            )
-        elif siem_type == "ossim":
-            install_result = install_ossim_agent(
                 agent_name,
                 deployment_config["siem_ip"],
                 deployment_config.get("config_template_id")

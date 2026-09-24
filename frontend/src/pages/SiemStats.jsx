@@ -4,7 +4,7 @@ import { useMetricsSocket } from "../ws";
 import { PageHeader, StatCard, Spinner } from "../components/UI";
 import { t } from "../i18n";
 
-const SIEM_TYPES = ["wazuh", "ossec", "ossim", "utmstack", "elastic"];
+const SIEM_TYPES = ["wazuh", "ossec", "utmstack", "elastic"];
 
 export default function SiemStats() {
   const { metrics } = useMetricsSocket();

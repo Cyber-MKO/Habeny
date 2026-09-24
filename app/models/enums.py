@@ -19,7 +19,6 @@ class SIEMType(str, Enum):
     NONE = "none"
     WAZUH = "wazuh"
     OSSEC = "ossec"
-    OSSIM = "ossim"
     UTMSTACK = "utmstack"
     ELASTIC = "elastic"
 

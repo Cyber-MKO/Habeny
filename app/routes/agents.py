@@ -79,7 +79,7 @@ async def deploy_agents(
     """
     Deploy multiple containers with SIEM agents
 
-    Supports Wazuh, OSSEC, OSSIM, and UTMstack with configurable parameters
+    Supports Wazuh, OSSEC, UTMstack and Elastic with configurable parameters
     """
     deployment_id = deployment.deployment_id or str(uuid.uuid4())
     progress_start(deployment_id, deployment.count, str(getattr(deployment.siem_type, "value", deployment.siem_type)))
@@ -106,6 +106,11 @@ async def deploy_agents(
                     (field == "agent_group" and req_val == "default") or
                     (field == "os_type" and req_val == "ubuntu_22_04")):
                     setattr(deployment, field, mgr_val)
+
+        # A manager profile saved before OSSIM support was removed can still name it
+        if str(getattr(deployment.siem_type, "value", deployment.siem_type)) == "ossim":
+            raise HTTPException(status_code=400, detail="OSSIM is no longer supported (the product was retired in "
+                                "2024). Change the manager profile's SIEM type.")
 
         # Validate: siem_ip required unless deploying bare containers
         if deployment.siem_type != "none" and not deployment.siem_ip:
