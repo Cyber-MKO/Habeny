@@ -2,6 +2,7 @@
 Housekeeping in the background of the web app, so data doesn't grow without bound:
 
 - every 10 s: save buffered API latency samples and job progress (app/services/records.py)
+- every minute: check alert conditions (disk space, LXC reachable; app/services/alerts.py)
 - every hour: delete data past its retention (see the HABENY_*_RETENTION_DAYS settings)
   and take a scheduled backup when one is due (app/services/backup.py)
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 FLUSH_EVERY = 10
 PRUNE_EVERY = 3600
+CHECK_EVERY = 60
 HIGH_FREQUENCY_METRICS = ["system", "api_latency"]
 
 
@@ -96,6 +98,7 @@ class Maintenance:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._next_prune = time.monotonic() + 60  # shortly after start, then hourly
+        self._next_check = time.monotonic() + 5
 
     def start(self) -> None:
         if self._thread is None:
@@ -121,6 +124,13 @@ class Maintenance:
     def _run(self) -> None:
         while not self._stop.wait(FLUSH_EVERY):
             self._flush()
+            if time.monotonic() >= self._next_check:
+                self._next_check = time.monotonic() + CHECK_EVERY
+                try:
+                    from app.services.alerts import check
+                    check()
+                except Exception:
+                    logger.exception("Maintenance: checking alerts failed")
             if time.monotonic() >= self._next_prune:
                 self._next_prune = time.monotonic() + PRUNE_EVERY
                 for name, task in (("pruning", prune), ("scheduled backup", _backup_if_due)):
@@ -131,8 +141,14 @@ class Maintenance:
 
 
 def _backup_if_due() -> None:
+    from app.services.alerts import backup_result
     from app.services.backup import backup_if_due
-    backup_if_due()
+    try:
+        if backup_if_due() is not None:
+            backup_result(None)
+    except Exception as e:
+        backup_result(str(e))
+        raise
 
 
 maintenance = Maintenance()

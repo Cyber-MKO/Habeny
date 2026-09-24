@@ -64,6 +64,12 @@ export const api = {
   deleteUser: (id) => request(`/users/${id}`, { method: "DELETE" }),
 
   getHealth: () => request("/system/health"),
+  getAlerts: () => request("/system/alerts"),
+  getChannels: () => request("/notifications/channels"),
+  createChannel: (body) => request("/notifications/channels", { method: "POST", body }),
+  updateChannel: (id, body) => request(`/notifications/channels/${id}`, { method: "PUT", body }),
+  deleteChannel: (id) => request(`/notifications/channels/${id}`, { method: "DELETE" }),
+  testChannel: (id) => request(`/notifications/channels/${id}/test`, { method: "POST" }),
   getSystemInfo: () => request("/system/info"),
   getAgents: (params) => request("/agents", { params }),
   getAgent: (id) => request(`/agents/${id}`),

@@ -44,6 +44,29 @@ async def get_deployment_progress(deployment_id: str):
     return APIResponse(success=True, message=f"Deployment {data['status']}", data=data)
 
 
+def _announce_deployment(deployment_id: str, outcome: str, requested: int, successful: int, failed: int,
+                         elapsed: float, siem_type: str, error: str | None) -> None:
+    """Metrics, the deploy_failed alert and the deployment.finished notification."""
+    from app.services import alerts, notify, telemetry
+    try:
+        telemetry.DEPLOYMENTS.inc(result=outcome)
+        telemetry.CONTAINERS_DEPLOYED.inc(successful, result="success")
+        telemetry.CONTAINERS_DEPLOYED.inc(failed, result="failure")
+        alerts.deployment_finished(deployment_id, requested, successful, failed, error)
+        notify.emit(
+            "deployment.finished",
+            f"Deployment {'succeeded' if outcome == 'completed' else 'partly failed' if outcome == 'partial' else 'failed'}: "
+            f"{successful}/{requested} containers",
+            f"First error: {error}" if error else "",
+            level={"completed": "success", "partial": "warning"}.get(outcome, "error"),
+            fields={"deployment_id": deployment_id, "siem_type": siem_type, "successful": successful,
+                    "failed": failed, "duration": f"{elapsed:.0f} s"},
+            link="/deploy",
+        )
+    except Exception:
+        logger.exception("Announcing the deployment result failed")
+
+
 @router.post("/agents/deploy", response_model=APIResponse)
 async def deploy_agents(
     deployment: AgentDeploymentRequest,
@@ -169,12 +192,15 @@ async def deploy_agents(
             },
             status="success" if len(failed) == 0 else "partial"
         )
+        outcome = "completed" if not failed else ("failed" if not successful else "partial")
         progress_finish(
-            deployment_id,
-            "completed" if not failed else ("failed" if not successful else "partial"),
+            deployment_id, outcome,
             f"Deployed {len(successful)}/{deployment.count} containers in {elapsed_time:.1f}s",
             level="success" if not failed else "error",
         )
+        _announce_deployment(deployment_id, outcome, deployment.count, len(successful), len(failed), elapsed_time,
+                             str(getattr(deployment.siem_type, "value", deployment.siem_type)),
+                             failed[0].get("error") if failed else None)
 
         return APIResponse(
             success=len(failed) == 0,
@@ -206,6 +232,8 @@ async def deploy_agents(
         logger.error(f"Container deployment failed: {e}")
         log_activity("container_deployment_failed", {"error": str(e)}, status="error")
         progress_finish(deployment_id, "failed", f"Deployment failed: {e}", level="error")
+        _announce_deployment(deployment_id, "failed", deployment.count, 0, deployment.count, 0,
+                             str(getattr(deployment.siem_type, "value", deployment.siem_type)), str(e))
         return APIResponse(success=False, message="Container deployment failed", error=str(e))
 
 

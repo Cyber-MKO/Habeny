@@ -952,3 +952,14 @@ a.auth-submit { display: inline-flex; text-decoration: none; margin-top: 0; }
 .activity-summary { color: var(--text-dim); max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-detail td { background: var(--bg-elevated); }
 .activity-detail .details { padding: 6px 4px; }
+.cell-note { font-size: 12px; color: var(--red); margin-top: 2px; overflow-wrap: anywhere; }
+.radio-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0; }
+fieldset.field { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+fieldset.field legend { font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 6px; padding: 0; }
+.alert-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.alert-item { border-left: 3px solid var(--orange); padding: 8px 12px; background: var(--bg-elevated); border-radius: var(--radius-sm); }
+.alert-item.alert-critical { border-left-color: var(--red); }
+.alert-item p { margin: 6px 0; }
+.alert-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.header-alerts { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--red-soft); color: var(--red); text-decoration: none; }
+.header-alerts.warning { background: var(--orange-soft); color: var(--orange); }

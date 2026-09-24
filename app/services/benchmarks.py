@@ -474,8 +474,9 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
         bm["status"] = "failed"
         bm["results"]["error"] = str(e)
 
-    # Finalize
-    bm["status"] = "aborted" if aborted else "completed"
+    # Finalize (a crash above already marked it failed)
+    if bm.get("status") != "failed":
+        bm["status"] = "aborted" if aborted else "completed"
     bm["completed_at"] = _now()
     bm["results"]["phases"] = phase_results
     bm["results"]["summary"] = _build_summary(benchmark_id, phase_results, max_stable_agents, peak_eps)
@@ -483,8 +484,27 @@ async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
 
     active_benchmarks.pop(benchmark_id, None)
     logger.info(f"[Benchmark {benchmark_id[:8]}] {bm['status'].upper()} — max agents: {max_stable_agents}, peak EPS: {peak_eps}")
+    _announce_benchmark(bm, max_stable_agents, peak_eps)
 
     return bm
+
+
+def _announce_benchmark(bm: dict, max_agents: int, peak_eps: int) -> None:
+    from app.services import notify, telemetry
+    try:
+        status = bm.get("status", "unknown")
+        telemetry.BENCHMARKS.inc(status=status)
+        notify.emit(
+            "benchmark.finished",
+            f"Benchmark {status}: {bm.get('name') or bm.get('scenario_id')}",
+            (bm.get("results") or {}).get("error") or "",
+            level={"completed": "success", "aborted": "warning", "stopped": "info"}.get(status, "error"),
+            fields={"benchmark_id": bm.get("benchmark_id"), "siem_type": bm.get("siem_type"),
+                    "max_stable_containers": max_agents, "peak_eps": peak_eps},
+            link="/benchmarks",
+        )
+    except Exception:
+        logger.exception("Announcing the benchmark result failed")
 
 
 def _build_summary(benchmark_id: str, phase_results: list,

@@ -112,6 +112,29 @@ def select_agents_for_simulation(selector: AgentSelector) -> list[str]:
     return selected
 
 
+def announce_finished(simulation_id: str) -> None:
+    """Metrics and the simulation.finished notification, from the simulation's final record."""
+    from app.services import notify, telemetry
+    sim = simulations_db.get(simulation_id) or {}
+    status = sim.get("status", "unknown")
+    if status == "running":
+        return
+    try:
+        telemetry.SIMULATIONS.inc(status=status)
+        kind = sim.get("type") or sim.get("profile_id") or "simulation"
+        notify.emit(
+            "simulation.finished",
+            f"Simulation {status}: {kind}",
+            sim.get("error") or "",
+            level={"completed": "success", "stopped": "info", "interrupted": "warning"}.get(status, "error"),
+            fields={"simulation_id": simulation_id, "events": sim.get("events_generated", 0),
+                    "containers": len(sim.get("agents") or sim.get("containers") or [])},
+            link="/simulations",
+        )
+    except Exception:
+        logger.exception("Announcing the simulation result failed")
+
+
 async def run_simulation(simulation_id: str, profile_id: str, agents: list[str],
                         duration: int, eps_target: int):
     """Run simulation on selected containers"""
@@ -158,6 +181,7 @@ async def run_simulation(simulation_id: str, profile_id: str, agents: list[str],
         if simulation_id in simulations_db:
             simulations_db[simulation_id]["status"] = "failed"
             simulations_db[simulation_id]["error"] = str(e)
+    announce_finished(simulation_id)
 
 
 async def run_custom_log_simulation(
@@ -211,6 +235,7 @@ async def run_custom_log_simulation(
             simulations_db[simulation_id]["status"] = "failed"
             simulations_db[simulation_id]["error"] = str(e)
         log_activity("custom_log_simulation_failed", {"simulation_id": simulation_id, "error": str(e)}, status="error")
+    announce_finished(simulation_id)
 
 
 SYSLOG_TEMPLATES = {
@@ -349,6 +374,7 @@ def run_syslog_simulation(simulation_id: str, request: SyslogSimulationRequest) 
             simulations_db[simulation_id]["status"] = "failed"
             simulations_db[simulation_id]["error"] = str(e)
         log_activity("syslog_simulation_failed", {"simulation_id": simulation_id, "error": str(e)}, status="error")
+    announce_finished(simulation_id)
 
 
 def generate_simulation_events(agent_name: str, profile_id: str, eps_target: int) -> dict:

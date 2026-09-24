@@ -166,6 +166,14 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_OIDC_BUTTON_LABEL` | `Sign in with SSO` | Sign-in button text |
 | `HABENY_OIDC_CA_BUNDLE` |  | CA file for a provider with a private certificate |
 | `HABENY_OIDC_ALLOW_HTTP` | `false` | Allow a plain-HTTP provider (testing only) |
+| `HABENY_PUBLIC_URL` |  | This server's address as users reach it (e.g. `https://habeny.example.com`), for links in notifications |
+| `HABENY_ALERT_DISK_PERCENT` | `10` | Alert when free space for data or containers falls below this percentage (0: off) |
+| `HABENY_SMTP_HOST` |  | Mail server for email notifications (empty: email off) |
+| `HABENY_SMTP_PORT` | `587` | Mail server port |
+| `HABENY_SMTP_SECURITY` | `starttls` | `starttls`, `ssl` (implicit TLS, usually port 465) or `off` |
+| `HABENY_SMTP_USER` |  | Mail server user name (empty: no login) |
+| `HABENY_SMTP_PASSWORD` |  | Mail server password |
+| `HABENY_SMTP_FROM` |  | Sender address (default: habeny@<host name>) |
 | `HABENY_DATA_DIR` | `/var/lib/lxc-siem-platform` | Database, keys, reports and logs *(set by the installer)* |
 | `HABENY_LXC_BACKEND` |  | `helper` (unprivileged app + root helper) or `direct` (app runs as root); default: direct when root, else helper *(set by the installer)* |
 | `HABENY_HELPER_SOCKET` | `/run/habeny/helper.sock` | The helper's Unix socket *(set by the installer)* |

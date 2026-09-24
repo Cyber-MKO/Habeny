@@ -26,6 +26,7 @@ def register_routes(app: FastAPI) -> None:
         logs,
         managers,
         metrics,
+        monitoring,
         reports,
         siem,
         simulations,
@@ -36,7 +37,9 @@ def register_routes(app: FastAPI) -> None:
     )
     from app.services.auth import require_access, require_user
 
+    app.include_router(monitoring.public_router)  # health probes: no sign-in
     for module in (
+        monitoring,
         system,
         metrics,
         console,
@@ -56,5 +59,6 @@ def register_routes(app: FastAPI) -> None:
     # Account self-service (password, sessions, 2FA) for every role; admin routes check themselves
     app.include_router(users.router, dependencies=[Depends(require_user)])
     app.include_router(backups.router)  # admins only (checked by the router)
+    app.include_router(monitoring.admin_router)  # notification channels: admins only
     app.include_router(auth.router)
     static.register(app)

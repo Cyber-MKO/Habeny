@@ -94,6 +94,24 @@
 # Allow a plain-HTTP provider (testing only)
 #HABENY_OIDC_ALLOW_HTTP=false
 
+# ── Monitoring and notifications ────────────────────────────────
+# This server's address as users reach it (e.g. https://habeny.example.com), for links in notifications
+#HABENY_PUBLIC_URL=
+# Alert when free space for data or containers falls below this percentage (0: off)
+#HABENY_ALERT_DISK_PERCENT=10
+# Mail server for email notifications (empty: email off)
+#HABENY_SMTP_HOST=
+# Mail server port
+#HABENY_SMTP_PORT=587
+# starttls, ssl (implicit TLS, usually port 465) or off
+#HABENY_SMTP_SECURITY=starttls
+# Mail server user name (empty: no login)
+#HABENY_SMTP_USER=
+# Mail server password
+#HABENY_SMTP_PASSWORD=
+# Sender address (default: habeny@<host name>)
+#HABENY_SMTP_FROM=
+
 # Set by the installer in the systemd units (reinstall to change):
 #   HABENY_DATA_DIR (default /var/lib/lxc-siem-platform)
 #   HABENY_LXC_BACKEND (default automatic)
