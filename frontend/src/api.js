@@ -128,6 +128,7 @@ export const api = {
   exportConfig: (id) => request(`/configs/export/${id}`),
 
   generateReport: (body) => request("/reports/generate", { method: "POST", body }),
+  getReports: () => request("/reports"),
   getReport: (id) => request(`/reports/${id}`),
   reportDownloadUrl: (id, format) => `${BASE}${hostPath(`/reports/${encodeURIComponent(id)}/download`)}?format=${format}`,
 

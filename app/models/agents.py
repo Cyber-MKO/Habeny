@@ -105,40 +105,6 @@ class AgentDeploymentRequest(BaseModel):
     )
 
 
-class AgentDeploymentResult(BaseModel):
-    """Result of container deployment"""
-    agent_name: str
-    container_id: str
-    agent_seq_id: int | None = None
-    success: bool
-    siem_type: SIEMType | None = None
-    siem_ip: str | None = None
-    agent_group: str | None = None
-    os_type: OSType | None = None
-    ip_address: str | None = None
-    agent_installation: dict[str, Any] | None = None
-    error: str | None = None
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-    )
-
-
-class ContainerStatus(BaseModel):
-    """Container status information"""
-    name: str
-    state: ContainerState
-    ip_addresses: list[str] = Field(default_factory=list)
-    init_pid: int = -1
-    memory_usage: str | None = None
-    cpu_usage: str | None = None
-    uptime: float | None = None
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-    )
-
-
 class SIEMConnectivity(BaseModel):
     """SIEM connectivity information"""
     status: SIEMConnectivityStatus
@@ -177,46 +143,18 @@ class AgentInfo(BaseModel):
     )
 
 
-class AgentStats(BaseModel):
-    """Detailed container statistics"""
-    agent_id: str
-    timestamp: datetime
-    cpu_percent: float | None = None
-    memory_used_mb: float | None = None
-    memory_limit_mb: float | None = None
-    memory_percent: float | None = None
-    disk_used_mb: float | None = None
-    network_rx_bytes: int | None = None
-    network_tx_bytes: int | None = None
-    process_count: int | None = None
-    uptime_seconds: float | None = None
-    events_generated: int | None = None
-    events_per_second: float | None = None
-
-
-class AgentListResponse(BaseModel):
-    """Response for container list endpoint"""
-    agents: list[AgentInfo]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
-    filters_applied: dict[str, Any] | None = None
-
-
 class AgentSelector(BaseModel):
     """Container selection criteria for simulations"""
     agent_ids: list[str] | None = Field(None, description="Specific container IDs")
     siem_type: SIEMType | None = Field(None, description="Filter by SIEM type")
     agent_group: str | None = Field(None, description="Filter by container group")
-    tags: list[str] | None = Field(None, description="Filter by tags")
     count: int | None = Field(None, ge=1, le=1000, description="Random subset count")
     status: AgentLifecycleStatus | None = Field(None, description="Filter by lifecycle status")
 
     @model_validator(mode="after")
     def validate_selector(self):
         """Ensure at least one selection criterion is provided"""
-        if not any([self.agent_ids, self.siem_type, self.agent_group, self.tags, self.count, self.status]):
+        if not any([self.agent_ids, self.siem_type, self.agent_group, self.count, self.status]):
             raise ValueError('At least one selection criterion must be provided')
         return self
 

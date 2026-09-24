@@ -16,10 +16,7 @@ class SimulationStartRequest(BaseModel):
     profile_id: SimulationProfile = Field(..., description="Simulation profile to run")
     agent_selector: AgentSelector = Field(..., description="Containers to target")
     duration: int = Field(default=300, ge=1, le=86400, description="Duration in seconds")
-    eps_target: int = Field(default=100, ge=1, le=10000, description="Target events per second")
-    intensity: str | None = Field(default="medium", description="Intensity level (low, medium, high)")
-    burst_mode: bool | None = Field(default=False, description="Generate events in bursts")
-    custom_parameters: dict[str, Any] | None = Field(default_factory=dict, description="Profile-specific parameters")
+    eps_target: int = Field(default=100, ge=1, le=10000, description="Events per second written in each container")
 
     model_config = ConfigDict(
         use_enum_values=True,
@@ -31,9 +28,7 @@ class SimulationStartRequest(BaseModel):
                     "count": 50
                 },
                 "duration": 600,
-                "eps_target": 200,
-                "intensity": "high",
-                "burst_mode": True
+                "eps_target": 200
             }
         },
     )
@@ -95,22 +90,6 @@ class SimulationInfo(BaseModel):
     model_config = ConfigDict(
         use_enum_values=True,
     )
-
-
-class SimulationStopRequest(BaseModel):
-    """Request to stop a simulation"""
-    simulation_id: str
-    reason: str | None = Field(None, description="Reason for stopping")
-
-
-class SimulationListResponse(BaseModel):
-    """Response for simulation list endpoint"""
-    simulations: list[SimulationInfo]
-    total: int
-    running: int
-    completed: int
-    failed: int
-    available_profiles: list[str]
 
 
 class SyslogSimulationRequest(BaseModel):

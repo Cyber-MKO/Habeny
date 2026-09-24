@@ -1,5 +1,5 @@
 """
-Root and system info/health endpoints.
+System info and health endpoints.
 """
 import asyncio
 import logging
@@ -12,7 +12,9 @@ from fastapi import APIRouter, HTTPException
 from app.config import BENCHMARK_WORKERS, DEPLOY_WORKERS
 from app.core.common import get_lxc_default_config_path, get_lxc_version
 from app.core.container import get_system_arch
-from app.models import APIResponse, HealthCheckResponse
+from app.core.os_images import OS_IMAGES
+from app.models import APIResponse, HealthCheckResponse, SIEMType
+from app.services import alerts
 from app.services.agent_info import container_state_summary
 from app.services.simulation import list_simulation_profiles
 from app.state import PROCESS_STARTED_AT, simulations_db
@@ -20,33 +22,6 @@ from app.version import __version__
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-@router.get("/", response_model=APIResponse)
-async def root():
-    """Root endpoint with comprehensive API information"""
-    return APIResponse(
-        success=True,
-        message="Multi-SIEM Container Emulation Platform API",
-        data={
-            "version": __version__,
-            "description": "LXC-based platform for deploying containers that run SIEM agents at scale",
-            "supported_siem_types": ["wazuh", "ossec", "utmstack", "elastic"],
-            "default_os": "ubuntu_22_04",
-            "max_workers": DEPLOY_WORKERS,
-            "cpu_count": cpu_count(),
-            "endpoint_groups": {
-                "system": ["/system/info", "/system/health"],
-                "containers": ["/agents", "/agents/deploy", "/agents/{id}", "/agents/stats"],
-                "simulations": ["/simulations", "/simulations/start", "/simulations/load", "/simulations/syslog/start", "/simulations/stop"],
-                "configs": ["/configs", "/configs/import", "/configs/export/{id}"],
-                "reports": ["/reports", "/reports/generate", "/reports/{id}"],
-                "activity": ["/activity/logs"],
-                "siem": ["/siem/{siem_type}/stats"],
-                "groups": ["/groups", "/groups/{group_name}/assign", "/groups/{group_name}/remove"]
-            }
-        }
-    )
 
 
 def _lxc_templates() -> list:
@@ -83,8 +58,8 @@ async def system_info():
                 "by_state": dict(containers["by_state"]),
             },
             "supported_features": {
-                "siem_types": ["wazuh", "ossec", "utmstack", "elastic"],
-                "os_types": ["ubuntu_22_04", "ubuntu_20_04", "debian_11"],
+                "siem_types": [t.value for t in SIEMType if t != SIEMType.NONE],
+                "os_types": list(OS_IMAGES),
                 "simulation_profiles": list_simulation_profiles(),
                 "parallel_modes": ["multiprocessing", "threading", "sequential"]
             },
@@ -98,19 +73,24 @@ async def system_info():
 
 @router.get("/system/health", response_model=HealthCheckResponse)
 async def health_check():
-    """Comprehensive health check endpoint"""
+    """Platform summary for the Dashboard. status is "degraded" while a critical alert is
+    active (e.g. LXC unavailable, disk nearly full), else "healthy"; /readyz is the probe."""
     try:
         containers = await asyncio.to_thread(container_state_summary)
+        active = alerts.manager.active()
+        critical = [a for a in active if a["severity"] == "critical"]
 
         return HealthCheckResponse(
-            status="healthy",
+            status="degraded" if critical else "healthy",
             version=__version__,
             uptime_seconds=round(time.monotonic() - PROCESS_STARTED_AT, 1),
             containers_count=containers["total"],
             system_info={
                 "cpu_count": cpu_count(),
                 "running_containers": containers["running"],
-                "active_simulations": len([s for s in simulations_db.values() if s.get("status") == "running"])
+                "active_simulations": len([s for s in simulations_db.values() if s.get("status") == "running"]),
+                "active_alerts": len(active),
+                "critical_alerts": len(critical),
             }
         )
     except Exception as e:

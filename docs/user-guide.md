@@ -114,11 +114,25 @@ you to type "delete" to confirm.
 
 **Testing → Simulations** (operators) has three kinds:
 
-- **Attack simulation:** pick a profile and an intensity (low, medium, high) and the
-  target containers (by SIEM type, group, tags, state or count). Profiles:
-  `auth_bruteforce`, `web_attacks`, `malware_beacon`, `lateral_movement`,
-  `data_exfiltration` and `privilege_escalation`. They write realistic log entries in the
-  containers, which the agents forward, so you can check what your SIEM detects.
+- **Attack simulation:** pick a profile, how many events per second each container writes,
+  for how long, and the target containers (by SIEM type, group, state, names or a random
+  count). Each profile writes log lines in the standard formats agents parse out of the box:
+
+  | Profile | What it writes | Where |
+  |---|---|---|
+  | SSH brute force (`auth_bruteforce`) | failed SSH passwords from one external address against many user names | `/var/log/auth.log` |
+  | Web attacks (`web_attacks`) | SQL injection, path traversal, XSS, Shellshock and scanner requests | `/var/log/apache2/access.log` |
+  | Malware beacon (`malware_beacon`) | repeated outbound connections to a command-and-control address, blocked by the firewall | `/var/log/syslog` |
+  | Lateral movement (`lateral_movement`) | one service account signing in over SSH from many internal hosts | `/var/log/auth.log` |
+  | Data exfiltration (`data_exfiltration`) | sudo archiving of sensitive directories, copied to an external host | `auth.log` and `syslog` |
+  | Privilege escalation (`privilege_escalation`) | a web server account trying sudo and su to become root | `/var/log/auth.log` |
+
+  External addresses come from the documentation ranges (203.0.113.0/24, 198.51.100.0/24),
+  so no real host is implicated; each run uses one attacker address, shown on the run. The
+  agent must be watching the file. Agents usually pick up the system logs that exist when
+  they're installed, such as `auth.log` and `syslog`; add others, such as the Apache log,
+  with a config template, and check your agent's configuration if nothing arrives. **Events** counts the lines actually written; a run where nothing
+  could be written ends as **failed**, with the reason.
 - **Custom EPS log simulation:** send log lines from your own JSON templates at a chosen
   number of events per second, for load testing ingestion.
 - **Syslog simulation:** send syslog from simulated routers, switches, firewalls or IDS

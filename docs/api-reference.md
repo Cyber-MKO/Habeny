@@ -57,7 +57,7 @@ List Alerts
 
 ### `GET /system/health`
 
-Comprehensive health check endpoint
+Platform summary for the Dashboard. status is "degraded" while a critical alert is
 
 - **Role:** viewer
 
@@ -381,7 +381,7 @@ Deploy multiple containers with SIEM agents
   - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic`, default `wazuh`
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional), default `4.14.2`
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `debian_10` \| `centos_8`, default `ubuntu_22_04`
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8`, default `ubuntu_22_04`
   - `agent_group`: string, default `default`
   - `agent_base_name`: string, default `container`
   - `memory_limit`: string (optional), default `512MB`
@@ -426,9 +426,6 @@ Perform bulk operations on multiple containers
 - **Body (JSON):**
   - `container_names` (required): list of string
   - `operation` (required): string
-  - `force`: boolean, default `False`
-  - `parallel`: boolean, default `True`
-  - `max_workers`: integer (optional)
 
 ### `POST /agents/{agent_id}/start`
 
@@ -464,7 +461,6 @@ Schedule periodic log uploads to a container.
 - **Body (JSON):**
   - `content` (required): string
   - `destination_path` (required): string
-  - `log_type`: `auth` \| `web` \| `application` \| `system` \| `security` \| `custom`, default `custom`
   - `append`: boolean, default `True`
   - `interval_seconds`: integer, default `120`
   - `duration_seconds`: integer (optional)
@@ -490,7 +486,6 @@ Upload log content to a container
 - **Body (JSON):**
   - `content` (required): string
   - `destination_path` (required): string
-  - `log_type`: `auth` \| `web` \| `application` \| `system` \| `security` \| `custom`, default `custom`
   - `append`: boolean, default `False`
 
 ## Groups
@@ -555,7 +550,6 @@ Upload log content to all containers in a group.
 - **Body (JSON):**
   - `content` (required): string
   - `destination_path` (required): string
-  - `log_type`: `auth` \| `web` \| `application` \| `system` \| `security` \| `custom`, default `custom`
   - `append`: boolean, default `False`
 
 ### `POST /groups/{group_name}/logs/schedule`
@@ -566,7 +560,6 @@ Schedule periodic log uploads to all containers in a group.
 - **Body (JSON):**
   - `content` (required): string
   - `destination_path` (required): string
-  - `log_type`: `auth` \| `web` \| `application` \| `system` \| `security` \| `custom`, default `custom`
   - `append`: boolean, default `True`
   - `interval_seconds`: integer, default `120`
   - `duration_seconds`: integer (optional)
@@ -598,7 +591,7 @@ Create a manager profile
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional)
   - `siem_auth_key`: string (optional)
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `debian_10` \| `centos_8`, default `ubuntu_22_04`
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8`, default `ubuntu_22_04`
   - `agent_group`: string, default `default`
   - `memory_limit`: string (optional), default `512MB`
   - `cpu_shares`: integer (optional), default `1024`
@@ -616,7 +609,7 @@ Update a manager profile
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional)
   - `siem_auth_key`: string (optional)
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `debian_10` \| `centos_8` (optional)
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8` (optional)
   - `agent_group`: string (optional)
   - `memory_limit`: string (optional)
   - `cpu_shares`: integer (optional)
@@ -728,7 +721,6 @@ Load custom EPS simulations using JSON log templates.
     - `agent_ids`: list of string (optional)
     - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic` (optional)
     - `agent_group`: string (optional)
-    - `tags`: list of string (optional)
     - `count`: integer (optional)
     - `status`: `running` \| `stopped` \| `error` \| `starting` \| `stopping` (optional)
   - `file_path`: string, default `/var/log/custom-eps.json`
@@ -763,19 +755,15 @@ Start an attack simulation on selected containers
 
 - **Role:** operator
 - **Body (JSON):**
-  - `profile_id` (required): `auth_bruteforce` \| `web_attacks` \| `malware_beacon` \| `lateral_movement` \| `data_exfiltration` \| `privilege_escalation` \| `port_scan` \| `sql_injection` \| `xss_attack` \| `ddos_attack`
+  - `profile_id` (required): `auth_bruteforce` \| `web_attacks` \| `malware_beacon` \| `lateral_movement` \| `data_exfiltration` \| `privilege_escalation`
   - `agent_selector` (required): AgentSelector
     - `agent_ids`: list of string (optional)
     - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic` (optional)
     - `agent_group`: string (optional)
-    - `tags`: list of string (optional)
     - `count`: integer (optional)
     - `status`: `running` \| `stopped` \| `error` \| `starting` \| `stopping` (optional)
   - `duration`: integer, default `300`
   - `eps_target`: integer, default `100`
-  - `intensity`: string (optional), default `medium`
-  - `burst_mode`: boolean (optional), default `False`
-  - `custom_parameters`: object (optional)
 
 ### `POST /simulations/{simulation_id}/stop`
 
@@ -879,6 +867,12 @@ Generate a performance/benchmark report (over your team's containers unless you'
   - `metrics`: list of string
   - `include_findings`: boolean, default `True`
   - `format`: string, default `json`
+
+### `GET /reports`
+
+Generated reports you can see (your team's; all for admins), newest first
+
+- **Role:** viewer
 
 ### `GET /reports/{report_id}`
 
@@ -1038,12 +1032,6 @@ Relay a WebSocket (live metrics, container console) to the host.
 - **Role:** viewer
 
 ## System
-
-### `GET /`
-
-Root endpoint with comprehensive API information
-
-- **Role:** viewer
 
 ### `GET /system/info`
 

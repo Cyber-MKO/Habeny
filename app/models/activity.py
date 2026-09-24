@@ -20,12 +20,3 @@ class ActivityLog(BaseModel):
     user_id: str | None = None
     source_ip: str | None = None
     duration_ms: float | None = None
-
-
-class ActivityLogListResponse(BaseModel):
-    """Response for activity log list endpoint"""
-    logs: list[ActivityLog]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool

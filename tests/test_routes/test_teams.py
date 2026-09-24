@@ -135,7 +135,7 @@ def test_deploy_records_the_owner(client, world, monkeypatch):
     tenancy.forget([f"{base}-0002"])
 
 
-def test_simulations_and_reports_are_per_team(world):
+def test_simulations_and_reports_are_per_team(client, world):
     alice, bob = world["people"]["alice"]["client"], world["people"]["bob"]["client"]
     sim = alice.post("/simulations/syslog/start", json={
         "target_ip": "127.0.0.1", "target_port": 5514, "protocol": "udp", "eps": 1, "duration": 1,
@@ -152,6 +152,8 @@ def test_simulations_and_reports_are_per_team(world):
     assert alice.get(f"/reports/{report_id}").status_code == 200
     assert bob.get(f"/reports/{report_id}").status_code == 404
     assert bob.get(f"/reports/{report_id}/download").status_code == 404
+    listed = lambda c: {r["report_id"] for r in c.get("/reports").json()["data"]["reports"]}  # noqa: E731
+    assert report_id in listed(alice) and report_id not in listed(bob) and report_id in listed(client)
 
 
 def test_admin_moves_containers_and_deletes_teams(client, world):

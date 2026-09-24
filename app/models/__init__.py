@@ -1,15 +1,11 @@
 """
 Pydantic models split by domain. Import from here: ``from app.models import APIResponse``.
 """
-from app.models.activity import ActivityLog, ActivityLogListResponse
+from app.models.activity import ActivityLog
 from app.models.agents import (
     AgentDeploymentRequest,
-    AgentDeploymentResult,
     AgentInfo,
-    AgentListResponse,
     AgentSelector,
-    AgentStats,
-    ContainerStatus,
     SIEMConnectivity,
 )
 from app.models.auth import (
@@ -27,12 +23,10 @@ from app.models.auth import (
 )
 from app.models.benchmarks import BenchmarkCompareRequest, BenchmarkStartRequest
 from app.models.common import utc_now
-from app.models.configs import ConfigExportResponse, ConfigImportRequest, ConfigTemplate
+from app.models.configs import ConfigImportRequest, ConfigTemplate
 from app.models.enums import (
     AgentLifecycleStatus,
-    ArchType,
     ContainerState,
-    LogType,
     OSType,
     ParallelMode,
     SIEMConnectivityStatus,
@@ -41,18 +35,13 @@ from app.models.enums import (
     SimulationStatus,
     SyslogDeviceType,
     SyslogProtocol,
-    TemplateType,
 )
 from app.models.groups import GroupAgentRequest, GroupCreateRequest, GroupRenameRequest
-from app.models.logs import LogBundleUploadRequest, LogScheduleRequest, LogUploadRequest
+from app.models.logs import LogScheduleRequest, LogUploadRequest
 from app.models.operations import (
     APIResponse,
     BulkOperationRequest,
-    BulkOperationResult,
-    ErrorResponse,
     HealthCheckResponse,
-    PerformanceMetrics,
-    SystemStats,
 )
 from app.models.profiles import (
     ManagerProfileCreate,
@@ -64,17 +53,13 @@ from app.models.reports import (
     Report,
     ReportFinding,
     ReportGenerateRequest,
-    ReportListResponse,
     ReportMetrics,
     ReportSummary,
 )
-from app.models.siem import OSSECAgentInfo, SIEMStats, WazuhAgentInfo
 from app.models.simulations import (
     CustomLogSimulationRequest,
     SimulationInfo,
-    SimulationListResponse,
     SimulationStartRequest,
-    SimulationStopRequest,
     SyslogSimulationRequest,
 )
 
@@ -94,29 +79,20 @@ __all__ = [
     "ContainerState",
     "SIEMType",
     "OSType",
-    "ArchType",
-    "TemplateType",
     "ParallelMode",
     "SyslogProtocol",
     "AgentLifecycleStatus",
     "SIEMConnectivityStatus",
     "SimulationStatus",
     "SimulationProfile",
-    "LogType",
     "SyslogDeviceType",
     "AgentDeploymentRequest",
-    "AgentDeploymentResult",
-    "ContainerStatus",
     "SIEMConnectivity",
     "AgentInfo",
-    "AgentStats",
-    "AgentListResponse",
     "AgentSelector",
     "SimulationStartRequest",
     "CustomLogSimulationRequest",
     "SimulationInfo",
-    "SimulationStopRequest",
-    "SimulationListResponse",
     "SyslogSimulationRequest",
     "ManagerProfileCreate",
     "ManagerProfileUpdate",
@@ -124,10 +100,8 @@ __all__ = [
     "SyslogConfigUpdate",
     "ConfigImportRequest",
     "ConfigTemplate",
-    "ConfigExportResponse",
     "LogUploadRequest",
     "LogScheduleRequest",
-    "LogBundleUploadRequest",
     "GroupCreateRequest",
     "GroupRenameRequest",
     "GroupAgentRequest",
@@ -136,19 +110,10 @@ __all__ = [
     "ReportMetrics",
     "ReportFinding",
     "Report",
-    "ReportListResponse",
     "ActivityLog",
-    "ActivityLogListResponse",
     "BulkOperationRequest",
-    "BulkOperationResult",
     "APIResponse",
-    "ErrorResponse",
     "HealthCheckResponse",
-    "PerformanceMetrics",
-    "SystemStats",
-    "WazuhAgentInfo",
-    "OSSECAgentInfo",
-    "SIEMStats",
     "BenchmarkStartRequest",
     "BenchmarkCompareRequest",
 ]

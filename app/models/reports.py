@@ -80,9 +80,3 @@ class Report(BaseModel):
     metrics: ReportMetrics
     findings: list[ReportFinding] = Field(default_factory=list)
     metadata: dict[str, Any] | None = None
-
-
-class ReportListResponse(BaseModel):
-    """Response for report list endpoint"""
-    reports: list[dict[str, Any]]
-    total: int

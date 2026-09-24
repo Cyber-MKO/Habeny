@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end check of an installed Habeny against real LXC (run as root after
 # deploy/install.sh; used by .github/workflows/integration.yml):
-# first admin → deploy a real container → start/stop/delete it → full backup and verify.
+# first admin → deploy a real container → start/stop it → attack simulations → full backup
+# and verify → delete it.
 set -euo pipefail
 
 BASE="${HABENY_URL:-https://127.0.0.1:9000}"
@@ -63,6 +64,22 @@ lxc-info -n "$CONTAINER" -s | grep -q RUNNING || fail "$CONTAINER didn't start"
 
 step "Listing containers"
 api GET /agents | field '[a["agent_name"] for a in d["data"]["agents"]]' | grep -q "$CONTAINER" || fail "$CONTAINER not listed"
+
+step "Attack simulations write real log lines in the container"
+for PROFILE in auth_bruteforce web_attacks; do
+    SIM="$(api POST /simulations/start "{\"profile_id\":\"$PROFILE\",\"duration\":3,\"eps_target\":5,\"agent_selector\":{\"agent_ids\":[\"$CONTAINER\"]}}" | field 'd["data"]["simulation_id"]')"
+    for _ in $(seq 30); do
+        STATUS="$(api GET /simulations | field "[s['status'] for s in d['data']['simulations'] if s['simulation_id'] == '$SIM'][0]")"
+        [ "$STATUS" = running ] || break
+        sleep 1
+    done
+    [ "$STATUS" = completed ] || { api GET /simulations >&2; fail "$PROFILE simulation ended as $STATUS"; }
+    EVENTS="$(api GET /simulations | field "[s['events_generated'] for s in d['data']['simulations'] if s['simulation_id'] == '$SIM'][0]")"
+    [ "$EVENTS" -ge 5 ] || fail "$PROFILE wrote $EVENTS events"
+done
+lxc-attach -n "$CONTAINER" -- grep -Eq '^[A-Z][a-z]{2} [ 0-9][0-9] [0-9:]{8} [^ ]+ sshd\[[0-9]+\]: Failed password for invalid user' /var/log/auth.log \
+    || fail "no syslog-format brute force lines in /var/log/auth.log"
+lxc-attach -n "$CONTAINER" -- grep -q 'HTTP/1.1" [0-9]' /var/log/apache2/access.log || fail "no web attack lines"
 
 step "Full backup, then verify it"
 BACKUP="$(api POST /system/backups | field 'd["data"]["backup"]["name"]')"
