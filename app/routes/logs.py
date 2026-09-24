@@ -4,11 +4,13 @@ Per-container log upload and recurring log upload schedules.
 import asyncio
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.lxc_backend import lxc
 from app.models import APIResponse, LogScheduleRequest, LogUploadRequest, utc_now
+from app.services import tenancy
 from app.services.activity import log_activity
+from app.services.auth import current_user
 from app.services.logs import perform_log_upload, run_log_schedule, schedule_public
 from app.state import scheduled_log_tasks
 
@@ -16,10 +18,11 @@ router = APIRouter()
 
 
 @router.post("/agents/{agent_id}/logs/schedule", response_model=APIResponse)
-async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest):
+async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest,
+                              user: dict | None = Depends(current_user)):
     """Schedule periodic log uploads to a container."""
     try:
-        if agent_id not in lxc.list_containers():
+        if agent_id not in lxc.list_containers() or not tenancy.can_see(user, agent_id):
             raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")
 
         if schedule.interval_seconds < 5:
@@ -73,11 +76,11 @@ async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest):
 
 
 @router.post("/agents/logs/schedules/{schedule_id}/stop", response_model=APIResponse)
-async def stop_log_schedule(schedule_id: str):
+async def stop_log_schedule(schedule_id: str, user: dict | None = Depends(current_user)):
     """Stop a scheduled log upload."""
     try:
         schedule = scheduled_log_tasks.get(schedule_id)
-        if not schedule:
+        if not schedule or not tenancy.can_see(user, schedule.get("agent_id", "")):
             raise HTTPException(status_code=404, detail="Schedule not found")
         task = schedule.get("task")
         if task and not task.done():
@@ -92,19 +95,20 @@ async def stop_log_schedule(schedule_id: str):
 
 
 @router.get("/agents/logs/schedules", response_model=APIResponse)
-async def list_log_schedules():
-    """List all log upload schedules."""
-    data = []
-    for schedule in scheduled_log_tasks.values():
-        data.append(schedule_public(schedule))
+async def list_log_schedules(user: dict | None = Depends(current_user)):
+    """List the log upload schedules for containers you can see."""
+    schedules = list(scheduled_log_tasks.values())
+    allowed = set(tenancy.visible(user, [s.get("agent_id", "") for s in schedules]))
+    data = [schedule_public(s) for s in schedules if s.get("agent_id", "") in allowed]
     return APIResponse(success=True, message="Log schedules retrieved", data={"schedules": data})
 
 
 @router.post("/agents/{agent_id}/logs/upload", response_model=APIResponse)
-async def upload_logs_to_agent(agent_id: str, log_upload: LogUploadRequest):
+async def upload_logs_to_agent(agent_id: str, log_upload: LogUploadRequest,
+                               user: dict | None = Depends(current_user)):
     """Upload log content to a container"""
     try:
-        if agent_id not in lxc.list_containers():
+        if agent_id not in lxc.list_containers() or not tenancy.can_see(user, agent_id):
             raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")
 
         # Write log content to container

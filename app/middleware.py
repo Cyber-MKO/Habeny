@@ -80,7 +80,7 @@ class RequestContextMiddleware:
             return
         incoming = next((v for k, v in scope.get("headers", []) if k == b"x-request-id"), b"")
         request_id = incoming.decode() if _VALID_REQUEST_ID.match(incoming) else uuid.uuid4().hex[:16]
-        ctx = {"id": request_id, "user": None}
+        ctx = {"id": request_id, "user": None, "ip": (scope.get("client") or (None,))[0]}
         token = request_context.set(ctx)
         started = time.perf_counter()
         state = {"status": None}
@@ -116,7 +116,7 @@ class RequestContextMiddleware:
 
 
 _VALID_REQUEST_ID = re.compile(rb"^[A-Za-z0-9._:-]{8,64}$")
-_QUIET_PREFIXES = ("/assets/", "/favicon")
+_QUIET_PREFIXES = ("/assets/", "/favicon", "/healthz", "/readyz")  # probes would flood the log
 
 
 def _after_request(scope, status, duration_ms: float, ctx: dict) -> None:
@@ -131,6 +131,9 @@ def _after_request(scope, status, duration_ms: float, ctx: dict) -> None:
                           "duration_ms": round(duration_ms, 1),
                           "client": (scope.get("client") or ("-",))[0]}},
     )
+    if scope["type"] == "http":
+        from app.services.telemetry import observe_request
+        observe_request(method, status, duration_ms / 1000)
     if scope["type"] == "http" and path != "/index.html":
         _latency_samples.append((api_path, duration_ms, method, datetime.now(timezone.utc).isoformat()))
 

@@ -1,18 +1,23 @@
 """
 Account and user management: change your own password; admins manage all users.
 """
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.config import DB_PATH, SESSION_COOKIE
 from app.core.secrets import decrypt_secret, encrypt_secret
 from app.db import (
+    create_api_token,
     create_user,
+    delete_api_token,
     delete_session,
     delete_user,
     delete_user_sessions,
     disable_totp,
     enable_totp,
     get_user_by_id,
+    list_api_tokens,
     list_user_sessions,
     list_users,
     set_pending_totp,
@@ -22,6 +27,7 @@ from app.db import (
 )
 from app.models import (
     APIResponse,
+    ApiTokenCreateRequest,
     PasswordChangeRequest,
     PasswordConfirmRequest,
     PasswordResetRequest,
@@ -34,9 +40,11 @@ from app.routes.auth import public_user
 from app.services import totp
 from app.services.activity import log_activity
 from app.services.auth import (
+    has_role,
     hash_password,
+    new_api_token,
     require_admin,
-    require_user,
+    require_session,
     session_public_id,
     token_hash,
     verify_password,
@@ -57,7 +65,7 @@ def _get_other_user(user_id: int, current: dict) -> dict:
 
 
 @router.post("/me/password", response_model=APIResponse)
-async def change_own_password(body: PasswordChangeRequest, request: Request, user: dict = Depends(require_user)):
+async def change_own_password(body: PasswordChangeRequest, request: Request, user: dict = Depends(require_session)):
     """Change your own password. Signs out your other sessions."""
     _confirm_password(user, body.current_password)
     if body.new_password == body.current_password:
@@ -85,7 +93,7 @@ def _confirm_password(user: dict, password: str) -> dict:
 # ── two-factor authentication ───────────────────────────────────────────
 
 @router.get("/me/2fa", response_model=APIResponse)
-async def my_two_factor(user: dict = Depends(require_user)):
+async def my_two_factor(user: dict = Depends(require_session)):
     full = get_user_by_id(DB_PATH, user["id"])
     return APIResponse(success=True, message="Two-factor status", data={
         "enabled": bool(full.get("totp_enabled")),
@@ -94,7 +102,7 @@ async def my_two_factor(user: dict = Depends(require_user)):
 
 
 @router.post("/me/2fa/setup", response_model=APIResponse)
-async def start_two_factor(body: PasswordConfirmRequest, user: dict = Depends(require_user)):
+async def start_two_factor(body: PasswordConfirmRequest, user: dict = Depends(require_session)):
     """Start enrolling an authenticator app: returns a new secret (shown as a QR code).
     Nothing changes for sign-in until /me/2fa/enable confirms a code from the app."""
     full = _confirm_password(user, body.current_password)
@@ -109,7 +117,7 @@ async def start_two_factor(body: PasswordConfirmRequest, user: dict = Depends(re
 
 
 @router.post("/me/2fa/enable", response_model=APIResponse)
-async def enable_two_factor(body: TwoFactorCodeRequest, request: Request, user: dict = Depends(require_user)):
+async def enable_two_factor(body: TwoFactorCodeRequest, request: Request, user: dict = Depends(require_session)):
     """Confirm enrolment with a code from the app. Returns one-time recovery codes (shown once)."""
     full = get_user_by_id(DB_PATH, user["id"])
     if full.get("totp_enabled"):
@@ -128,7 +136,7 @@ async def enable_two_factor(body: TwoFactorCodeRequest, request: Request, user: 
 
 
 @router.post("/me/2fa/recovery-codes", response_model=APIResponse)
-async def regenerate_recovery_codes(body: PasswordConfirmRequest, user: dict = Depends(require_user)):
+async def regenerate_recovery_codes(body: PasswordConfirmRequest, user: dict = Depends(require_session)):
     """Replace your recovery codes (the old ones stop working)."""
     full = _confirm_password(user, body.current_password)
     if not full.get("totp_enabled"):
@@ -140,7 +148,7 @@ async def regenerate_recovery_codes(body: PasswordConfirmRequest, user: dict = D
 
 
 @router.post("/me/2fa/disable", response_model=APIResponse)
-async def disable_two_factor(body: TwoFactorDisableRequest, user: dict = Depends(require_user)):
+async def disable_two_factor(body: TwoFactorDisableRequest, user: dict = Depends(require_session)):
     full = _confirm_password(user, body.current_password)
     if not full.get("totp_enabled"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor authentication is off")
@@ -165,7 +173,7 @@ def _public_session(row: dict, current_id: str) -> dict:
 
 
 @router.get("/me/sessions", response_model=APIResponse)
-async def my_sessions(user: dict = Depends(require_user)):
+async def my_sessions(user: dict = Depends(require_session)):
     """Your active sessions (browsers/devices signed in to your account)."""
     rows = list_user_sessions(DB_PATH, user["id"])
     return APIResponse(success=True, message=f"{len(rows)} active sessions",
@@ -173,7 +181,7 @@ async def my_sessions(user: dict = Depends(require_user)):
 
 
 @router.delete("/me/sessions/{session_id}", response_model=APIResponse)
-async def end_my_session(session_id: str, user: dict = Depends(require_user)):
+async def end_my_session(session_id: str, user: dict = Depends(require_session)):
     """Sign out one of your sessions."""
     for row in list_user_sessions(DB_PATH, user["id"]):
         if session_public_id(row["token_hash"]) == session_id:
@@ -184,11 +192,68 @@ async def end_my_session(session_id: str, user: dict = Depends(require_user)):
 
 
 @router.post("/me/sessions/revoke-others", response_model=APIResponse)
-async def end_my_other_sessions(request: Request, user: dict = Depends(require_user)):
+async def end_my_other_sessions(request: Request, user: dict = Depends(require_session)):
     """Sign out everywhere except this browser."""
     delete_user_sessions(DB_PATH, user["id"], keep_token_hash=token_hash(request.cookies[SESSION_COOKIE]))
     log_activity("sessions_revoked", {"username": user["username"], "scope": "others"})
     return APIResponse(success=True, message="Signed out of all other sessions")
+
+
+# ── API tokens ──────────────────────────────────────────────────────────
+
+def _public_token(row: dict) -> dict:
+    return {k: row.get(k) for k in ("id", "name", "prefix", "role", "created_at", "expires_at",
+                                    "last_used_at", "last_used_ip", "user_id", "username")}
+
+
+@router.get("/me/tokens", response_model=APIResponse)
+async def my_tokens(user: dict = Depends(require_session)):
+    rows = list_api_tokens(DB_PATH, user["id"])
+    return APIResponse(success=True, message=f"{len(rows)} API tokens", data={"tokens": [_public_token(r) for r in rows]})
+
+
+@router.post("/me/tokens", response_model=APIResponse)
+async def create_my_token(body: ApiTokenCreateRequest, user: dict = Depends(require_session)):
+    """Create an API token for scripts and CI: send it as `Authorization: Bearer <token>`.
+    The token is returned once; only its hash is stored. It can have a lower role than
+    your account, never a higher one."""
+    role = body.role or user["role"]
+    if not has_role(user, role):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"You can't create a token with the {role} role")
+    expires_at = ((datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)).isoformat()
+                  if body.expires_in_days else None)
+    token, prefix = new_api_token()
+    row = create_api_token(DB_PATH, user["id"], body.name, token_hash(token), prefix, role, expires_at)
+    log_activity("api_token_created", {"username": user["username"], "token": body.name, "role": role,
+                                       "expires_at": expires_at})
+    return APIResponse(success=True, message="API token created. Copy it now: it won't be shown again.",
+                       data={"token": token, "info": _public_token({**row, "username": user["username"]})})
+
+
+@router.delete("/me/tokens/{token_id}", response_model=APIResponse)
+async def revoke_my_token(token_id: int, user: dict = Depends(require_session)):
+    deleted = delete_api_token(DB_PATH, token_id, user_id=user["id"])
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    log_activity("api_token_revoked", {"username": user["username"], "token": deleted["name"]})
+    return APIResponse(success=True, message=f"Token '{deleted['name']}' revoked")
+
+
+@router.get("/tokens", response_model=APIResponse)
+async def all_tokens(admin: dict = Depends(require_admin)):
+    """Every user's API tokens (admins), e.g. to find unused or never-expiring ones."""
+    rows = list_api_tokens(DB_PATH)
+    return APIResponse(success=True, message=f"{len(rows)} API tokens", data={"tokens": [_public_token(r) for r in rows]})
+
+
+@router.delete("/tokens/{token_id}", response_model=APIResponse)
+async def revoke_token(token_id: int, admin: dict = Depends(require_admin)):
+    deleted = delete_api_token(DB_PATH, token_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    log_activity("api_token_revoked", {"username": deleted["username"], "token": deleted["name"],
+                                       "by": admin["username"]})
+    return APIResponse(success=True, message=f"Token '{deleted['name']}' of {deleted['username']} revoked")
 
 
 @router.get("", response_model=APIResponse)
@@ -240,7 +305,7 @@ async def user_sessions(user_id: int, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     rows = list_user_sessions(DB_PATH, user_id)
     return APIResponse(success=True, message=f"{len(rows)} active sessions",
-                       data={"sessions": [_public_session(r, admin["session_id"]) for r in rows]})
+                       data={"sessions": [_public_session(r, admin.get("session_id", "")) for r in rows]})
 
 
 @router.post("/{user_id}/sessions/revoke", response_model=APIResponse)

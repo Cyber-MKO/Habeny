@@ -7,6 +7,9 @@ as the service user with the service's settings.
   habeny db status|migrate|backup|restore FILE|downgrade --to N
   habeny backup create|list|verify FILE|restore FILE
   habeny prune [--dry-run]
+  habeny token create USER NAME [--role R] [--expires-days N]|list|revoke ID
+  habeny tls fingerprint
+  habeny audit verify|export [--format csv|jsonl] [--since D] [--until D] [--user U] [--action A]
 """
 import argparse
 import os
@@ -137,8 +140,9 @@ def cmd_prune(args) -> int:
     from app.services.maintenance import prune
     removed = prune(dry_run=args.dry_run)
     if args.dry_run:
-        print(f"Would delete {removed['activity_files']} activity log file(s) and {removed['report_files']} report "
-              "file(s); database rows past retention are counted when deleted.")
+        print(f"Would delete {removed['audit_entries']} audit entries, {removed['activity_files']} old activity log "
+              f"file(s) and {removed['report_files']} report file(s); other database rows past retention are counted "
+              "when deleted.")
     else:
         print("Deleted: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in removed.items()))
     return 0
@@ -194,6 +198,97 @@ def cmd_db(args) -> int:
     return 2
 
 
+def _schema_current() -> None:
+    from app import migrations
+    from app.config import DB_PATH
+    if migrations.current_version(DB_PATH) < migrations.latest_version():
+        raise RuntimeError("the database needs migrating first: start Habeny or run `habeny db migrate`")
+
+
+def cmd_token(args) -> int:
+    """API tokens from the command line, e.g. to bootstrap automation on a new server."""
+    from datetime import datetime, timedelta, timezone
+
+    from app.config import DB_PATH
+    from app.db import create_api_token, delete_api_token, get_user_by_username, list_api_tokens
+    from app.services.activity import log_activity
+    from app.services.auth import has_role, new_api_token, token_hash
+
+    _schema_current()
+    if args.action == "create":
+        user = get_user_by_username(DB_PATH, args.user)
+        if not user:
+            print(f"error: no user {args.user!r}", file=sys.stderr)
+            return 1
+        role = args.role or user["role"]
+        if not has_role(user, role):
+            print(f"error: {user['username']} is a {user['role']}; the token can't have the {role} role", file=sys.stderr)
+            return 1
+        expires = ((datetime.now(timezone.utc) + timedelta(days=args.expires_days)).isoformat()
+                   if args.expires_days else None)
+        token, prefix = new_api_token()
+        create_api_token(DB_PATH, user["id"], args.name, token_hash(token), prefix, role, expires)
+        log_activity("api_token_created", {"username": user["username"], "token": args.name, "role": role,
+                                           "expires_at": expires, "via": "cli"}, user="cli")
+        print(token)
+        print(f"# {role} token '{args.name}' for {user['username']}, "
+              f"{'expires ' + expires[:10] if expires else 'never expires'}. It isn't stored: copy it now.",
+              file=sys.stderr)
+        return 0
+    if args.action == "list":
+        rows = list_api_tokens(DB_PATH)
+        if not rows:
+            print("No API tokens")
+        for row in rows:
+            print(f"{row['id']:>4}  {row['prefix']}…  {row['username']:<16} {row['name']:<24} {row['role']:<8} "
+                  f"expires {(row['expires_at'] or 'never')[:10]:<10}  last used {(row['last_used_at'] or 'never')[:16]}")
+        return 0
+    if args.action == "revoke":
+        deleted = delete_api_token(DB_PATH, args.id)
+        if not deleted:
+            print(f"error: no token {args.id}", file=sys.stderr)
+            return 1
+        log_activity("api_token_revoked", {"username": deleted["username"], "token": deleted["name"], "via": "cli"},
+                     user="cli")
+        print(f"Revoked '{deleted['name']}' of {deleted['username']}")
+        return 0
+    return 2
+
+
+def cmd_tls(args) -> int:
+    from app.tls import certificate_fingerprint, tls_mode
+    if tls_mode() == "off":
+        print("TLS is off here (HABENY_TLS=off): the reverse proxy in front has the certificate", file=sys.stderr)
+        return 1
+    fingerprint = certificate_fingerprint()
+    if not fingerprint:
+        print("No certificate yet: it's created when Habeny first starts", file=sys.stderr)
+        return 1
+    print(fingerprint)
+    return 0
+
+
+def cmd_audit(args) -> int:
+    from app.services import audit
+
+    _schema_current()
+    if args.action == "verify":
+        result = audit.verify()
+        if result["ok"]:
+            print(f"OK: {result['checked']} entries verified (ids {result['anchor_id'] + 1}–{result['last_id']}), "
+                  f"head {result['head_hash']}")
+            return 0
+        print(f"BROKEN at entry {result['problem']['id']}: {result['problem']['reason']} "
+              f"({result['checked']} entries before it are intact)", file=sys.stderr)
+        return 1
+    if args.action == "export":
+        filters = audit.Filters(action=args.action_filter, user=args.user, since=args.since, until=args.until)
+        for chunk in audit.export(filters, args.format):
+            sys.stdout.write(chunk)
+        return 0
+    return 2
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="habeny", description="Habeny administration")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -227,9 +322,34 @@ def main(argv=None) -> int:
     p_prune = sub.add_parser("prune", help="delete data past its retention now (runs hourly anyway)")
     p_prune.add_argument("--dry-run", action="store_true", help="only count old files")
 
+    p_token = sub.add_parser("token", help="API tokens for scripts and CI")
+    token_sub = p_token.add_subparsers(dest="action", required=True)
+    p_tcreate = token_sub.add_parser("create", help="create a token (printed once)")
+    p_tcreate.add_argument("user")
+    p_tcreate.add_argument("name")
+    p_tcreate.add_argument("--role", choices=["viewer", "operator", "admin"], help="default: the user's role")
+    p_tcreate.add_argument("--expires-days", type=int, default=90, help="0: never (default 90)")
+    token_sub.add_parser("list", help="every user's tokens")
+    p_trevoke = token_sub.add_parser("revoke", help="revoke a token by its ID")
+    p_trevoke.add_argument("id", type=int)
+
+    p_audit = sub.add_parser("audit", help="the audit trail: verify its hash chain, export it")
+    audit_sub = p_audit.add_subparsers(dest="action", required=True)
+    audit_sub.add_parser("verify", help="check no entry was changed, removed or reordered")
+    p_aexport = audit_sub.add_parser("export", help="write entries (oldest first) to stdout")
+    p_aexport.add_argument("--format", choices=["csv", "jsonl"], default="jsonl")
+    p_aexport.add_argument("--since", help="ISO date or date-time")
+    p_aexport.add_argument("--until", help="ISO date or date-time")
+    p_aexport.add_argument("--user")
+    p_aexport.add_argument("--action", dest="action_filter", help="exact, or a prefix ending in *")
+
+    p_tls = sub.add_parser("tls", help="this server's certificate")
+    p_tls.add_argument("action", choices=["fingerprint"], help="SHA-256 fingerprint, to confirm when adding "
+                       "this server as a host in another console")
+
     args = parser.parse_args(argv)
     handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
-                "prune": cmd_prune}
+                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit, "tls": cmd_tls}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head

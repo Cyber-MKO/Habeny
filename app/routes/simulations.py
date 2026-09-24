@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 
 from app.models import (
@@ -15,7 +15,9 @@ from app.models import (
     SyslogSimulationRequest,
     utc_now,
 )
+from app.services import tenancy
 from app.services.activity import log_activity
+from app.services.auth import current_user
 from app.services.simulation import (
     list_simulation_profiles,
     run_custom_log_simulation,
@@ -30,16 +32,17 @@ router = APIRouter()
 
 
 @router.get("/simulations", response_model=APIResponse)
-async def list_simulations():
-    """List all simulations (running and completed)"""
+async def list_simulations(user: dict | None = Depends(current_user)):
+    """List simulations (running and completed): all for admins, your team's otherwise"""
     try:
+        sims = [s for s in simulations_db.values() if tenancy.same_team(user, s.get("team_id"))]
         return APIResponse(
             success=True,
             message="Simulations retrieved",
             data={
-                "simulations": list(simulations_db.values()),
-                "total": len(simulations_db),
-                "running": len([s for s in simulations_db.values() if s["status"] == "running"]),
+                "simulations": sims,
+                "total": len(sims),
+                "running": len([s for s in sims if s["status"] == "running"]),
                 "available_profiles": list_simulation_profiles()
             }
         )
@@ -50,13 +53,14 @@ async def list_simulations():
 @router.post("/simulations/load", response_model=APIResponse)
 async def load_simulation(
     request: CustomLogSimulationRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user: dict | None = Depends(current_user),
 ):
     """Load custom EPS simulations using JSON log templates."""
     try:
         simulation_id = str(uuid.uuid4())
 
-        target_agents = select_agents_for_simulation(request.agent_selector)
+        target_agents = select_agents_for_simulation(request.agent_selector, user)
         if not target_agents:
             raise HTTPException(status_code=400, detail="No containers match the selector")
 
@@ -78,7 +82,8 @@ async def load_simulation(
             "started_at": utc_now().isoformat(),
             "events_generated": 0,
             "custom_parameters": config_payload,
-            "simulation_type": "custom_logs"
+            "simulation_type": "custom_logs",
+            **tenancy.stamp(user),
         }
 
         simulations_db[simulation_id] = simulation
@@ -110,7 +115,8 @@ async def load_simulation(
 
 
 @router.post("/simulations/syslog/start", response_model=APIResponse)
-async def start_syslog_simulation(request: SyslogSimulationRequest, background_tasks: BackgroundTasks):
+async def start_syslog_simulation(request: SyslogSimulationRequest, background_tasks: BackgroundTasks,
+                                  user: dict | None = Depends(current_user)):
     """Start a syslog simulation to a target IP/port."""
     try:
         simulation_id = str(uuid.uuid4())
@@ -140,7 +146,8 @@ async def start_syslog_simulation(request: SyslogSimulationRequest, background_t
                 "device_type": device_type,
                 "device_name_prefix": request.device_name_prefix,
                 "facility": request.facility
-            }
+            },
+            **tenancy.stamp(user),
         }
 
         simulations_db[simulation_id] = simulation
@@ -168,7 +175,8 @@ async def start_syslog_simulation(request: SyslogSimulationRequest, background_t
 @router.post("/simulations/start", response_model=APIResponse)
 async def start_simulation(
     simulation_request: SimulationStartRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user: dict | None = Depends(current_user),
 ):
     """Start an attack simulation on selected containers"""
     try:
@@ -179,7 +187,7 @@ async def start_simulation(
             raise HTTPException(status_code=400, detail=f"Invalid profile: {simulation_request.profile_id}")
 
         # Select target containers
-        target_agents = select_agents_for_simulation(simulation_request.agent_selector)
+        target_agents = select_agents_for_simulation(simulation_request.agent_selector, user)
 
         if not target_agents:
             raise HTTPException(status_code=400, detail="No containers match the selector")
@@ -192,7 +200,8 @@ async def start_simulation(
             "duration": simulation_request.duration,
             "eps_target": simulation_request.eps_target,
             "started_at": utc_now().isoformat(),
-            "events_generated": 0
+            "events_generated": 0,
+            **tenancy.stamp(user),
         }
 
         simulations_db[simulation_id] = simulation
@@ -227,10 +236,10 @@ async def start_simulation(
 
 
 @router.post("/simulations/{simulation_id}/stop", response_model=APIResponse)
-async def stop_simulation(simulation_id: str):
+async def stop_simulation(simulation_id: str, user: dict | None = Depends(current_user)):
     """Stop a running simulation"""
     try:
-        if simulation_id not in simulations_db:
+        if simulation_id not in simulations_db or not tenancy.same_team(user, simulations_db[simulation_id].get("team_id")):
             raise HTTPException(status_code=404, detail=f"Simulation {simulation_id} not found")
 
         simulation = simulations_db[simulation_id]

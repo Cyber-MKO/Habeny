@@ -31,7 +31,7 @@ jobs:
       - run: ruff check .
       # tests/stubs/lxc.py stands in for python-lxc, so no LXC is needed (the
       # integration workflow covers real LXC). The coverage floor stops it sliding back.
-      - run: python -m pytest -q -W error::DeprecationWarning --cov=app --cov-report=term --cov-fail-under=72
+      - run: python -m pytest -q -W error::DeprecationWarning --cov=app --cov-report=term --cov-fail-under=76
         env:
           HABENY_LXC_BACKEND: direct
           PYTHONPATH: tests/stubs

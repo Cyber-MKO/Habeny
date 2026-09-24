@@ -104,3 +104,21 @@ def hsts_enabled() -> bool | None:
     """Only with a real certificate: HSTS on a self-signed one would make the browser
     warning impossible to click through."""
     return tls_mode() not in ("off", "false", "0", "no") and uses_own_certificate()
+
+
+def _fingerprint_of_file(path) -> str | None:
+    import hashlib
+    import ssl as _ssl
+    try:
+        with open(path) as f:
+            der = _ssl.PEM_cert_to_DER_cert(f.read())
+    except (OSError, ValueError):
+        return None
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i:i + 2] for i in range(0, 64, 2))
+
+
+def certificate_fingerprint() -> str | None:
+    """SHA-256 fingerprint of the certificate this server presents (what another Habeny
+    console pins when adding this server as a host)."""
+    return _fingerprint_of_file(config.raw("HABENY_TLS_CERT") if uses_own_certificate() else SELF_SIGNED_CERT)

@@ -64,6 +64,13 @@ A summary for reviewers and administrators. The README has the settings.
 - **Sessions:** random tokens, and only their hashes are stored. They live in HttpOnly,
   SameSite=Strict cookies. Users can list and end their sessions; admins can sign
   anyone out.
+- **API tokens:** 256-bit random, stored as hashes, shown once. Capped at the account's
+  role, optionally expiring, and unable to change account settings.
+- **Audit trail:** every action with user, token, IP and request ID, hash-chained so
+  changes are detectable (`habeny audit verify`).
+- **Teams:** members see and act only on their team's containers, simulations and reports.
+- **Other hosts:** relayed with per-host tokens stored encrypted, and self-signed
+  certificates pinned by fingerprint.
 - **Browser protections:** WebSocket origin checks. CORS is off unless you configure an
   explicit list of allowed origins.
 - **Secrets at rest:** SIEM keys and enrollment tokens, and TOTP secrets, are encrypted

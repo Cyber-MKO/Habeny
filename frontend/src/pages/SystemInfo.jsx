@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { PageHeader, StatCard, Spinner } from "../components/UI";
+import { t } from "../i18n";
 
 function formatUptime(seconds) {
   if (seconds == null) return "—";
@@ -29,7 +30,7 @@ export default function SystemInfo() {
       setUpdatedAt(new Date());
     } catch (err) {
       setError(err.message);
-      toast(`System info: ${err.message}`, "error");
+      toast(t("System info: {message}", { message: err.message }), "error");
     } finally {
       setRefreshing(false);
     }
@@ -40,8 +41,8 @@ export default function SystemInfo() {
     if (!error) return <Spinner />;
     return (
       <div className="empty">
-        <p>Failed to load system info: {error}</p>
-        <button className="btn btn-secondary" onClick={load} disabled={refreshing}>Retry</button>
+        <p>{t("Failed to load system info:")} {error}</p>
+        <button className="btn btn-secondary" onClick={load} disabled={refreshing}>{t("Retry")}</button>
       </div>
     );
   }
@@ -55,55 +56,55 @@ export default function SystemInfo() {
   return (
     <>
       <PageHeader
-        title="System Info"
-        subtitle={updatedAt ? `Platform and LXC configuration · updated ${updatedAt.toLocaleTimeString()}` : "Platform and LXC configuration"}
+        title={t("System Info")}
+        subtitle={updatedAt ? t("Platform and LXC configuration · updated {time}", { time: updatedAt.toLocaleTimeString() }) : t("Platform and LXC configuration")}
       >
         <button className="btn btn-secondary" onClick={load} disabled={refreshing}>
-          {refreshing ? "Refreshing…" : "Refresh"}
+          {refreshing ? t("Refreshing…") : t("Refresh")}
         </button>
       </PageHeader>
 
       <div className="section">
-        <div className="section-title">Platform</div>
+        <div className="section-title">{t("Platform")}</div>
         <div className="stats-grid">
-          <StatCard label="Version" value={p.version || "—"} />
-          <StatCard label="Uptime" value={formatUptime(p.uptime_seconds)} meta="Since the API server started" />
-          <StatCard label="LXC Version" value={p.lxc_version || "—"} />
-          <StatCard label="Config Path" value={p.default_config_path || "—"} />
+          <StatCard label={t("Version")} value={p.version || "—"} />
+          <StatCard label={t("Uptime")} value={formatUptime(p.uptime_seconds)} meta={t("Since the API server started")} />
+          <StatCard label={t("LXC Version")} value={p.lxc_version || "—"} />
+          <StatCard label={t("Config Path")} value={p.default_config_path || "—"} />
         </div>
       </div>
 
       <div className="section">
-        <div className="section-title">System</div>
+        <div className="section-title">{t("System")}</div>
         <div className="stats-grid">
-          <StatCard label="Architecture" value={s.arch || "—"} />
-          <StatCard label="Root" value={s.is_root ? "Yes" : "No"} color={s.is_root ? "green" : "red"} />
-          <StatCard label="CPU Count" value={s.cpu_count ?? "—"} />
-          <StatCard label="Deploy Workers" value={s.worker_config?.deploy_workers ?? "—"} />
-          <StatCard label="Benchmark Workers" value={s.worker_config?.benchmark_workers ?? "—"} />
+          <StatCard label={t("Architecture")} value={s.arch || "—"} />
+          <StatCard label={t("Root")} value={s.is_root ? "Yes" : "No"} color={s.is_root ? "green" : "red"} />
+          <StatCard label={t("CPU Count")} value={s.cpu_count ?? "—"} />
+          <StatCard label={t("Deploy Workers")} value={s.worker_config?.deploy_workers ?? "—"} />
+          <StatCard label={t("Benchmark Workers")} value={s.worker_config?.benchmark_workers ?? "—"} />
         </div>
       </div>
 
       <div className="section">
-        <div className="section-title">Containers</div>
+        <div className="section-title">{t("Containers")}</div>
         <div className="stats-grid">
-          <StatCard label="Total" value={c.total ?? 0} color="blue" />
-          <StatCard label="Running" value={byState.RUNNING ?? 0} color="green" />
-          <StatCard label="Stopped" value={byState.STOPPED ?? 0} color="red" />
-          <StatCard label="Frozen" value={byState.FROZEN ?? 0} color="cyan" />
-          {byState.OTHER > 0 && <StatCard label="Other" value={byState.OTHER} meta="Starting, stopping or aborting" />}
+          <StatCard label={t("Total")} value={c.total ?? 0} color="blue" />
+          <StatCard label={t("Running")} value={byState.RUNNING ?? 0} color="green" />
+          <StatCard label={t("Stopped")} value={byState.STOPPED ?? 0} color="red" />
+          <StatCard label={t("Frozen")} value={byState.FROZEN ?? 0} color="cyan" />
+          {byState.OTHER > 0 && <StatCard label={t("Other")} value={byState.OTHER} meta={t("Starting, stopping or aborting")} />}
         </div>
       </div>
 
       <div className="section">
-        <div className="section-title">Supported Features</div>
+        <div className="section-title">{t("Supported Features")}</div>
         <div className="card">
           <table>
             <tbody>
-              <tr><td style={{fontWeight:600,width:180}}>SIEM Types</td><td>{(f.siem_types||[]).join(", ")}</td></tr>
-              <tr><td style={{fontWeight:600}}>OS Types</td><td>{(f.os_types||[]).join(", ")}</td></tr>
-              <tr><td style={{fontWeight:600}}>Simulation Profiles</td><td>{(f.simulation_profiles||[]).join(", ")}</td></tr>
-              <tr><td style={{fontWeight:600}}>Parallel Modes</td><td>{(f.parallel_modes||[]).join(", ")}</td></tr>
+              <tr><td style={{fontWeight:600,width:180}}>{t("SIEM Types")}</td><td>{(f.siem_types||[]).join(", ")}</td></tr>
+              <tr><td style={{fontWeight:600}}>{t("OS Types")}</td><td>{(f.os_types||[]).join(", ")}</td></tr>
+              <tr><td style={{fontWeight:600}}>{t("Simulation Profiles")}</td><td>{(f.simulation_profiles||[]).join(", ")}</td></tr>
+              <tr><td style={{fontWeight:600}}>{t("Parallel Modes")}</td><td>{(f.parallel_modes||[]).join(", ")}</td></tr>
             </tbody>
           </table>
         </div>
@@ -111,8 +112,8 @@ export default function SystemInfo() {
 
       {info.templates?.length > 0 && (
         <div className="section">
-          <div className="section-title">LXC Templates</div>
-          <div className="card"><pre className="json-block">{(info.templates||[]).join("\n")}</pre></div>
+          <div className="section-title">{t("LXC Templates")}</div>
+          <div className="card"><ul className="plain-list">{(info.templates || []).map((t) => <li key={t}><code>{t}</code></li>)}</ul></div>
         </div>
       )}
     </>

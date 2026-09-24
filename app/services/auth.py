@@ -16,8 +16,15 @@ from fastapi import Depends, HTTPException, WebSocketException, status
 from starlette.requests import HTTPConnection
 
 from app.config import DB_PATH, SESSION_COOKIE, SESSION_TTL_HOURS
-from app.db import create_session, delete_session, get_session_user, touch_session
-from app.logging_config import set_request_user
+from app.db import (
+    create_session,
+    delete_session,
+    get_api_token_user,
+    get_session_user,
+    touch_api_token,
+    touch_session,
+)
+from app.logging_config import request_context, set_request_user
 from app.services import lifecycle
 
 # scrypt parameters (~16 MiB memory per hash)
@@ -82,7 +89,45 @@ def end_session(token: str) -> None:
     delete_session(DB_PATH, token_hash(token))
 
 
+# ── API tokens (scripts, CI, Prometheus, other Habeny consoles) ──────────
+# "hby_" + 256 random bits. Only a SHA-256 hash is stored; the token is shown once.
+API_TOKEN_PREFIX = "hby_"
+
+
+def new_api_token() -> tuple[str, str]:
+    """A new token and the short prefix kept for recognising it in lists."""
+    token = API_TOKEN_PREFIX + secrets.token_urlsafe(32)
+    return token, token[:12]
+
+
+def bearer_token(conn: HTTPConnection) -> str | None:
+    scheme, _, value = conn.headers.get("authorization", "").partition(" ")
+    return value.strip() or None if scheme.lower() == "bearer" else None
+
+
+def token_user(conn: HTTPConnection, token: str) -> dict[str, Any] | None:
+    """The user an API token acts as. Its role is the lower of the token's and the account's,
+    so demoting the account also limits its tokens."""
+    user = get_api_token_user(DB_PATH, token_hash(token))
+    if user is None:
+        return None
+    token_role = user.pop("token_role")
+    user["role"] = min(token_role, user["role"], key=lambda r: _RANK.get(r, -1))
+    user["auth"] = "token"
+    seen = user.pop("token_last_used_at", None)
+    now = datetime.now(timezone.utc)
+    if not seen or now - datetime.fromisoformat(seen) > TOUCH_INTERVAL:
+        with contextlib.suppress(Exception):  # "last used" is informational
+            touch_api_token(DB_PATH, user["token_id"], client_ip(conn))
+    return user
+
+
 def session_user(conn: HTTPConnection) -> dict[str, Any] | None:
+    """The signed-in user: from an `Authorization: Bearer` API token when one is sent,
+    otherwise from the session cookie."""
+    bearer = bearer_token(conn)
+    if bearer is not None:
+        return token_user(conn, bearer)
     token = conn.cookies.get(SESSION_COOKIE)
     if not token:
         return None
@@ -96,6 +141,7 @@ def session_user(conn: HTTPConnection) -> dict[str, Any] | None:
             with contextlib.suppress(Exception):  # "last active" is informational
                 touch_session(DB_PATH, hashed, client_ip(conn))
         user["session_id"] = session_public_id(hashed)
+        user["auth"] = "session"
     return user
 
 
@@ -111,7 +157,11 @@ async def require_user(conn: HTTPConnection) -> dict[str, Any]:
     """Dependency for every protected HTTP route and WebSocket."""
     user = session_user(conn)
     if user is not None:
+        conn.state.user = user  # for routes: Depends(current_user)
         set_request_user(user["username"])  # for this request's log lines
+        ctx = request_context.get()
+        if ctx is not None and user.get("auth") == "token":
+            ctx["token"] = user["token_name"]  # recorded with the audit entry
     if conn.scope["type"] == "websocket":
         if user is None or not _same_origin(conn):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Not authenticated")
@@ -181,7 +231,8 @@ async def require_access(conn: HTTPConnection) -> dict[str, Any]:
     user = await require_user(conn)
     path = conn.scope.get("path", "")
     if conn.scope["type"] == "websocket":
-        needed = "operator" if path.startswith("/ws/console") else "viewer"
+        # the console (here, or on another host through the relay) needs operator
+        needed = "operator" if path.startswith("/ws/console") or "/ws/console/" in path else "viewer"
     elif conn.scope.get("method") in ("GET", "HEAD", "OPTIONS") or path in READ_ONLY_POSTS:
         needed = "viewer"
     else:
@@ -194,6 +245,20 @@ async def require_access(conn: HTTPConnection) -> dict[str, Any]:
             raise WebSocketException(code=status.WS_1012_SERVICE_RESTART, reason="Habeny is restarting")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, headers={"Retry-After": "60"},
                             detail="Habeny is restarting. Try again in a minute.")
+    return user
+
+
+def current_user(conn: HTTPConnection) -> dict[str, Any] | None:
+    """The signed-in user of this request (set by the router-wide access check)."""
+    return getattr(conn.state, "user", None)
+
+
+async def require_session(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """For changes to the account itself (password, two-factor, sessions, API tokens):
+    only from a signed-in browser session, never with an API token."""
+    if user.get("auth") == "token":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Account settings can't be changed with an API token; sign in instead")
     return user
 
 

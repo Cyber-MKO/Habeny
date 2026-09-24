@@ -166,6 +166,14 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_OIDC_BUTTON_LABEL` | `Sign in with SSO` | Sign-in button text |
 | `HABENY_OIDC_CA_BUNDLE` |  | CA file for a provider with a private certificate |
 | `HABENY_OIDC_ALLOW_HTTP` | `false` | Allow a plain-HTTP provider (testing only) |
+| `HABENY_PUBLIC_URL` |  | This server's address as users reach it (e.g. `https://habeny.example.com`), for links in notifications |
+| `HABENY_ALERT_DISK_PERCENT` | `10` | Alert when free space for data or containers falls below this percentage (0: off) |
+| `HABENY_SMTP_HOST` |  | Mail server for email notifications (empty: email off) |
+| `HABENY_SMTP_PORT` | `587` | Mail server port |
+| `HABENY_SMTP_SECURITY` | `starttls` | `starttls`, `ssl` (implicit TLS, usually port 465) or `off` |
+| `HABENY_SMTP_USER` |  | Mail server user name (empty: no login) |
+| `HABENY_SMTP_PASSWORD` |  | Mail server password |
+| `HABENY_SMTP_FROM` |  | Sender address (default: habeny@<host name>) |
 | `HABENY_DATA_DIR` | `/var/lib/lxc-siem-platform` | Database, keys, reports and logs *(set by the installer)* |
 | `HABENY_LXC_BACKEND` |  | `helper` (unprivileged app + root helper) or `direct` (app runs as root); default: direct when root, else helper *(set by the installer)* |
 | `HABENY_HELPER_SOCKET` | `/run/habeny/helper.sock` | The helper's Unix socket *(set by the installer)* |
@@ -259,7 +267,80 @@ A backup from a newer Habeny can't be restored into an older one.
   `journalctl -u habeny | grep 3f9a…`. A valid `X-Request-ID` from a reverse proxy is kept,
   which links its logs with Habeny's.
 - **Access log:** one line per request with method, path, status, duration and user.
-- **Activity log:** the audit trail of what users did, on the Activity page.
+- **Activity log:** the audit trail of what users did, on the Activity page (see below).
+
+## Audit trail
+
+Every action (deployments, deletions, sign-ins, user and token changes, settings) is
+recorded in the database with who did it, the API token if one was used, the client IP and
+the request ID. The **Activity** page searches it by action, user, result, date range and
+text, and exports what matches as CSV or JSON Lines.
+
+It's tamper-evident: each entry stores the SHA-256 of the previous entry's hash and its own
+content, and the database refuses to update entries. Checking the chain shows the first
+entry that was changed, removed or reordered:
+
+```bash
+sudo habeny audit verify                          # or Activity → Verify integrity (admins)
+sudo habeny audit export --since 2026-09-01 --format csv > audit.csv
+```
+
+Someone with root on the server could still rewrite the whole chain. For evidence that
+survives that, ship the server log off the machine: each entry's hash is also logged
+(logger `habeny.audit`), so the shipped copy shows what the chain looked like. Entries older
+than `HABENY_HISTORY_RETENTION_DAYS` are pruned; the last pruned entry is kept as the
+anchor the rest is verified from. On upgrade, the old daily `activity_*.json` files are
+imported.
+
+## Monitoring and alerts
+
+| Endpoint | Sign-in | Use |
+|---|---|---|
+| `GET /api/healthz` | no | Liveness: 200 while the process answers |
+| `GET /api/readyz` | no | Readiness: 200 when the database, LXC and the data disk are fine, else 503 |
+| `GET /api/metrics` | API token (viewer is enough) | Prometheus metrics |
+
+Metrics include containers by state, deployments and deployed containers by result, running
+deployments and simulations, HTTP requests and a latency histogram, free disk space for
+data and containers, database size, the newest backup's time, active alerts, users,
+sessions, API tokens, host load and memory. Scrape configuration:
+
+```yaml
+scrape_configs:
+  - job_name: habeny
+    scheme: https
+    tls_config: {insecure_skip_verify: true}   # only with Habeny's self-signed certificate
+    authorization: {credentials_file: /etc/prometheus/habeny.token}
+    static_configs: [{targets: ["habeny.example.com:9000"]}]
+```
+
+The **Monitoring** page has example alerting rules. Habeny also raises its own alerts,
+shown on that page and in the header, and sent to notification channels:
+
+| Alert | When |
+|---|---|
+| Low disk space | Free space for data or containers under `HABENY_ALERT_DISK_PERCENT` (10%); critical under half of it |
+| LXC unavailable | Container operations can't reach LXC (e.g. the helper is down) |
+| Backup failed | The last scheduled backup failed |
+| Deployment failed | The last deployment had failures; clears after one that fully succeeds |
+| Host unreachable | Another Habeny server managed from this console doesn't answer |
+
+## Notifications
+
+Admins add channels on the **Notifications** page:
+
+- **Slack**, or anything that takes Slack incoming webhooks (Mattermost, Rocket.Chat…)
+- **Webhook:** a JSON POST: `{"event", "level", "title", "text", "fields", "link", "time",
+  "server"}`. With a secret set, `X-Habeny-Signature: sha256=<HMAC-SHA256 of the body>`
+  proves it came from Habeny.
+- **Email:** through the mail server in `HABENY_SMTP_*` (host, port, `starttls`/`ssl`,
+  user, password, sender).
+
+Each channel picks its events: deployments, simulations and benchmarks finishing, alerts
+starting and clearing. It can be limited to problems (warnings and errors). Delivery happens
+in the background with retries. **Test** sends a message now, and the page shows each
+channel's last delivery and error. `HABENY_PUBLIC_URL` makes the links in messages point at
+your address. URLs and secrets are stored encrypted and never shown again in full.
 
 ## Data retention
 
@@ -269,10 +350,10 @@ A background task prunes old data hourly, so the disk doesn't fill up over time
 | Data | Kept | Setting |
 |---|---|---|
 | System metrics (saved once a minute) and API latency samples | 30 days | `HABENY_METRICS_RETENTION_DAYS` |
-| Activity log, deployment results, finished jobs | 365 days | `HABENY_HISTORY_RETENTION_DAYS` |
+| Audit trail (activity log), deployment results, finished jobs | 365 days | `HABENY_HISTORY_RETENTION_DAYS` |
 | Generated report files | forever | `HABENY_REPORT_RETENTION_DAYS` |
 | Full backups | newest 14 | `HABENY_BACKUP_KEEP` |
-| Expired sign-in sessions | removed | |
+| Expired sign-in sessions and API tokens | removed | |
 
 `0` keeps data forever. System metrics are recorded once per `HABENY_METRICS_SAMPLE_SECONDS`
 however many dashboards are open. They used to be recorded per viewer every 5 seconds,
@@ -312,9 +393,10 @@ What limits a host in practice:
   so several seconds per page load at around 500 containers.
 - **Users:** tens of people using the UI at once is fine; writes are serialized by SQLite.
 
-**Larger installs:** today, run **one Habeny per LXC host**. Each manages its own
-containers with its own data, users and backups. A shared PostgreSQL database is the
-path for a single Habeny across hosts. It isn't supported yet; it would mean:
+**Larger installs:** run **one Habeny per LXC host** and manage them all from one console
+(see [Several LXC hosts](#several-lxc-hosts)). Each host keeps its own containers, data,
+users and backups. A single Habeny instance spanning hosts, with a shared PostgreSQL
+database, isn't supported; it would mean:
 
 - porting `app/db.py` and the migrations
 - moving live job state and the maintenance task to database-coordinated workers, so
@@ -419,6 +501,42 @@ sign-in page is shown to anyone without a valid session.
   root and the service can read:
   `sudo cat /var/lib/lxc-siem-platform/setup-token` or `journalctl -u habeny | grep "setup token"`.
 
+### API tokens
+
+Scripts, CI pipelines, Prometheus and other Habeny consoles use **API tokens**:
+
+```bash
+curl -H "Authorization: Bearer hby_…" https://habeny.example.com:9000/api/agents
+```
+
+Create them under **Account → API tokens**, or on the server with
+`sudo habeny token create USER NAME [--role viewer] [--expires-days 90]`. A token:
+
+- acts as its user, with at most that user's role; demoting the user limits it too
+- can't change account settings: password, two-factor, sessions and tokens need a browser
+  sign-in
+- expires after 90 days by default
+- is shown once; only a hash is stored
+
+**Last used** shows when and from where each token was used. What was done with a token is
+recorded in the audit trail with its name. Admins see and revoke everyone's tokens.
+
+### Teams and limits
+
+Admins create teams on the **Teams** page to separate teams or customers:
+
+- Members of a team see and manage **only their team's containers**, simulations and
+  reports. Another team's container reads as "not found".
+- People without a team see the containers that belong to no team, so an install without
+  teams behaves as before. Admins see everything.
+- Containers belong to the team of the person who deploys them. Existing ones can be moved
+  between teams on the Teams page.
+- **Limits:** a team's container limit caps its total; a personal limit caps what one user
+  creates. Both are checked before deployments and benchmarks.
+
+Manager profiles, syslog configs, groups and config templates are shared by everyone. The
+host-wide dashboard figures (CPU, memory) stay visible to all.
+
 ### Single sign-on (OpenID Connect)
 
 Users can sign in through your identity provider: Microsoft Entra ID, Okta, Google
@@ -459,6 +577,44 @@ administrator is locked out, remove all accounts on the server and the UI will o
 ```bash
 sudo python3 -c "import sqlite3; c = sqlite3.connect('/var/lib/lxc-siem-platform/platform.db'); c.execute('DELETE FROM sessions'); c.execute('DELETE FROM users'); c.commit()"
 ```
+
+## Several LXC hosts
+
+Each LXC host runs its own Habeny. To manage several from one console:
+
+1. On the other host, create an API token for this console (**Account → API tokens**,
+   operator role for full control).
+2. Here, go to **Hosts → Add host** and enter its address and the token. With Habeny's
+   self-signed certificate, the console shows the certificate fingerprint. Check it matches
+   `sudo habeny tls fingerprint` on that host before confirming. From then on, connections
+   must present that certificate (pinning). A certificate from a trusted CA is verified
+   normally.
+3. Pick the host in the **Server** menu at the top of the sidebar, or on the Hosts page.
+   Every page then works on that host: containers, deployments, simulations, reports, live
+   metrics and the container console. A banner shows which host you're on.
+
+The console relays the API calls and WebSockets with that host's token. Your role on this
+console still limits what you can do: a viewer here can only read, whatever the token
+allows. Accounts, tokens, teams, notifications and backups stay separate on each server. A
+host can be limited to one team. The Hosts page shows every host's status, version,
+containers and alerts, and an unreachable host raises an alert.
+
+## Languages and accessibility
+
+The interface is available in **English and French** (Account → Language, or on the
+sign-in page; the default follows the browser). Messages from the server stay in English.
+Adding a language means translating `frontend/src/i18n/fr.json` into a new file and
+listing it in `frontend/src/i18n/index.js`. `npm test` fails if any interface text lacks a
+translation.
+
+Accessibility is checked with axe-core on every page, at desktop and phone width (see
+[docs/accessibility.md](docs/accessibility.md)):
+
+- every control is labelled
+- dialogs keep keyboard focus
+- messages are announced to screen readers
+- contrast meets WCAG AA
+- the layout works down to phone width, with the sidebar as a menu
 
 ## Frontend
 
@@ -516,10 +672,27 @@ npm run build      # outputs to ../static/
 
 ## API Endpoints
 
-### System
+All endpoints accept a signed-in session or `Authorization: Bearer <API token>`.
+
+### System and monitoring
 - `GET /` — API info
 - `GET /system/info` — Platform and LXC details
-- `GET /system/health` — Health check
+- `GET /system/health` — Health details (signed in)
+- `GET /healthz`, `GET /readyz` — Liveness and readiness probes (no sign-in)
+- `GET /metrics` — Prometheus metrics
+- `GET /system/alerts` — Active alerts
+
+### Accounts, tokens, teams (admins unless noted)
+- `GET|POST /users/me/tokens`, `DELETE /users/me/tokens/{id}` — Your API tokens (browser session)
+- `GET /users/tokens`, `DELETE /users/tokens/{id}` — Everyone's tokens
+- `GET|POST /teams`, `PUT|DELETE /teams/{id}`, `POST /teams/assign` — Teams, moving containers
+- `PUT /users/{id}/team` — A user's team and personal limit
+- `GET|POST /notifications/channels`, `PUT|DELETE /notifications/channels/{id}`, `POST …/{id}/test`
+
+### Hosts
+- `GET /hosts`, `GET /hosts/overview` — Hosts you can use and their status
+- `POST /hosts`, `PUT|DELETE /hosts/{id}` — Register (admins)
+- `/hosts/{id}/api/…`, `WS /hosts/{id}/ws/…` — Relayed to that host
 
 ### Containers
 - `POST /agents/deploy` — Deploy containers with SIEM agents
@@ -555,7 +728,10 @@ npm run build      # outputs to ../static/
 - `POST /reports/generate` — Generate report (JSON/CSV/PDF)
 - `GET /reports/{id}/download` — Download report
 - `POST /agents/{id}/logs/upload` — Upload logs to container
-- `GET /activity/logs` — Activity audit log
+- `GET /activity/logs` — Audit trail (`action`, `user`, `status`, `since`, `until`, `q`, paging)
+- `GET /activity/export?format=csv|jsonl` — Export (same filters)
+- `GET /activity/verify` — Check the hash chain (admins)
+- `GET /activity/facets` — Actions and users, for filters
 
 ### WebSocket
 - `WS /ws/metrics` — Live platform metrics (5s interval)

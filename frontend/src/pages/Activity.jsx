@@ -1,62 +1,173 @@
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner } from "../components/UI";
+import { Details, humanize } from "../components/Details";
+import { PageHeader, Pill, Spinner, Empty } from "../components/UI";
+import { formatDateTime, t } from "../i18n";
 
-const COLUMNS = [
-  { key: "timestamp", label: "Time", render: (r) => r.timestamp ? new Date(r.timestamp).toLocaleString() : "—" },
-  { key: "action", label: "Action" },
-  { key: "status", label: "Status", render: (r) => <Pill status={r.status} /> },
-  { key: "details", label: "Details", render: (r) => { const d = r.details || {}; return Object.entries(d).slice(0, 4).map(([k, v]) => `${k}: ${v}`).join(", ") || "—"; }},
-];
+const PAGE_SIZES = [25, 50, 100, 250];
+const EMPTY_FILTERS = { q: "", action: "", user: "", status: "", since: "", until: "" };
+
+function summary(details) {
+  const entries = Object.entries(details || {}).filter(([, v]) => v !== null && typeof v !== "object");
+  return entries.slice(0, 3).map(([k, v]) => `${humanize(k)}: ${v}`).join(" · ");
+}
+
+// Only set filters go to the API (and into export links)
+function activeFilters(filters) {
+  return Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+}
 
 export default function Activity() {
+  const { user } = useAuth();
   const { toast } = useStore();
-  const [logs, setLogs] = useState([]);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [applied, setApplied] = useState(EMPTY_FILTERS);
+  const [facets, setFacets] = useState({ actions: [], users: [] });
+  const [page, setPage] = useState({ logs: [], total: 0 });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("");
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [open, setOpen] = useState(null);
+  const [verification, setVerification] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit, offset };
-      if (filter) params.action = filter;
-      const res = await api.getActivity(params);
-      setLogs(res.data?.logs || []);
-      setTotal(res.data?.total || 0);
+      const res = await api.getActivity({ limit, offset, ...activeFilters(applied) });
+      setPage({ logs: res.data?.logs || [], total: res.data?.total || 0 });
     } catch (e) { toast(e.message, "error"); }
     finally { setLoading(false); }
-  }, [limit, offset, filter, toast]);
+  }, [limit, offset, applied, toast]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    api.getActivityFacets().then((res) => setFacets(res.data)).catch(() => {});
+  }, []);
 
+  const set = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+  const apply = (e) => { e?.preventDefault(); setOffset(0); setApplied(filters); };
+  const reset = () => { setFilters(EMPTY_FILTERS); setApplied(EMPTY_FILTERS); setOffset(0); };
+
+  const verify = async () => {
+    try {
+      const res = await api.verifyActivity();
+      setVerification(res);
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const { logs, total } = page;
+  const exportParams = activeFilters(applied);
   return (
     <>
-      <PageHeader title="Activity Log" subtitle={`${total} entries`}>
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
+      <PageHeader title={t("Activity Log")} subtitle={Object.keys(exportParams).length
+        ? t("{n} matching entries", { n: total.toLocaleString() })
+        : t("{n} entries", { n: total.toLocaleString() })}>
+        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "csv" })} download>{t("Export CSV")}</a>
+        <a className="btn btn-secondary" href={api.activityExportUrl({ ...exportParams, format: "jsonl" })} download>{t("Export JSON Lines")}</a>
+        {user.is_admin && <button className="btn btn-secondary" onClick={verify}>{t("Verify integrity")}</button>}
       </PageHeader>
 
-      <div className="filters">
-        <div className="field"><label>Action</label><input className="input" placeholder="e.g. container_deployment_started" value={filter} onChange={(e) => { setFilter(e.target.value); setOffset(0); }} /></div>
-        <div className="field"><label>Limit</label><input className="input" type="number" min={1} max={1000} value={limit} onChange={(e) => { setLimit(Number(e.target.value) || 100); setOffset(0); }} style={{ width: 80 }} /></div>
-        <div className="field"><label>Offset</label><input className="input" type="number" min={0} value={offset} onChange={(e) => setOffset(Number(e.target.value) || 0)} style={{ width: 80 }} /></div>
-        <div className="field" style={{ justifyContent: "flex-end" }}><button className="btn btn-secondary" onClick={load}>Apply</button></div>
-      </div>
-
-      <div className="card">
-        {loading ? <Spinner /> : <DataTable columns={COLUMNS} rows={logs} emptyMsg="No activity logs" />}
-      </div>
-
-      {total > limit && (
-        <div className="btn-group" style={{ marginTop: 16, justifyContent: "center" }}>
-          <button className="btn btn-secondary btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</button>
-          <span style={{ padding: "6px 12px", color: "var(--text-dim)", fontSize: 13 }}>{offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
-          <button className="btn btn-secondary btn-sm" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)}>Next</button>
+      {verification && (
+        <div className={verification.data.ok ? "auth-notice" : "auth-error"} role="status">
+          {verification.message}
+          {verification.data.ok && verification.data.head_hash && <> {t("· latest hash")} <code>{verification.data.head_hash.slice(0, 16)}…</code></>}
         </div>
       )}
+
+      <form className="filters" onSubmit={apply} role="search" aria-label={t("Filter the activity log")}>
+        <div className="field">
+          <label htmlFor="act-q">{t("Search")}</label>
+          <input id="act-q" className="input" type="search" placeholder={t("Container, group, username…")} value={filters.q} onChange={set("q")} />
+        </div>
+        <div className="field">
+          <label htmlFor="act-action">{t("Action")}</label>
+          <select id="act-action" className="select" value={filters.action} onChange={set("action")}>
+            <option value="">{t("Any")}</option>
+            {facets.actions.map((a) => <option key={a} value={a}>{humanize(a)}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="act-user">{t("User")}</label>
+          <select id="act-user" className="select" value={filters.user} onChange={set("user")}>
+            <option value="">{t("Anyone")}</option>
+            {facets.users.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="act-status">{t("Result")}</label>
+          <select id="act-status" className="select" value={filters.status} onChange={set("status")}>
+            <option value="">{t("Any")}</option>
+            <option value="success">{t("Success")}</option>
+            <option value="partial">{t("Partial")}</option>
+            <option value="error">{t("Error")}</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="act-since">{t("From")}</label>
+          <input id="act-since" className="input" type="date" value={filters.since} onChange={set("since")} />
+        </div>
+        <div className="field">
+          <label htmlFor="act-until">{t("To")}</label>
+          <input id="act-until" className="input" type="date" value={filters.until} onChange={set("until")} />
+        </div>
+        <div className="field filters-actions">
+          <button type="submit" className="btn btn-primary">{t("Apply")}</button>
+          <button type="button" className="btn btn-secondary" onClick={reset}>{t("Reset")}</button>
+        </div>
+      </form>
+
+      <div className="card">
+        {loading ? <Spinner /> : !logs.length ? <Empty message={t("No matching activity")} /> : (
+          <div className="table-wrap">
+            <table>
+              <caption className="sr-only">{t("Activity log entries, newest first")}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("Time")}</th><th scope="col">{t("User")}</th><th scope="col">{t("Action")}</th>
+                  <th scope="col">{t("Result")}</th><th scope="col">{t("Summary")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((r) => (
+                  <Fragment key={r.id}>
+                    <tr>
+                      <td>
+                        <button type="button" className="link-btn" aria-expanded={open === r.id} aria-controls={`act-${r.id}`}
+                          onClick={() => setOpen(open === r.id ? null : r.id)}>
+                          {formatDateTime(r.timestamp)}
+                        </button>
+                      </td>
+                      <td>{r.user || <span className="muted">{t("system")}</span>}{r.token && <span className="tag" title={t("Done with an API token")}>{t("token")} {r.token}</span>}</td>
+                      <td>{humanize(r.action)}</td>
+                      <td><Pill status={r.status} /></td>
+                      <td className="activity-summary">{summary(r.details) || "—"}</td>
+                    </tr>
+                    {open === r.id && (
+                      <tr className="activity-detail" id={`act-${r.id}`}>
+                        <td colSpan={5}>
+                          <Details data={{ ...r.details, entry: r.id, request_id: r.request_id, from_ip: r.ip }} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <nav className="pager" aria-label={t("Activity pages")}>
+        <label htmlFor="act-size" className="muted">{t("Per page")}</label>
+        <select id="act-size" className="select select-sm" value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0); }}>
+          {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <button className="btn btn-secondary btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>{t("Previous")}</button>
+        <span className="muted">{total ? t("{from}–{to} of {total}", { from: offset + 1, to: Math.min(offset + limit, total), total: total.toLocaleString() }) : "0"}</span>
+        <button className="btn btn-secondary btn-sm" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)}>{t("Next")}</button>
+      </nav>
     </>
   );
 }

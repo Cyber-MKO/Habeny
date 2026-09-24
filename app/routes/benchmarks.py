@@ -1,15 +1,19 @@
 """
 Benchmark scenarios, runs and comparisons.
 """
+import asyncio
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 import app.services.benchmarks as bm_engine
 from app.config import DB_PATH
+from app.core.lxc_backend import lxc
 from app.db import get_manager
 from app.models import APIResponse, BenchmarkCompareRequest, BenchmarkStartRequest
+from app.services import tenancy
 from app.services.activity import log_activity
+from app.services.auth import current_user
 
 router = APIRouter()
 
@@ -25,7 +29,8 @@ async def list_benchmark_scenarios():
 
 @router.post("/benchmarks/start", response_model=APIResponse)
 async def start_benchmark(request: BenchmarkStartRequest,
-                          background_tasks: BackgroundTasks):
+                          background_tasks: BackgroundTasks,
+                          user: dict | None = Depends(current_user)):
     """Start a benchmark execution"""
     try:
         scenario_id = request.scenario_id
@@ -46,7 +51,12 @@ async def start_benchmark(request: BenchmarkStartRequest,
         if request.name:
             cfg["name"] = request.name
 
-        background_tasks.add_task(bm_engine.run_benchmark, benchmark_id, scenario_id, cfg)
+        # Benchmarks create containers: the team and user limits apply to all of them
+        phases = cfg.get("phases") or bm_engine.SCENARIOS[scenario_id]["phases"]
+        existing = await asyncio.to_thread(lxc.list_containers)
+        tenancy.check_quota(user, sum(p.get("agents", 5) for p in phases), list(existing))
+        background_tasks.add_task(bm_engine.run_benchmark, benchmark_id, scenario_id, cfg,
+                                  {k: (user or {}).get(k) for k in ("id", "team_id", "username")})
         log_activity("benchmark_started", {"benchmark_id": benchmark_id, "scenario": scenario_id})
 
         return APIResponse(success=True, message=f"Benchmark {benchmark_id[:8]} started",

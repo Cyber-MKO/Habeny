@@ -3,9 +3,31 @@ const BASE = import.meta.env.VITE_API_URL || "/api";
 // Fired when the API rejects a request because the session is missing or expired
 export const UNAUTHORIZED_EVENT = "habeny:unauthorized";
 
+// Another Habeny server ("host") chosen in the host switcher: its API calls and WebSockets
+// go through this server's relay. Accounts, tokens, teams, hosts, notifications and backups
+// always stay with this server.
+let currentHost = null;
+const LOCAL_ONLY = ["/auth", "/users", "/hosts", "/teams", "/notifications", "/system/backups"];
+
+export function setApiHost(id) {
+  currentHost = id || null;
+}
+
+export function hostPath(path) {
+  if (!currentHost || LOCAL_ONLY.some((p) => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`))) return path;
+  return `/hosts/${currentHost}/api${path}`;
+}
+
+// WebSocket URL for a path such as /ws/metrics, on the chosen host
+export function wsUrl(path) {
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const base = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).host : window.location.host;
+  return `${proto}://${base}${currentHost ? `/hosts/${currentHost}` : ""}${path}`;
+}
+
 async function request(path, opts = {}) {
   const { method = "GET", body, params } = opts;
-  let url = `${BASE}${path}`;
+  let url = `${BASE}${hostPath(path)}`;
   if (params) {
     const qs = new URLSearchParams(params).toString();
     if (qs) url += `?${qs}`;
@@ -47,11 +69,22 @@ export const api = {
   enableTwoFactor: (body) => request("/users/me/2fa/enable", { method: "POST", body }),
   disableTwoFactor: (body) => request("/users/me/2fa/disable", { method: "POST", body }),
   newRecoveryCodes: (body) => request("/users/me/2fa/recovery-codes", { method: "POST", body }),
+  getMyTokens: () => request("/users/me/tokens"),
+  createMyToken: (body) => request("/users/me/tokens", { method: "POST", body }),
+  revokeMyToken: (id) => request(`/users/me/tokens/${id}`, { method: "DELETE" }),
+  getAllTokens: () => request("/users/tokens"),
+  revokeToken: (id) => request(`/users/tokens/${id}`, { method: "DELETE" }),
   getBackups: () => request("/system/backups"),
   createBackup: () => request("/system/backups", { method: "POST" }),
   backupDownloadUrl: (name) => `${BASE}/system/backups/${encodeURIComponent(name)}`,
   resetUserTwoFactor: (id) => request(`/users/${id}/2fa`, { method: "DELETE" }),
   endUserSessions: (id) => request(`/users/${id}/sessions/revoke`, { method: "POST" }),
+  getTeams: () => request("/teams"),
+  createTeam: (body) => request("/teams", { method: "POST", body }),
+  updateTeam: (id, body) => request(`/teams/${id}`, { method: "PUT", body }),
+  deleteTeam: (id) => request(`/teams/${id}`, { method: "DELETE" }),
+  setUserTeam: (id, body) => request(`/users/${id}/team`, { method: "PUT", body }),
+  assignToTeam: (body) => request("/teams/assign", { method: "POST", body }),
   getUsers: () => request("/users"),
   createUser: (body) => request("/users", { method: "POST", body }),
   updateUser: (id, body) => request(`/users/${id}`, { method: "PATCH", body }),
@@ -59,6 +92,12 @@ export const api = {
   deleteUser: (id) => request(`/users/${id}`, { method: "DELETE" }),
 
   getHealth: () => request("/system/health"),
+  getAlerts: () => request("/system/alerts"),
+  getChannels: () => request("/notifications/channels"),
+  createChannel: (body) => request("/notifications/channels", { method: "POST", body }),
+  updateChannel: (id, body) => request(`/notifications/channels/${id}`, { method: "PUT", body }),
+  deleteChannel: (id) => request(`/notifications/channels/${id}`, { method: "DELETE" }),
+  testChannel: (id) => request(`/notifications/channels/${id}/test`, { method: "POST" }),
   getSystemInfo: () => request("/system/info"),
   getAgents: (params) => request("/agents", { params }),
   getAgent: (id) => request(`/agents/${id}`),
@@ -88,8 +127,17 @@ export const api = {
 
   generateReport: (body) => request("/reports/generate", { method: "POST", body }),
   getReport: (id) => request(`/reports/${id}`),
+  reportDownloadUrl: (id, format) => `${BASE}${hostPath(`/reports/${encodeURIComponent(id)}/download`)}?format=${format}`,
 
   getActivity: (params) => request("/activity/logs", { params }),
+  getActivityFacets: () => request("/activity/facets"),
+  verifyActivity: () => request("/activity/verify"),
+  activityExportUrl: (params) => `${BASE}${hostPath("/activity/export")}?${new URLSearchParams(params)}`,
+  getHosts: () => request("/hosts"),
+  getHostsOverview: () => request("/hosts/overview"),
+  addHost: (body) => request("/hosts", { method: "POST", body }),
+  updateHost: (id, body) => request(`/hosts/${id}`, { method: "PUT", body }),
+  removeHost: (id) => request(`/hosts/${id}`, { method: "DELETE" }),
   getSiemStats: (type) => request(`/siem/${type}/stats`),
 
   uploadLogs: (id, body) => request(`/agents/${id}/logs/upload`, { method: "POST", body }),

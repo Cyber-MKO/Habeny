@@ -1,7 +1,32 @@
 import { useState } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, JsonBlock, Spinner } from "../components/UI";
+import { PageHeader, Spinner } from "../components/UI";
+import { Details, RecordTable } from "../components/Details";
+import { formatDateTime, t } from "../i18n";
+
+// A generated report, readable: summary, findings and metrics
+function ReportView({ report, fallback }) {
+  if (!report) return <Details data={fallback} />;
+  const { summary = {}, findings = [], metrics = {}, time_range: range } = report;
+  return (
+    <div className="report-view">
+      <p className="account-help">
+        {range && <>{t("From")} <time dateTime={range.start}>{formatDateTime(range.start)}</time> {t("to")}{" "}
+          <time dateTime={range.end}>{formatDateTime(range.end)}</time>. </>}
+        {t("Generated")} <time dateTime={report.generated_at}>{formatDateTime(report.generated_at)}</time>.
+      </p>
+      <h4 className="subsection-title">{t("Summary")}</h4>
+      <Details data={{ ...summary, simulations_in_range: (summary.simulations_in_range || []).length }} />
+      <h4 className="subsection-title">{t("Findings")}</h4>
+      {findings.length
+        ? (findings.every((f) => typeof f === "object") ? <RecordTable rows={findings} /> : <ul className="plain-list">{findings.map((f, i) => <li key={i}>{String(f)}</li>)}</ul>)
+        : <p className="muted">{t("No findings.")}</p>}
+      <h4 className="subsection-title">{t("Metrics")}</h4>
+      <Details data={metrics} />
+    </div>
+  );
+}
 
 export default function Reports() {
   const { toast } = useStore();
@@ -15,7 +40,6 @@ export default function Reports() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const BASE = import.meta.env.VITE_API_URL || "/api";
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -30,15 +54,15 @@ export default function Reports() {
       setResult(res);
       const rid = res.data?.report_id;
       if (rid && !history.includes(rid)) setHistory((p) => [rid, ...p]);
-      toast("Report generated", "success");
+      toast(t("Report generated"), "success");
     } catch (e) { toast(e.message, "error"); }
     finally { setLoading(false); }
   };
 
   const handleFetch = async () => {
-    if (!fetchId.trim()) return toast("Enter a report ID", "error");
+    if (!fetchId.trim()) return toast(t("Enter a report ID"), "error");
     setLoading(true);
-    try { const res = await api.getReport(fetchId.trim()); setResult(res); toast("Report fetched", "success"); }
+    try { const res = await api.getReport(fetchId.trim()); setResult(res); toast(t("Report fetched"), "success"); }
     catch (e) { toast(e.message, "error"); }
     finally { setLoading(false); }
   };
@@ -47,43 +71,43 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="Reports" subtitle="Generate and retrieve reports" />
+      <PageHeader title={t("Reports")} subtitle={t("Generate and retrieve reports")} />
 
       <form onSubmit={handleGenerate} className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">Generate Report</div>
+        <div className="section-title">{t("Generate Report")}</div>
         <div className="form-grid">
-          <div className="field"><label>Start Time</label><input className="input" type="datetime-local" value={form.start_time} onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
-          <div className="field"><label>End Time</label><input className="input" type="datetime-local" value={form.end_time} onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))} /></div>
-          <div className="field"><label>Format</label><select className="select" value={form.format} onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}><option value="json">JSON</option><option value="csv">CSV</option><option value="pdf">PDF</option></select></div>
-          <div className="field"><label>Metrics (comma-separated)</label><input className="input" value={form.metrics} onChange={(e) => setForm((p) => ({ ...p, metrics: e.target.value }))} /></div>
-          <div className="field"><label className="checkbox-label"><input type="checkbox" checked={form.include_findings} onChange={(e) => setForm((p) => ({ ...p, include_findings: e.target.checked }))} /> Include findings</label></div>
-          <div className="field" style={{ justifyContent: "flex-end" }}><button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Generating…" : "Generate"}</button></div>
+          <div className="field"><label htmlFor="reports-start-time">{t("Start Time")}</label><input id="reports-start-time" className="input" type="datetime-local" value={form.start_time} onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="reports-end-time">{t("End Time")}</label><input id="reports-end-time" className="input" type="datetime-local" value={form.end_time} onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))} /></div>
+          <div className="field"><label htmlFor="reports-format">{t("Format")}</label><select id="reports-format" className="select" value={form.format} onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}><option value="json">JSON</option><option value="csv">CSV</option><option value="pdf">PDF</option></select></div>
+          <div className="field"><label htmlFor="reports-metrics-comma-separated">{t("Metrics (comma-separated)")}</label><input id="reports-metrics-comma-separated" className="input" value={form.metrics} onChange={(e) => setForm((p) => ({ ...p, metrics: e.target.value }))} /></div>
+          <div className="field"><label className="checkbox-label"><input type="checkbox" checked={form.include_findings} onChange={(e) => setForm((p) => ({ ...p, include_findings: e.target.checked }))} /> {t("Include findings")}</label></div>
+          <div className="field" style={{ justifyContent: "flex-end" }}><button className="btn btn-primary" type="submit" disabled={loading}>{loading ? t("Generating…") : t("Generate")}</button></div>
         </div>
       </form>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">Fetch Report by ID</div>
+        <div className="section-title">{t("Fetch Report by ID")}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input className="input" placeholder="Report ID" value={fetchId} onChange={(e) => setFetchId(e.target.value)} style={{ flex: 1 }} />
-          <button className="btn btn-secondary" onClick={handleFetch} disabled={loading}>Fetch</button>
+          <input className="input" placeholder={t("Report ID")} value={fetchId} onChange={(e) => setFetchId(e.target.value)} style={{ flex: 1 }} />
+          <button className="btn btn-secondary" onClick={handleFetch} disabled={loading}>{t("Fetch")}</button>
         </div>
       </div>
 
       {history.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="section-title">Report History</div>
+          <div className="section-title">{t("Report History")}</div>
           <table>
-            <thead><tr><th>Report ID</th><th>Actions</th></tr></thead>
+            <thead><tr><th>{t("Report ID")}</th><th>{t("Actions")}</th></tr></thead>
             <tbody>
               {history.map((rid) => (
                 <tr key={rid}>
                   <td style={{ fontFamily: "monospace", fontSize: 12 }}>{rid}</td>
                   <td>
                     <div className="btn-group">
-                      <button className="btn btn-sm btn-secondary" onClick={() => { setFetchId(rid); handleFetch(); }}>View</button>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=json`} target="_blank" rel="noopener noreferrer">JSON</a>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=pdf`} target="_blank" rel="noopener noreferrer">PDF</a>
+                      <button className="btn btn-sm btn-secondary" onClick={() => { setFetchId(rid); handleFetch(); }}>{t("View")}</button>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "json")} target="_blank" rel="noopener noreferrer">JSON</a>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "csv")} target="_blank" rel="noopener noreferrer">CSV</a>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "pdf")} target="_blank" rel="noopener noreferrer">PDF</a>
                     </div>
                   </td>
                 </tr>
@@ -97,10 +121,10 @@ export default function Reports() {
       {result && (
         <div className="card">
           <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Result</span>
-            {reportId && <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${reportId}/download?format=${form.format}`} target="_blank" rel="noopener noreferrer">Download {form.format.toUpperCase()}</a>}
+            <span>{t("Result")}</span>
+            {reportId && <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(reportId, form.format)} target="_blank" rel="noopener noreferrer">{t("Download")} {form.format.toUpperCase()}</a>}
           </div>
-          <JsonBlock data={result.data?.report || result} />
+          <ReportView report={result.data?.report} fallback={result} />
         </div>
       )}
     </>

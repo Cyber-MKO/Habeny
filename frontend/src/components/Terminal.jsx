@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
+import { wsUrl } from "../api";
+import { t } from "../i18n";
 
 export default function Terminal({ containerName, onClose }) {
   const termRef = useRef(null);
@@ -11,6 +13,7 @@ export default function Terminal({ containerName, onClose }) {
   useEffect(() => {
     const term = new XTerm({
       cursorBlink: true,
+      screenReaderMode: true, // output readable by screen readers
       fontSize: 13,
       fontFamily: '"IBM Plex Mono", "SF Mono", "Fira Code", "Cascadia Code", monospace',
       theme: {
@@ -26,11 +29,7 @@ export default function Terminal({ containerName, onClose }) {
     fitAddon.fit();
     xtermRef.current = term;
 
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const host = import.meta.env.VITE_API_URL
-      ? new URL(import.meta.env.VITE_API_URL).host
-      : window.location.host;
-    const ws = new WebSocket(`${proto}://${host}/ws/console/${containerName}`);
+    const ws = new WebSocket(wsUrl(`/ws/console/${encodeURIComponent(containerName)}`));
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -71,8 +70,8 @@ export default function Terminal({ containerName, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="terminal-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">Console: {containerName}</span>
-          <button className="btn btn-sm btn-danger" onClick={onClose}>Disconnect</button>
+          <span className="modal-title">{t("Console: {name}", { name: containerName })}</span>
+          <button className="btn btn-sm btn-danger" onClick={onClose}>{t("Disconnect")}</button>
         </div>
         <div className="terminal-body" ref={termRef} />
       </div>

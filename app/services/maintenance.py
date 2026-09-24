@@ -2,6 +2,7 @@
 Housekeeping in the background of the web app, so data doesn't grow without bound:
 
 - every 10 s: save buffered API latency samples and job progress (app/services/records.py)
+- every minute: check alert conditions (disk space, LXC reachable; app/services/alerts.py)
 - every hour: delete data past its retention (see the HABENY_*_RETENTION_DAYS settings)
   and take a scheduled backup when one is due (app/services/backup.py)
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 FLUSH_EVERY = 10
 PRUNE_EVERY = 3600
+CHECK_EVERY = 60
 HIGH_FREQUENCY_METRICS = ["system", "api_latency"]
 
 
@@ -48,10 +50,11 @@ def _mtime(path: Path) -> datetime:
 
 def prune(dry_run: bool = False) -> dict:
     """Delete data past its retention. Returns what was (or, dry run, would be) removed."""
-    from app.db import prune_expired_sessions, prune_metrics
+    from app.db import delete_expired_api_tokens, prune_expired_sessions, prune_metrics
+    from app.services import audit
 
-    removed = {"metric_samples": 0, "history_metrics": 0, "activity_files": 0, "report_files": 0,
-               "expired_sessions": 0, "finished_jobs": 0}
+    removed = {"metric_samples": 0, "history_metrics": 0, "audit_entries": 0, "activity_files": 0, "report_files": 0,
+               "expired_sessions": 0, "expired_tokens": 0, "finished_jobs": 0}
 
     samples_cutoff = _cutoff(config.get("HABENY_METRICS_RETENTION_DAYS"))
     history_cutoff = _cutoff(config.get("HABENY_HISTORY_RETENTION_DAYS"))
@@ -62,7 +65,8 @@ def prune(dry_run: bool = False) -> dict:
     old_reports = [p for p in REPORTS_DIR.glob("*") if p.is_file() and _mtime(p) < reports_cutoff] \
         if reports_cutoff else []
     if dry_run:
-        removed.update(activity_files=len(old_activity), report_files=len(old_reports))
+        removed.update(activity_files=len(old_activity), report_files=len(old_reports),
+                       audit_entries=audit.prune(history_cutoff.isoformat(), dry_run=True) if history_cutoff else 0)
         return removed
 
     if samples_cutoff:
@@ -72,6 +76,7 @@ def prune(dry_run: bool = False) -> dict:
                                                    exclude_types=HIGH_FREQUENCY_METRICS)
         from app.state import STORES
         removed["finished_jobs"] = sum(store.prune(history_cutoff.isoformat()) for store in STORES)
+        removed["audit_entries"] = audit.prune(history_cutoff.isoformat())
     for path in old_activity:
         path.unlink(missing_ok=True)
     removed["activity_files"] = len(old_activity)
@@ -79,6 +84,7 @@ def prune(dry_run: bool = False) -> dict:
         path.unlink(missing_ok=True)
     removed["report_files"] = len(old_reports)
     removed["expired_sessions"] = prune_expired_sessions(DB_PATH)
+    removed["expired_tokens"] = delete_expired_api_tokens(DB_PATH)
     if any(removed.values()):
         logger.info("Pruned old data: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in removed.items() if v),
                     extra={"fields": {"pruned": removed}})
@@ -92,6 +98,7 @@ class Maintenance:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._next_prune = time.monotonic() + 60  # shortly after start, then hourly
+        self._next_check = time.monotonic() + 5
 
     def start(self) -> None:
         if self._thread is None:
@@ -117,6 +124,13 @@ class Maintenance:
     def _run(self) -> None:
         while not self._stop.wait(FLUSH_EVERY):
             self._flush()
+            if time.monotonic() >= self._next_check:
+                self._next_check = time.monotonic() + CHECK_EVERY
+                try:
+                    from app.services.alerts import check
+                    check()
+                except Exception:
+                    logger.exception("Maintenance: checking alerts failed")
             if time.monotonic() >= self._next_prune:
                 self._next_prune = time.monotonic() + PRUNE_EVERY
                 for name, task in (("pruning", prune), ("scheduled backup", _backup_if_due)):
@@ -127,8 +141,14 @@ class Maintenance:
 
 
 def _backup_if_due() -> None:
+    from app.services.alerts import backup_result
     from app.services.backup import backup_if_due
-    backup_if_due()
+    try:
+        if backup_if_due() is not None:
+            backup_result(None)
+    except Exception as e:
+        backup_result(str(e))
+        raise
 
 
 maintenance = Maintenance()

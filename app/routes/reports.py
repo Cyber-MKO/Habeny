@@ -7,15 +7,17 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse
 
 from app.config import REPORTS_DIR
 from app.core.lxc_backend import lxc
 from app.models import APIResponse, ReportGenerateRequest, utc_now
+from app.services import tenancy
 from app.services.activity import log_activity
 from app.services.agent_info import get_agent_info
+from app.services.auth import current_user
 from app.services.reporting import (
     build_report_findings,
     build_report_metrics,
@@ -30,13 +32,13 @@ router = APIRouter()
 
 
 @router.post("/reports/generate", response_model=APIResponse)
-async def generate_report(report_request: ReportGenerateRequest):
-    """Generate a performance/benchmark report"""
+async def generate_report(report_request: ReportGenerateRequest, user: dict | None = Depends(current_user)):
+    """Generate a performance/benchmark report (over your team's containers unless you're an admin)"""
     try:
         report_id = str(uuid.uuid4())
 
         # Collect data
-        containers = lxc.list_containers()
+        containers = tenancy.visible(user, lxc.list_containers())
         agent_stats = []
 
         for name in containers:
@@ -62,6 +64,8 @@ async def generate_report(report_request: ReportGenerateRequest):
         simulations_by_type = {}
         syslog_targets = {}
         for sim in simulations_db.values():
+            if not tenancy.same_team(user, sim.get("team_id")):
+                continue
             started_at = sim.get("started_at")
             if not started_at:
                 continue
@@ -98,7 +102,8 @@ async def generate_report(report_request: ReportGenerateRequest):
                 "syslog_targets": syslog_targets
             },
             "metrics": build_report_metrics(start_time.isoformat()),
-            "findings": build_report_findings(agents_by_status)
+            "findings": build_report_findings(agents_by_status),
+            **tenancy.stamp(user),
         }
 
         # Convert datetimes to JSON-safe values
@@ -145,10 +150,10 @@ async def generate_report(report_request: ReportGenerateRequest):
 
 
 @router.get("/reports/{report_id}", response_model=APIResponse)
-async def get_report(report_id: str):
+async def get_report(report_id: str, user: dict | None = Depends(current_user)):
     """Retrieve a generated report"""
     try:
-        if report_id not in reports_db:
+        if report_id not in reports_db or not tenancy.same_team(user, reports_db[report_id].get("team_id")):
             raise HTTPException(status_code=404, detail=f"Report {report_id} not found")
 
         return APIResponse(
@@ -164,9 +169,13 @@ async def get_report(report_id: str):
 
 
 @router.get("/reports/{report_id}/download")
-async def download_report(report_id: str, format: str | None = Query(None)):
+async def download_report(report_id: str, format: str | None = Query(None),
+                          user: dict | None = Depends(current_user)):
     """Download report in the requested format (json, csv, pdf)."""
     try:
+        record = reports_db.get(report_id)
+        if not tenancy.is_unrestricted(user) and (record is None or not tenancy.same_team(user, record.get("team_id"))):
+            raise HTTPException(status_code=404, detail="Report file not found")
         requested = (format or "json").lower()
         available = report_files.get(report_id, {})
         report_path = available.get(requested)

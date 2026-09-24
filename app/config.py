@@ -169,6 +169,19 @@ SETTINGS: list[Setting] = [
             "Single sign-on"),
     Setting("HABENY_OIDC_ALLOW_HTTP", "false", "Allow a plain-HTTP provider (testing only)", "Single sign-on",
             _bool),
+    # Monitoring and notifications
+    Setting("HABENY_PUBLIC_URL", "", "This server's address as users reach it (e.g. `https://habeny.example.com`), "
+            "for links in notifications", "Monitoring and notifications"),
+    Setting("HABENY_ALERT_DISK_PERCENT", "10", "Alert when free space for data or containers falls below this "
+            "percentage (0: off)", "Monitoring and notifications", _int(0, 99)),
+    Setting("HABENY_SMTP_HOST", "", "Mail server for email notifications (empty: email off)",
+            "Monitoring and notifications"),
+    Setting("HABENY_SMTP_PORT", "587", "Mail server port", "Monitoring and notifications", _int(1, 65535)),
+    Setting("HABENY_SMTP_SECURITY", "starttls", "`starttls`, `ssl` (implicit TLS, usually port 465) or `off`",
+            "Monitoring and notifications", _choice("starttls", "ssl", "off")),
+    Setting("HABENY_SMTP_USER", "", "Mail server user name (empty: no login)", "Monitoring and notifications"),
+    Setting("HABENY_SMTP_PASSWORD", "", "Mail server password", "Monitoring and notifications", secret=True),
+    Setting("HABENY_SMTP_FROM", "", "Sender address (default: habeny@<host name>)", "Monitoring and notifications"),
     # Set by the installer
     Setting("HABENY_DATA_DIR", "/var/lib/lxc-siem-platform", "Database, keys, reports and logs",
             "Installation", _path, installer=True),

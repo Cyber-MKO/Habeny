@@ -600,7 +600,8 @@ def get_user_by_id(db_path: Path, user_id: int) -> dict[str, Any] | None:
 def list_users(db_path: Path) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
-            "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at FROM users"
+            "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at, team_id,"
+            " max_containers FROM users"
             " ORDER BY username COLLATE NOCASE"
         ).fetchall()
         return [_user_row(r) for r in rows]
@@ -802,7 +803,7 @@ def get_session_user(db_path: Path, token_hash: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
             SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.oidc_subject, u.created_at, u.last_login_at,
-                   s.last_seen_at AS session_last_seen_at
+                   u.team_id, u.max_containers, s.last_seen_at AS session_last_seen_at
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.token_hash = ? AND s.expires_at > ?
             """,
@@ -815,3 +816,73 @@ def delete_session(db_path: Path, token_hash: str) -> None:
     with _connection(db_path) as conn:
         conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
         conn.commit()
+
+
+# ===== API TOKENS =====
+
+def create_api_token(db_path: Path, user_id: int, name: str, token_hash: str, prefix: str, role: str,
+                     expires_at: str | None) -> dict[str, Any]:
+    with _connection(db_path) as conn:
+        now = utc_now()
+        cur = conn.execute(
+            "INSERT INTO api_tokens (user_id, name, token_hash, prefix, role, created_at, expires_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, token_hash, prefix, role, now, expires_at),
+        )
+        conn.commit()
+        return {"id": cur.lastrowid, "user_id": user_id, "name": name, "prefix": prefix, "role": role,
+                "created_at": now, "expires_at": expires_at, "last_used_at": None, "last_used_ip": None}
+
+
+def list_api_tokens(db_path: Path, user_id: int | None = None) -> list[dict[str, Any]]:
+    """A user's tokens, or every token (with its owner) when user_id is None."""
+    with _connection(db_path) as conn:
+        query = ("SELECT t.id, t.user_id, u.username, t.name, t.prefix, t.role, t.created_at, t.expires_at,"
+                 " t.last_used_at, t.last_used_ip FROM api_tokens t JOIN users u ON u.id = t.user_id")
+        if user_id is None:
+            rows = conn.execute(query + " ORDER BY t.created_at DESC").fetchall()
+        else:
+            rows = conn.execute(query + " WHERE t.user_id = ? ORDER BY t.created_at DESC", (user_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_api_token_user(db_path: Path, token_hash: str) -> dict[str, Any] | None:
+    """The user behind a live (unexpired) API token, with the token's id, name, role and last use."""
+    with _connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT u.id, u.username, u.is_admin, u.role, u.totp_enabled, u.oidc_subject, u.created_at,
+                   u.last_login_at, u.team_id, u.max_containers, t.id AS token_id, t.name AS token_name, t.role AS token_role,
+                   t.last_used_at AS token_last_used_at
+            FROM api_tokens t JOIN users u ON u.id = t.user_id
+            WHERE t.token_hash = ? AND (t.expires_at IS NULL OR t.expires_at > ?)
+            """,
+            (token_hash, utc_now()),
+        ).fetchone()
+        return _user_row(row)
+
+
+def touch_api_token(db_path: Path, token_id: int, ip: str | None) -> None:
+    with _connection(db_path) as conn:
+        conn.execute("UPDATE api_tokens SET last_used_at = ?, last_used_ip = COALESCE(?, last_used_ip) WHERE id = ?",
+                     (utc_now(), ip, token_id))
+        conn.commit()
+
+
+def delete_api_token(db_path: Path, token_id: int, user_id: int | None = None) -> dict[str, Any] | None:
+    """Delete a token (only one of `user_id`'s when given). Returns what was deleted."""
+    with _connection(db_path) as conn:
+        row = conn.execute("SELECT t.id, t.user_id, t.name, u.username FROM api_tokens t"
+                           " JOIN users u ON u.id = t.user_id WHERE t.id = ?", (token_id,)).fetchone()
+        if not row or (user_id is not None and row["user_id"] != user_id):
+            return None
+        conn.execute("DELETE FROM api_tokens WHERE id = ?", (token_id,))
+        conn.commit()
+        return dict(row)
+
+
+def delete_expired_api_tokens(db_path: Path) -> int:
+    with _connection(db_path) as conn:
+        cur = conn.execute("DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at <= ?", (utc_now(),))
+        conn.commit()
+        return cur.rowcount

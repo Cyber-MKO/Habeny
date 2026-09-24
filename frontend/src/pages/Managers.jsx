@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Pill, Spinner, Modal } from "../components/UI";
+import { useConfirm } from "../components/Confirm";
+import { Details } from "../components/Details";
+import { t } from "../i18n";
 
 const SIEM_TYPES = ["none", "wazuh", "ossec", "ossim", "utmstack", "elastic"];
 const OS_TYPES = ["ubuntu_22_04", "ubuntu_20_04", "debian_11"];
@@ -14,6 +17,7 @@ const EMPTY_FORM = {
 
 export default function Managers() {
   const { toast } = useStore();
+  const confirm = useConfirm();
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -48,11 +52,11 @@ export default function Managers() {
     try {
       if (editing) {
         await api.updateManager(editing, payload);
-        toast("Manager profile updated", "success");
+        toast(t("Manager profile updated"), "success");
         setEditing(null);
       } else {
         await api.createManager(payload);
-        toast("Manager profile created", "success");
+        toast(t("Manager profile created"), "success");
       }
       setForm({ ...EMPTY_FORM });
       load();
@@ -72,8 +76,8 @@ export default function Managers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this manager profile?")) return;
-    try { await api.deleteManager(id); toast("Deleted", "success"); load(); }
+    if (!(await confirm({ title: t("Delete this manager profile?"), message: t("Containers already deployed with it aren't affected."), confirmLabel: t("Delete profile"), danger: true }))) return;
+    try { await api.deleteManager(id); toast(t("Deleted"), "success"); load(); }
     catch (e) { toast(e.message, "error"); }
   };
 
@@ -82,67 +86,67 @@ export default function Managers() {
   const cancelEdit = () => { setEditing(null); setForm({ ...EMPTY_FORM }); };
 
   const columns = [
-    { key: "name", label: "Name" },
-    { key: "siem_type", label: "SIEM Type", render: (r) => <Pill status={r.siem_type === "none" ? "unknown" : r.siem_type} /> },
-    { key: "siem_ip", label: "Manager IP", render: (r) => r.siem_ip || "—" },
-    { key: "siem_auth_key_hint", label: "Auth Key", render: (r) => r.has_siem_auth_key ? <span style={{ fontFamily: "var(--font-mono)" }}>{r.siem_auth_key_hint}</span> : "—" },
+    { key: "name", label: t("Name") },
+    { key: "siem_type", label: t("SIEM Type"), render: (r) => <Pill status={r.siem_type === "none" ? "unknown" : r.siem_type} /> },
+    { key: "siem_ip", label: t("Manager IP"), render: (r) => r.siem_ip || "—" },
+    { key: "siem_auth_key_hint", label: t("Auth Key"), render: (r) => r.has_siem_auth_key ? <span style={{ fontFamily: "var(--font-mono)" }}>{r.siem_auth_key_hint}</span> : "—" },
     { key: "os_type", label: "OS" },
-    { key: "agent_group", label: "Group" },
-    { key: "memory_limit", label: "Memory" },
-    { key: "created_at", label: "Created", render: (r) => r.created_at ? new Date(r.created_at).toLocaleDateString() : "—" },
-    { key: "actions", label: "Actions", render: (r) => (
+    { key: "agent_group", label: t("Group") },
+    { key: "memory_limit", label: t("Memory") },
+    { key: "created_at", label: t("Created"), render: (r) => r.created_at ? new Date(r.created_at).toLocaleDateString() : "—" },
+    { key: "actions", label: t("Actions"), render: (r) => (
       <div className="btn-group">
-        <button className="btn btn-sm btn-secondary" onClick={() => setViewData(r)}>View</button>
-        <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(r)}>Edit</button>
-        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(r.manager_id)}>Delete</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => setViewData(r)}>{t("View")}</button>
+        <button className="btn btn-sm btn-secondary" onClick={() => handleEdit(r)}>{t("Edit")}</button>
+        <button className="btn btn-sm btn-danger" onClick={() => handleDelete(r.manager_id)}>{t("Delete")}</button>
       </div>
     )},
   ];
 
   return (
     <>
-      <PageHeader title="Managers" subtitle="Saved SIEM manager profiles for quick deployment">
-        <button className="btn btn-secondary" onClick={load}>Refresh</button>
+      <PageHeader title={t("Managers")} subtitle={t("Saved SIEM manager profiles for quick deployment")}>
+        <button className="btn btn-secondary" onClick={load}>{t("Refresh")}</button>
       </PageHeader>
 
       <form onSubmit={handleSave} className="card" style={{ marginBottom: 20 }}>
-        <div className="section-title">{editing ? "Edit Profile" : "Create Profile"}</div>
+        <div className="section-title">{editing ? t("Edit Profile") : t("Create Profile")}</div>
         <div className="form-grid">
-          <div className="field"><label>Profile Name</label><input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
-          <div className="field"><label>Description</label><input className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
-          <div className="field"><label>SIEM Type</label>
-            <select className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
-              {SIEM_TYPES.map((t) => <option key={t} value={t}>{t === "none" ? "None (bare)" : t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+          <div className="field"><label htmlFor="managers-profile-name">{t("Profile Name")}</label><input id="managers-profile-name" className="input" value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
+          <div className="field"><label htmlFor="managers-description">{t("Description")}</label><input id="managers-description" className="input" value={form.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-siem-type">{t("SIEM Type")}</label>
+            <select id="managers-siem-type" className="select" value={form.siem_type} onChange={(e) => set("siem_type", e.target.value)}>
+              {SIEM_TYPES.map((type) => <option key={type} value={type}>{type === "none" ? t("None (bare)") : type.charAt(0).toUpperCase() + type.slice(1)}</option>)}
             </select>
           </div>
-          {!isBare && <div className="field"><label>Manager IP / Hostname</label><input className="input" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} /></div>}
-          {!isBare && !needsAuthKey && <div className="field"><label>SIEM Version</label><input className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} /></div>}
-          {isElastic && <div className="field"><label>Agent Version</label><input className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} /></div>}
-          {needsAuthKey && <div className="field"><label>{isElastic ? "Enrollment Token" : "Auth Key"}</label><input className="input" type="password" autoComplete="off" value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
-            placeholder={editingKeyHint ? `Stored (${editingKeyHint}) — leave blank to keep` : ""} /></div>}
-          <div className="field"><label>OS Type</label>
-            <select className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
-              {OS_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          {!isBare && <div className="field"><label htmlFor="managers-manager-ip-hostname">{t("Manager IP / Hostname")}</label><input id="managers-manager-ip-hostname" className="input" value={form.siem_ip} onChange={(e) => set("siem_ip", e.target.value)} /></div>}
+          {!isBare && !needsAuthKey && <div className="field"><label htmlFor="managers-siem-version">{t("SIEM Version")}</label><input id="managers-siem-version" className="input" value={form.siem_version} onChange={(e) => set("siem_version", e.target.value)} /></div>}
+          {isElastic && <div className="field"><label htmlFor="managers-agent-version">{t("Agent Version")}</label><input id="managers-agent-version" className="input" value={form.siem_version || "9.0.2"} onChange={(e) => set("siem_version", e.target.value)} /></div>}
+          {needsAuthKey && <div className="field"><label>{isElastic ? t("Enrollment Token") : t("Auth Key")}</label><input className="input" type="password" autoComplete="off" value={form.siem_auth_key} onChange={(e) => set("siem_auth_key", e.target.value)}
+            placeholder={editingKeyHint ? t("Stored ({editingKeyHint}) — leave blank to keep", { editingKeyHint }) : ""} /></div>}
+          <div className="field"><label htmlFor="managers-os-type">{t("OS Type")}</label>
+            <select id="managers-os-type" className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
+              {OS_TYPES.map((os) => <option key={os} value={os}>{os}</option>)}
             </select>
           </div>
-          <div className="field"><label>Agent Group</label><input className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} /></div>
-          <div className="field"><label>Memory Limit</label><input className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
-          <div className="field"><label>CPU Shares</label><input className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} /></div>
-          <div className="field"><label>Config Template ID</label><input className="input" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-agent-group">{t("Agent Group")}</label><input id="managers-agent-group" className="input" value={form.agent_group} onChange={(e) => set("agent_group", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-memory-limit">{t("Memory Limit")}</label><input id="managers-memory-limit" className="input" value={form.memory_limit} onChange={(e) => set("memory_limit", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-cpu-shares">{t("CPU Shares")}</label><input id="managers-cpu-shares" className="input" type="number" min={2} max={10240} value={form.cpu_shares} onChange={(e) => set("cpu_shares", e.target.value)} /></div>
+          <div className="field"><label htmlFor="managers-config-template-id">{t("Config Template ID")}</label><input id="managers-config-template-id" className="input" value={form.config_template_id} onChange={(e) => set("config_template_id", e.target.value)} /></div>
         </div>
         <div className="btn-group" style={{ marginTop: 12 }}>
-          <button className="btn btn-primary" type="submit">{editing ? "Update" : "Create"}</button>
-          {editing && <button className="btn btn-secondary" type="button" onClick={cancelEdit}>Cancel</button>}
+          <button className="btn btn-primary" type="submit">{editing ? t("Update") : t("Create")}</button>
+          {editing && <button className="btn btn-secondary" type="button" onClick={cancelEdit}>{t("Cancel")}</button>}
         </div>
       </form>
 
       <div className="card">
-        {loading ? <Spinner /> : <DataTable columns={columns} rows={managers} emptyMsg="No manager profiles. Create one above." />}
+        {loading ? <Spinner /> : <DataTable columns={columns} rows={managers} emptyMsg={t("No manager profiles. Create one above.")} />}
       </div>
 
       {viewData && (
-        <Modal title={`Manager: ${viewData.name}`} onClose={() => setViewData(null)}>
-          <JsonBlock data={viewData} />
+        <Modal title={t("Manager: {name}", { name: viewData.name })} onClose={() => setViewData(null)}>
+          <Details data={viewData} />
         </Modal>
       )}
     </>

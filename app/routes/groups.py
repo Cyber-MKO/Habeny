@@ -3,7 +3,7 @@ Container group management, including group-wide bulk ops and log uploads.
 """
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.config import DB_PATH
 from app.core.lxc_backend import lxc
@@ -29,18 +29,31 @@ from app.models import (
 )
 from app.routes.agents import bulk_agent_operation
 from app.routes.logs import schedule_log_upload
+from app.services import tenancy
 from app.services.activity import log_activity
+from app.services.auth import current_user
 from app.services.logs import perform_log_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _visible_members(data: dict, user: dict | None) -> dict:
+    """Group counts include only the containers this user can see."""
+    groups = []
+    for group in data.get("groups", []):
+        members = tenancy.visible(user, get_agents_in_group(DB_PATH, group["name"]))
+        groups.append({**group, "agent_count": len(members)})
+    return {**data, "groups": groups}
+
+
 @router.get("/groups", response_model=APIResponse)
-async def list_agent_groups():
-    """List all container groups with counts."""
+async def list_agent_groups(user: dict | None = Depends(current_user)):
+    """List all container groups with counts (of the containers you can see)."""
     try:
         data = list_groups(DB_PATH)
+        if not tenancy.is_unrestricted(user):
+            data = _visible_members(data, user)
         return APIResponse(success=True, message="Groups retrieved", data=data)
     except Exception as e:
         logger.error(f"Failed to list groups: {e}")
@@ -98,12 +111,13 @@ async def delete_agent_group(group_name: str):
 
 
 @router.post("/groups/{group_name}/assign", response_model=APIResponse)
-async def assign_group_agents(group_name: str, request: GroupAgentRequest):
+async def assign_group_agents(group_name: str, request: GroupAgentRequest,
+                              user: dict | None = Depends(current_user)):
     """Assign containers to a group."""
     try:
         if not group_exists(DB_PATH, group_name):
             raise HTTPException(status_code=404, detail="Group not found")
-        existing = set(lxc.list_containers())
+        existing = set(tenancy.visible(user, lxc.list_containers()))
         valid_agent_ids = [agent_id for agent_id in request.agent_ids if agent_id in existing]
         invalid_agent_ids = [agent_id for agent_id in request.agent_ids if agent_id not in existing]
 
@@ -129,12 +143,13 @@ async def assign_group_agents(group_name: str, request: GroupAgentRequest):
 
 
 @router.post("/groups/{group_name}/remove", response_model=APIResponse)
-async def remove_group_agents(group_name: str, request: GroupAgentRequest):
+async def remove_group_agents(group_name: str, request: GroupAgentRequest,
+                              user: dict | None = Depends(current_user)):
     """Remove containers from a group."""
     try:
         if not group_exists(DB_PATH, group_name):
             raise HTTPException(status_code=404, detail="Group not found")
-        updated = remove_agents_from_group(DB_PATH, request.agent_ids)
+        updated = remove_agents_from_group(DB_PATH, tenancy.visible(user, request.agent_ids))
         log_activity("group_remove", {"group": group_name, "containers": request.agent_ids})
         return APIResponse(
             success=True,
@@ -149,7 +164,7 @@ async def remove_group_agents(group_name: str, request: GroupAgentRequest):
 
 
 @router.post("/groups/{group_name}/bulk/{operation}", response_model=APIResponse)
-async def bulk_group_operation(group_name: str, operation: str):
+async def bulk_group_operation(group_name: str, operation: str, user: dict | None = Depends(current_user)):
     """Perform bulk operations on all containers in a group."""
     try:
         if operation not in ['start', 'stop', 'delete']:
@@ -157,12 +172,12 @@ async def bulk_group_operation(group_name: str, operation: str):
         if not group_exists(DB_PATH, group_name):
             raise HTTPException(status_code=404, detail="Group not found")
 
-        agent_ids = get_agents_in_group(DB_PATH, group_name)
+        agent_ids = tenancy.visible(user, get_agents_in_group(DB_PATH, group_name))
         if not agent_ids:
             return APIResponse(success=False, message="No containers in group", error="empty_group")
 
         request = BulkOperationRequest(container_names=agent_ids, operation=operation)
-        return await bulk_agent_operation(operation, request)
+        return await bulk_agent_operation(operation, request, root=True, user=user)
     except HTTPException:
         raise
     except Exception as e:
@@ -171,18 +186,20 @@ async def bulk_group_operation(group_name: str, operation: str):
 
 
 @router.post("/groups/{group_name}/logs/upload", response_model=APIResponse)
-async def upload_logs_to_group(group_name: str, log_upload: LogUploadRequest):
+async def upload_logs_to_group(group_name: str, log_upload: LogUploadRequest,
+                               user: dict | None = Depends(current_user)):
     """Upload log content to all containers in a group."""
     try:
         if not group_exists(DB_PATH, group_name):
             raise HTTPException(status_code=404, detail="Group not found")
-        agent_ids = get_agents_in_group(DB_PATH, group_name)
+        agent_ids = tenancy.visible(user, get_agents_in_group(DB_PATH, group_name))
         if not agent_ids:
             return APIResponse(success=False, message="No containers in group", error="empty_group")
 
         results = []
+        existing = set(lxc.list_containers())
         for agent_id in agent_ids:
-            if agent_id not in lxc.list_containers():
+            if agent_id not in existing:
                 results.append({"agent_id": agent_id, "success": False, "error": "Not found"})
                 continue
             result = await perform_log_upload(agent_id, log_upload)
@@ -197,18 +214,19 @@ async def upload_logs_to_group(group_name: str, log_upload: LogUploadRequest):
 
 
 @router.post("/groups/{group_name}/logs/schedule", response_model=APIResponse)
-async def schedule_logs_to_group(group_name: str, schedule: LogScheduleRequest):
+async def schedule_logs_to_group(group_name: str, schedule: LogScheduleRequest,
+                                 user: dict | None = Depends(current_user)):
     """Schedule periodic log uploads to all containers in a group."""
     try:
         if not group_exists(DB_PATH, group_name):
             raise HTTPException(status_code=404, detail="Group not found")
-        agent_ids = get_agents_in_group(DB_PATH, group_name)
+        agent_ids = tenancy.visible(user, get_agents_in_group(DB_PATH, group_name))
         if not agent_ids:
             return APIResponse(success=False, message="No containers in group", error="empty_group")
 
         schedules = []
         for agent_id in agent_ids:
-            result = await schedule_log_upload(agent_id, schedule)
+            result = await schedule_log_upload(agent_id, schedule, user=user)
             if result.success and result.data:
                 schedules.append(result.data)
         log_activity("group_log_schedule_started", {"group": group_name, "count": len(schedules)})

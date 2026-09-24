@@ -17,8 +17,10 @@ from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
 from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
+from app.services import tenancy
 from app.services.activity import log_activity
 from app.services.agent_info import container_counts, delete_agent_metadata, get_agent_info, write_agent_metadata
+from app.services.auth import current_user
 from app.services.deployment import (
     progress_event,
     progress_finish,
@@ -44,11 +46,35 @@ async def get_deployment_progress(deployment_id: str):
     return APIResponse(success=True, message=f"Deployment {data['status']}", data=data)
 
 
+def _announce_deployment(deployment_id: str, outcome: str, requested: int, successful: int, failed: int,
+                         elapsed: float, siem_type: str, error: str | None) -> None:
+    """Metrics, the deploy_failed alert and the deployment.finished notification."""
+    from app.services import alerts, notify, telemetry
+    try:
+        telemetry.DEPLOYMENTS.inc(result=outcome)
+        telemetry.CONTAINERS_DEPLOYED.inc(successful, result="success")
+        telemetry.CONTAINERS_DEPLOYED.inc(failed, result="failure")
+        alerts.deployment_finished(deployment_id, requested, successful, failed, error)
+        notify.emit(
+            "deployment.finished",
+            f"Deployment {'succeeded' if outcome == 'completed' else 'partly failed' if outcome == 'partial' else 'failed'}: "
+            f"{successful}/{requested} containers",
+            f"First error: {error}" if error else "",
+            level={"completed": "success", "partial": "warning"}.get(outcome, "error"),
+            fields={"deployment_id": deployment_id, "siem_type": siem_type, "successful": successful,
+                    "failed": failed, "duration": f"{elapsed:.0f} s"},
+            link="/deploy",
+        )
+    except Exception:
+        logger.exception("Announcing the deployment result failed")
+
+
 @router.post("/agents/deploy", response_model=APIResponse)
 async def deploy_agents(
     deployment: AgentDeploymentRequest,
     background_tasks: BackgroundTasks,
-    root: bool = Depends(check_root)
+    root: bool = Depends(check_root),
+    user: dict | None = Depends(current_user),
 ):
     """
     Deploy multiple containers with SIEM agents
@@ -126,6 +152,13 @@ async def deploy_agents(
         # Create container names
         agent_names = [f"{deployment.agent_base_name}-{i:04d}" for i in range(1, deployment.count + 1)]
 
+        # Team and user limits; then the new containers belong to this user and their team
+        # (names that already exist fail to deploy and keep their owner)
+        existing = set(await asyncio.to_thread(lxc.list_containers))
+        new_names = [n for n in agent_names if n not in existing]
+        tenancy.check_quota(user, len(new_names), list(existing))
+        tenancy.record(new_names, user)
+
         agent_seq_ids = {}
         for name in agent_names:
             progress_event(deployment_id, "Queued", container=name, status="pending")
@@ -169,12 +202,15 @@ async def deploy_agents(
             },
             status="success" if len(failed) == 0 else "partial"
         )
+        outcome = "completed" if not failed else ("failed" if not successful else "partial")
         progress_finish(
-            deployment_id,
-            "completed" if not failed else ("failed" if not successful else "partial"),
+            deployment_id, outcome,
             f"Deployed {len(successful)}/{deployment.count} containers in {elapsed_time:.1f}s",
             level="success" if not failed else "error",
         )
+        _announce_deployment(deployment_id, outcome, deployment.count, len(successful), len(failed), elapsed_time,
+                             str(getattr(deployment.siem_type, "value", deployment.siem_type)),
+                             failed[0].get("error") if failed else None)
 
         return APIResponse(
             success=len(failed) == 0,
@@ -206,14 +242,21 @@ async def deploy_agents(
         logger.error(f"Container deployment failed: {e}")
         log_activity("container_deployment_failed", {"error": str(e)}, status="error")
         progress_finish(deployment_id, "failed", f"Deployment failed: {e}", level="error")
+        _announce_deployment(deployment_id, "failed", deployment.count, 0, deployment.count, 0,
+                             str(getattr(deployment.siem_type, "value", deployment.siem_type)), str(e))
         return APIResponse(success=False, message="Container deployment failed", error=str(e))
 
 
 LIST_PARALLELISM = 16
 
 
-def _all_agent_infos() -> list:
-    names = lxc.list_containers()
+def _visible_container(name: str, user: dict | None) -> bool:
+    """Exists and this user may see it (another team's container reads as not found)."""
+    return name in lxc.list_containers() and tenancy.can_see(user, name)
+
+
+def _all_agent_infos(user: dict | None = None) -> list:
+    names = tenancy.visible(user, lxc.list_containers())
     with ThreadPoolExecutor(max_workers=min(LIST_PARALLELISM, max(1, len(names)))) as pool:
         return list(pool.map(lambda name: get_agent_info(lxc.Container(name)), names))
 
@@ -224,13 +267,17 @@ async def list_agents(
     status: str | None = Query(None, description="Filter by status"),
     agent_group: str | None = Query(None, description="Filter by container group"),
     limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
+    user: dict | None = Depends(current_user),
 ):
-    """List all containers with filtering and pagination"""
+    """List the containers you can see (all for admins; your team's otherwise), filtered and paged"""
     try:
         # Blocking (LXC calls, one lxc-attach per running container): in a thread so the rest
         # of the API stays responsive, and container by container in parallel
-        infos = await asyncio.to_thread(_all_agent_infos)
+        infos = await asyncio.to_thread(_all_agent_infos, user)
+        owners = await asyncio.to_thread(tenancy.owners, [i.get("agent_name") for i in infos])
+        for info in infos:
+            info["team_id"] = (owners.get(info.get("agent_name")) or {}).get("team_id")
         all_agents = [
             info for info in infos
             if (not siem_type or info.get("siem_type") == siem_type)
@@ -260,10 +307,14 @@ async def list_agents(
 
 
 @router.get("/agents/stats", response_model=APIResponse)
-async def get_agents_stats():
-    """Get aggregated container statistics"""
+async def get_agents_stats(user: dict | None = Depends(current_user)):
+    """Container totals (for your team's containers unless you're an admin)"""
     try:
-        counts = await asyncio.to_thread(container_counts)
+        if tenancy.is_unrestricted(user):
+            counts = await asyncio.to_thread(container_counts)
+        else:
+            counts = await asyncio.to_thread(
+                lambda: container_counts(tenancy.visible(user, lxc.list_containers())))
         return APIResponse(
             success=True,
             message="Container statistics retrieved",
@@ -281,10 +332,10 @@ async def get_agents_stats():
 
 
 @router.get("/agents/{agent_id}", response_model=APIResponse)
-async def get_agent(agent_id: str):
+async def get_agent(agent_id: str, user: dict | None = Depends(current_user)):
     """Get detailed information about a specific container"""
     try:
-        if agent_id not in lxc.list_containers():
+        if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         container = lxc.Container(agent_id)
@@ -304,10 +355,10 @@ async def get_agent(agent_id: str):
 
 
 @router.delete("/agents/{agent_id}", response_model=APIResponse)
-async def delete_agent(agent_id: str, root: bool = Depends(check_root)):
+async def delete_agent(agent_id: str, root: bool = Depends(check_root), user: dict | None = Depends(current_user)):
     """Delete a container and optionally unregister from SIEM"""
     try:
-        if agent_id not in lxc.list_containers():
+        if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         container = lxc.Container(agent_id)
@@ -346,7 +397,8 @@ async def delete_agent(agent_id: str, root: bool = Depends(check_root)):
 async def bulk_agent_operation(
     operation: str,
     request: BulkOperationRequest,
-    root: bool = Depends(check_root)
+    root: bool = Depends(check_root),
+    user: dict | None = Depends(current_user),
 ):
     """Perform bulk operations on multiple containers"""
     try:
@@ -354,10 +406,11 @@ async def bulk_agent_operation(
             raise HTTPException(status_code=400, detail=f"Invalid operation: {operation}")
 
         results = []
+        existing = set(tenancy.visible(user, lxc.list_containers()))  # once, not per container
 
         for agent_id in request.container_names:
             try:
-                if agent_id not in lxc.list_containers():
+                if agent_id not in existing:
                     results.append({"agent_id": agent_id, "success": False, "error": "Not found"})
                     continue
 
@@ -383,7 +436,8 @@ async def bulk_agent_operation(
         successful = sum(1 for r in results if r["success"])
         log_activity(f"bulk_{operation}", {
             "total": len(request.container_names),
-            "successful": successful
+            "successful": successful,
+            "containers": request.container_names[:200],
         })
 
         return APIResponse(
@@ -400,10 +454,10 @@ async def bulk_agent_operation(
 
 
 @router.post("/agents/{agent_id}/start", response_model=APIResponse)
-async def start_agent(agent_id: str, root: bool = Depends(check_root)):
+async def start_agent(agent_id: str, root: bool = Depends(check_root), user: dict | None = Depends(current_user)):
     """Start a container"""
     try:
-        if agent_id not in lxc.list_containers():
+        if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         container = lxc.Container(agent_id)
@@ -437,10 +491,10 @@ async def start_agent(agent_id: str, root: bool = Depends(check_root)):
 
 
 @router.post("/agents/{agent_id}/stop", response_model=APIResponse)
-async def stop_agent(agent_id: str, root: bool = Depends(check_root)):
+async def stop_agent(agent_id: str, root: bool = Depends(check_root), user: dict | None = Depends(current_user)):
     """Stop a container"""
     try:
-        if agent_id not in lxc.list_containers():
+        if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         container = lxc.Container(agent_id)
@@ -470,11 +524,11 @@ async def stop_agent(agent_id: str, root: bool = Depends(check_root)):
 
 
 @router.post("/agents/{agent_id}/enable-syslog", response_model=APIResponse)
-async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp")):
+async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), user: dict | None = Depends(current_user)):
     """Enable syslog on a UTMstack container (port 7014) and create a syslog config profile"""
     try:
-        if agent_id not in lxc.list_containers():
-            raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")
+        if not _visible_container(agent_id, user):
+            raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         proto = protocol.lower()
         if proto not in ("tcp", "udp"):
@@ -518,11 +572,11 @@ async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp")):
 
 
 @router.post("/agents/{agent_id}/disable-syslog", response_model=APIResponse)
-async def disable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp")):
+async def disable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), user: dict | None = Depends(current_user)):
     """Disable syslog on a UTMstack container"""
     try:
-        if agent_id not in lxc.list_containers():
-            raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")
+        if not _visible_container(agent_id, user):
+            raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
 
         proto = protocol.lower()
         if proto not in ("tcp", "udp"):

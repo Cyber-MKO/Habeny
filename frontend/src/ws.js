@@ -1,4 +1,5 @@
 import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
+import { wsUrl } from "./api";
 
 function useMetricsConnection() {
   const [metrics, setMetrics] = useState(null);
@@ -10,11 +11,7 @@ function useMetricsConnection() {
   useEffect(() => {
     let stopped = false; // this effect's lifetime: after cleanup, don't reconnect
     const connect = () => {
-      const proto = window.location.protocol === "https:" ? "wss" : "ws";
-      const base = import.meta.env.VITE_API_URL
-        ? new URL(import.meta.env.VITE_API_URL).host
-        : window.location.host;
-      const ws = new WebSocket(`${proto}://${base}/ws/metrics`);
+      const ws = new WebSocket(wsUrl("/ws/metrics"));
       wsRef.current = ws;
 
       ws.onopen = () => {
