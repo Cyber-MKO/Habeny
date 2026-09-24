@@ -936,3 +936,19 @@ a.auth-submit { display: inline-flex; text-decoration: none; margin-top: 0; }
 .token-box { display: flex; align-items: center; gap: 10px; margin: 12px 0; padding: 10px 12px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
 .token-box code { flex: 1; word-break: break-all; font-family: var(--font-mono); font-size: 13px; }
 .code-sample { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; overflow-x: auto; white-space: pre; }
+
+/* ── Structured details (instead of raw JSON) ──────────── */
+.details { display: grid; gap: 6px; margin: 0; font-size: 13px; }
+.details-row { display: grid; grid-template-columns: minmax(120px, 200px) 1fr; gap: 12px; align-items: baseline; }
+.details dt { color: var(--text-dim); }
+.details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.details-nested { padding-left: 12px; border-left: 2px solid var(--border); }
+.details-long { display: block; white-space: pre-wrap; font-family: var(--font-mono); font-size: 12px; background: var(--bg-input); padding: 6px 8px; border-radius: var(--radius-sm); }
+.details-table { margin: 4px 0; }
+@media (max-width: 560px) { .details-row { grid-template-columns: 1fr; gap: 2px; } }
+.filters-actions { flex-direction: row !important; align-items: flex-end; gap: 8px; min-width: 0 !important; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; font-size: 13px; }
+.select-sm { width: auto; padding: 4px 8px; }
+.activity-summary { color: var(--text-dim); max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-detail td { background: var(--bg-elevated); }
+.activity-detail .details { padding: 6px 4px; }

@@ -95,6 +95,9 @@ export const api = {
   getReport: (id) => request(`/reports/${id}`),
 
   getActivity: (params) => request("/activity/logs", { params }),
+  getActivityFacets: () => request("/activity/facets"),
+  verifyActivity: () => request("/activity/verify"),
+  activityExportUrl: (params) => `${BASE}/activity/export?${new URLSearchParams(params)}`,
   getSiemStats: (type) => request(`/siem/${type}/stats`),
 
   uploadLogs: (id, body) => request(`/agents/${id}/logs/upload`, { method: "POST", body }),

@@ -49,8 +49,9 @@ def _mtime(path: Path) -> datetime:
 def prune(dry_run: bool = False) -> dict:
     """Delete data past its retention. Returns what was (or, dry run, would be) removed."""
     from app.db import delete_expired_api_tokens, prune_expired_sessions, prune_metrics
+    from app.services import audit
 
-    removed = {"metric_samples": 0, "history_metrics": 0, "activity_files": 0, "report_files": 0,
+    removed = {"metric_samples": 0, "history_metrics": 0, "audit_entries": 0, "activity_files": 0, "report_files": 0,
                "expired_sessions": 0, "expired_tokens": 0, "finished_jobs": 0}
 
     samples_cutoff = _cutoff(config.get("HABENY_METRICS_RETENTION_DAYS"))
@@ -62,7 +63,8 @@ def prune(dry_run: bool = False) -> dict:
     old_reports = [p for p in REPORTS_DIR.glob("*") if p.is_file() and _mtime(p) < reports_cutoff] \
         if reports_cutoff else []
     if dry_run:
-        removed.update(activity_files=len(old_activity), report_files=len(old_reports))
+        removed.update(activity_files=len(old_activity), report_files=len(old_reports),
+                       audit_entries=audit.prune(history_cutoff.isoformat(), dry_run=True) if history_cutoff else 0)
         return removed
 
     if samples_cutoff:
@@ -72,6 +74,7 @@ def prune(dry_run: bool = False) -> dict:
                                                    exclude_types=HIGH_FREQUENCY_METRICS)
         from app.state import STORES
         removed["finished_jobs"] = sum(store.prune(history_cutoff.isoformat()) for store in STORES)
+        removed["audit_entries"] = audit.prune(history_cutoff.isoformat())
     for path in old_activity:
         path.unlink(missing_ok=True)
     removed["activity_files"] = len(old_activity)

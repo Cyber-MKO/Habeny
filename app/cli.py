@@ -8,6 +8,7 @@ as the service user with the service's settings.
   habeny backup create|list|verify FILE|restore FILE
   habeny prune [--dry-run]
   habeny token create USER NAME [--role R] [--expires-days N]|list|revoke ID
+  habeny audit verify|export [--format csv|jsonl] [--since D] [--until D] [--user U] [--action A]
 """
 import argparse
 import os
@@ -138,8 +139,9 @@ def cmd_prune(args) -> int:
     from app.services.maintenance import prune
     removed = prune(dry_run=args.dry_run)
     if args.dry_run:
-        print(f"Would delete {removed['activity_files']} activity log file(s) and {removed['report_files']} report "
-              "file(s); database rows past retention are counted when deleted.")
+        print(f"Would delete {removed['audit_entries']} audit entries, {removed['activity_files']} old activity log "
+              f"file(s) and {removed['report_files']} report file(s); other database rows past retention are counted "
+              "when deleted.")
     else:
         print("Deleted: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in removed.items()))
     return 0
@@ -226,7 +228,7 @@ def cmd_token(args) -> int:
         token, prefix = new_api_token()
         create_api_token(DB_PATH, user["id"], args.name, token_hash(token), prefix, role, expires)
         log_activity("api_token_created", {"username": user["username"], "token": args.name, "role": role,
-                                           "expires_at": expires, "via": "cli"})
+                                           "expires_at": expires, "via": "cli"}, user="cli")
         print(token)
         print(f"# {role} token '{args.name}' for {user['username']}, "
               f"{'expires ' + expires[:10] if expires else 'never expires'}. It isn't stored: copy it now.",
@@ -245,8 +247,30 @@ def cmd_token(args) -> int:
         if not deleted:
             print(f"error: no token {args.id}", file=sys.stderr)
             return 1
-        log_activity("api_token_revoked", {"username": deleted["username"], "token": deleted["name"], "via": "cli"})
+        log_activity("api_token_revoked", {"username": deleted["username"], "token": deleted["name"], "via": "cli"},
+                     user="cli")
         print(f"Revoked '{deleted['name']}' of {deleted['username']}")
+        return 0
+    return 2
+
+
+def cmd_audit(args) -> int:
+    from app.services import audit
+
+    _schema_current()
+    if args.action == "verify":
+        result = audit.verify()
+        if result["ok"]:
+            print(f"OK: {result['checked']} entries verified (ids {result['anchor_id'] + 1}–{result['last_id']}), "
+                  f"head {result['head_hash']}")
+            return 0
+        print(f"BROKEN at entry {result['problem']['id']}: {result['problem']['reason']} "
+              f"({result['checked']} entries before it are intact)", file=sys.stderr)
+        return 1
+    if args.action == "export":
+        filters = audit.Filters(action=args.action_filter, user=args.user, since=args.since, until=args.until)
+        for chunk in audit.export(filters, args.format):
+            sys.stdout.write(chunk)
         return 0
     return 2
 
@@ -295,9 +319,19 @@ def main(argv=None) -> int:
     p_trevoke = token_sub.add_parser("revoke", help="revoke a token by its ID")
     p_trevoke.add_argument("id", type=int)
 
+    p_audit = sub.add_parser("audit", help="the audit trail: verify its hash chain, export it")
+    audit_sub = p_audit.add_subparsers(dest="action", required=True)
+    audit_sub.add_parser("verify", help="check no entry was changed, removed or reordered")
+    p_aexport = audit_sub.add_parser("export", help="write entries (oldest first) to stdout")
+    p_aexport.add_argument("--format", choices=["csv", "jsonl"], default="jsonl")
+    p_aexport.add_argument("--since", help="ISO date or date-time")
+    p_aexport.add_argument("--until", help="ISO date or date-time")
+    p_aexport.add_argument("--user")
+    p_aexport.add_argument("--action", dest="action_filter", help="exact, or a prefix ending in *")
+
     args = parser.parse_args(argv)
     handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
-                "prune": cmd_prune, "token": cmd_token}
+                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head
