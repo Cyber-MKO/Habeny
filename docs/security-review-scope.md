@@ -53,7 +53,7 @@ OSSIM), and Habeny simulates activity in them for testing and benchmarking.
 - **Command execution inside containers:**
   - `app/core/shell.py`, `app/core/container.py` and `app/installers/*`: SIEM
     installers built from user input (manager IP, auth keys, group names).
-  - `app/simulation/*`, `app/routes/logs.py` and log upload: file paths and content.
+  - `app/services/simulation.py`, `app/routes/logs.py` and log upload: file paths and content.
   - Look for injection into shell commands and path traversal.
 - **Container console** (`app/routes/console.py`, WebSocket): authorization, origin
   checks, and whether it can be steered to a container the user shouldn't reach, or to
