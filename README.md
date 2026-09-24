@@ -204,11 +204,13 @@ sudo ./start.sh --dev    # API on :9000 plus the Vite dev server with hot reload
 `/etc/habeny/habeny.conf` or `HABENY_*` variables, e.g. `HABENY_DATA_DIR=/tmp/habeny`). It
 needs Node.js only when the frontend must be (re)built or for `--dev`.
 
-**Making a release:** bump `app/version.py`, merge, then
-tag it: `git tag v2.1.1 && git push origin v2.1.1`. The Release workflow checks the tag
-matches, runs the tests, builds the frontend, and publishes the tarball, the `.deb`, offline
-wheel bundles for Python 3.10–3.13 and `SHA256SUMS` (`deploy/build-release.sh` does the
-same locally). **Changing the database schema:** add the next `app/migrations/vNNNN_*.py`
+**Making a release:** bump `app/version.py` in a PR and merge it. Then, on GitHub, open
+**Actions → Release → Run workflow** (on `main`), or push the tag yourself
+(`git tag v2.1.1 && git push origin v2.1.1`). The Release workflow tags `main` with the
+version (refusing one that's already released), runs the tests, builds the frontend, and
+publishes the tarball, the `.deb`, offline wheel bundles for Python 3.10–3.13 and
+`SHA256SUMS`. Tick **dry run** to build everything and attach it to the workflow run without
+publishing. `deploy/build-release.sh` builds the same artifacts locally. **Changing the database schema:** add the next `app/migrations/vNNNN_*.py`
 with `up(conn)` (and `down(conn)` if it can be undone); never edit a released one.
 
 ## HTTPS

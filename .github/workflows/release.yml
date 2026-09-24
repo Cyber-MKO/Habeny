@@ -1,25 +1,51 @@
 name: Release
 
-# Push a tag matching app/version.py to publish a release:
-#   git tag v2.1.0 && git push origin v2.1.0
+# Publish a release of the version in app/version.py, either way:
+# - Actions tab → Release → "Run workflow" (on main): tags the commit and publishes.
+#   Tick "dry run" to build the artifacts without publishing (attached to the run).
+# - Push a tag yourself: git tag v2.1.0 && git push origin v2.1.0
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and attach the artifacts to this run, don't tag or publish"
+        type: boolean
+        default: false
 
 permissions:
-  contents: write  # create the GitHub release
+  contents: write  # create the tag and the GitHub release
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Tag must match app/version.py
+      - name: Work out the tag
         run: |
           version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' app/version.py)"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME doesn't match app/version.py ($version)"; exit 1
+          [ -n "$version" ] || { echo "::error::no __version__ in app/version.py"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+            if [ "$tag" != "v$version" ]; then
+              echo "::error::tag $tag doesn't match app/version.py ($version)"; exit 1
+            fi
+          else
+            tag="v$version"
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::run releases from main (this run is on $GITHUB_REF_NAME)"; exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "::error::$tag already exists. Bump app/version.py (in a PR) before releasing again."; exit 1
+            fi
           fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "Releasing $tag from $GITHUB_SHA"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -38,7 +64,16 @@ jobs:
         working-directory: frontend
       - name: Build release artifacts
         run: deploy/build-release.sh dist
+      - name: Attach artifacts to this run (dry run)
+        if: inputs.dry_run
+        uses: actions/upload-artifact@v4
+        with:
+          name: habeny-${{ env.TAG }}-dry-run
+          path: dist/
       - name: Publish
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Habeny ${GITHUB_REF_NAME#v}" --generate-notes
+        if: ${{ !inputs.dry_run }}
+        # Creates the tag on this commit when it doesn't exist yet (manual runs). A tag made
+        # with the workflow's token doesn't start this workflow a second time.
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Habeny ${TAG#v}" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
