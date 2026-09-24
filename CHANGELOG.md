@@ -7,10 +7,21 @@ The release workflow publishes a version's section here as its release notes.
 
 ## [Unreleased]
 
-New features, so the next release is **2.2.0**. **Upgrading:** migrations v0003–v0007 run
-automatically after a backup, and the old daily activity files are imported into the new
-audit trail. v0006 (teams) can't be undone by `habeny db downgrade`; restore the backup
-taken before it instead.
+## [2.2.0] - 2026-09-24
+
+**Upgrading:**
+- **A license is now required.** Each install gets a 30-day trial counted from its first
+  account, so an install older than that stops accepting new deployments, simulations,
+  benchmarks and log uploads when you upgrade, until a license is installed. Viewing and
+  managing existing containers keep working. Before upgrading, run
+  `sudo habeny license request` and send the server ID to Habeny Platform.
+- **OSSIM support is removed.** Existing OSSIM containers keep working and can be deleted.
+  Manager profiles that name OSSIM need a different SIEM type.
+- Database migrations v0003–v0007 run automatically after a backup, and the old daily
+  activity files are imported into the new audit trail. v0006 (teams) can't be undone by
+  `habeny db downgrade`; restore the backup taken before it instead.
+- Installation and operations documentation moved from the README to `docs/` (start with
+  `docs/admin-guide.md`).
 
 ### Added
 - **API tokens** for scripts and CI (`Authorization: Bearer`): at most the account's
@@ -34,10 +45,8 @@ taken before it instead.
 - **French** interface, with a translation framework for more languages.
 - **Per-server licenses**, checked offline: `habeny license request|install|status` and
   Settings → License. A 30-day trial, then new deployments, simulations, benchmarks and
-  log uploads need a license; viewing and managing existing containers always work.
-  **Upgrading:** existing installs start a 30-day trial counted from their first
-  account, so an install older than 30 days needs a license right away to keep
-  deploying. Run `habeny license request` and send the server ID to Habeny Platform.
+  log uploads need a license; viewing and managing existing containers always work. See
+  Upgrading above.
 - `THIRD_PARTY_NOTICES.txt` in every release (and linked from About Habeny): the bundled
   Python and npm packages with their licenses. The build fails on a copyleft or unknown
   license.
@@ -157,5 +166,6 @@ The original import (untagged): LXC container deployment with Wazuh, OSSEC, OSSI
 UTMstack and Elastic agents, attack and syslog simulations, benchmarks, reports and a
 React UI.
 
-[Unreleased]: https://github.com/Cyber-MKO/Habeny/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/Cyber-MKO/Habeny/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/Cyber-MKO/Habeny/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/Cyber-MKO/Habeny/releases/tag/v2.1.0
