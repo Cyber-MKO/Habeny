@@ -7,6 +7,15 @@ import pytest
 from app.core.os_images import get_os_config
 
 
+@pytest.fixture(autouse=True)
+def lxc_access(app):
+    """CI runs unprivileged; these tests are about validation, not the root check."""
+    from app.core.common import check_root
+    app.dependency_overrides[check_root] = lambda: True
+    yield
+    app.dependency_overrides.pop(check_root, None)
+
+
 def test_unknown_os_is_an_error_not_ubuntu():
     assert get_os_config("debian_11")["release"] == "bullseye"
     with pytest.raises(ValueError, match="Unsupported OS type 'debian_10'"):
