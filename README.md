@@ -497,7 +497,6 @@ npm run build      # outputs to ../static/
 │   └── models/              # Pydantic models by domain (import from app.models)
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
-├── index.legacy.html        # Legacy single-file frontend
 │
 ├── frontend/                # React + Vite frontend
 │   ├── src/
@@ -565,14 +564,12 @@ npm run build      # outputs to ../static/
 ## Linting
 
 ```bash
-# Python (ruff)
 pip install -r requirements-dev.txt
-ruff check .
-ruff format .
-
-# JavaScript (eslint)
-cd frontend && npx eslint src/
+ruff check .                      # Python (config: ruff.toml)
+cd frontend && npx eslint .       # JavaScript (config: frontend/eslint.config.js)
 ```
+
+CI runs both on every pull request, and both must be clean.
 
 ## Testing
 
@@ -580,13 +577,33 @@ cd frontend && npx eslint src/
 pip install -r requirements-dev.txt
 python3 -m pytest tests/ -v
 
-# Without LXC (e.g. on a laptop): use the in-memory python-lxc stand-in
-HABENY_LXC_BACKEND=direct PYTHONPATH=tests/stubs python3 -m pytest tests/
+# Without LXC (e.g. on a laptop): use the in-memory python-lxc stand-in, with coverage
+HABENY_LXC_BACKEND=direct PYTHONPATH=tests/stubs python3 -m pytest tests/ --cov=app
+
+# Frontend (Vitest + Testing Library)
+cd frontend && npm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs the tests on Python 3.10 and 3.12, the ruff
-correctness rules, a frontend build, and `pip-audit` / `npm audit` on every push and pull
-request and weekly. Dependabot (`.github/dependabot.yml`) proposes dependency updates.
+`tests/integration/smoke.sh` is an end-to-end check of an installed Habeny against real
+LXC: it creates the first admin, deploys an Ubuntu container, stops, starts and deletes it,
+takes and verifies a backup, and restarts the service. Run it as root on a disposable
+machine right after `deploy/install.sh`.
+
+CI runs on every push and pull request:
+
+- `.github/workflows/ci.yml`: the Python tests on 3.10 and 3.12, with deprecation
+  warnings as errors and a coverage floor; ruff; ESLint, the frontend tests and build;
+  shellcheck and a package build; `pip-audit` / `npm audit` (also weekly)
+- `.github/workflows/integration.yml`: installs Habeny on an Ubuntu 24.04 runner and runs
+  `tests/integration/smoke.sh` against real LXC
+
+Dependabot (`.github/dependabot.yml`) proposes dependency updates.
+
+## Contributing and releases
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers pull requests, commit messages, versioning
+(SemVer; the version lives in `app/version.py`) and how to publish a release.
+[CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 
 ## Security
 

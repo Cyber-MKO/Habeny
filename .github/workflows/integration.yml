@@ -1,0 +1,39 @@
+name: Integration
+
+# Installs Habeny on a real Ubuntu runner and drives it against real LXC: the unit tests
+# use a stub instead of python-lxc, so this is what shows the helper, systemd units,
+# installer and container lifecycle actually work together.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lxc:
+    name: Install and deploy a real container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Habeny
+        run: sudo deploy/install.sh
+      # Docker on the runner sets the FORWARD policy to DROP, which cuts containers off
+      - run: sudo iptables -P FORWARD ACCEPT
+      - name: End-to-end test
+        run: sudo tests/integration/smoke.sh
+      - name: Service logs
+        if: always()
+        run: sudo journalctl -u habeny -u habeny-helper --no-pager -n 300

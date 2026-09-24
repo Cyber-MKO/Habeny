@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# End-to-end check of an installed Habeny against real LXC (run as root after
+# deploy/install.sh; used by .github/workflows/integration.yml):
+# first admin → deploy a real container → start/stop/delete it → full backup and verify.
+set -euo pipefail
+
+BASE="${HABENY_URL:-https://127.0.0.1:9000}"
+DATA_DIR="${HABENY_DATA_DIR:-/var/lib/lxc-siem-platform}"
+NAME="itest"
+JAR="$(mktemp)"
+trap 'rm -f "$JAR"' EXIT
+
+step() { echo; echo "==> $*"; }
+fail() { echo "FAIL: $*" >&2; exit 1; }
+# api METHOD PATH [JSON]: prints the response body; fails on HTTP errors
+api() {
+    local args=(-sS -k --fail-with-body -b "$JAR" -c "$JAR" -X "$1" -H "Content-Type: application/json" --max-time 900)
+    [ $# -ge 3 ] && args+=(-d "$3")
+    curl "${args[@]}" "$BASE$2"
+}
+field() { python3 -c "import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {}, {'d': d}))" "$1"; }
+
+step "Waiting for Habeny"
+for _ in $(seq 60); do
+    curl -sk --max-time 2 "$BASE/system/health" >/dev/null && break
+    sleep 1
+done
+api GET /auth/status | field 'd["data"]["setup_required"]' | grep -qx True || fail "expected a fresh install"
+
+step "Creating the first admin with the setup token"
+TOKEN="$(cat "$DATA_DIR/setup-token")"
+api POST /auth/setup "{\"username\":\"admin\",\"password\":\"integration-test-passphrase\",\"setup_token\":\"$TOKEN\"}" >/dev/null
+[ ! -e "$DATA_DIR/setup-token" ] || fail "the setup token should be removed once used"
+api GET /auth/status | field 'd["data"]["user"]["username"]' | grep -qx admin || fail "not signed in"
+
+step "Deploying one container (downloads the Ubuntu 22.04 image)"
+RESULT="$(api POST /agents/deploy "{\"count\":1,\"siem_type\":\"none\",\"agent_base_name\":\"$NAME\",\"parallel_mode\":\"sequential\",\"deployment_id\":\"itest-1\"}")"
+echo "$RESULT" | field 'd["message"]'
+echo "$RESULT" | field 'd["success"]' | grep -qx True || { echo "$RESULT" >&2; fail "deployment failed"; }
+CONTAINER="$(echo "$RESULT" | field 'd["data"]["deployed_agents"][0]["agent_name"]')"
+lxc-ls --running | tr -s ' \n' '\n' | grep -qx "$CONTAINER" || fail "$CONTAINER isn't running according to lxc-ls"
+lxc-attach -n "$CONTAINER" -- cat /etc/os-release | grep -q jammy || fail "not an Ubuntu 22.04 container"
+api GET /agents/deploy/progress/itest-1 | field 'd["data"]["status"]' | grep -qx completed || fail "progress not completed"
+
+step "Container details, stop and start"
+api GET "/agents/$CONTAINER" | field 'd["data"]["lifecycle_status"]'
+api POST "/agents/$CONTAINER/stop" >/dev/null
+lxc-info -n "$CONTAINER" -s | grep -q STOPPED || fail "$CONTAINER didn't stop"
+api POST "/agents/$CONTAINER/start" >/dev/null
+lxc-info -n "$CONTAINER" -s | grep -q RUNNING || fail "$CONTAINER didn't start"
+
+step "Listing containers"
+api GET /agents | field '[a["agent_name"] for a in d["data"]["agents"]]' | grep -q "$CONTAINER" || fail "$CONTAINER not listed"
+
+step "Full backup, then verify it"
+BACKUP="$(api POST /system/backups | field 'd["data"]["backup"]["name"]')"
+habeny backup verify "$DATA_DIR/backups/$BACKUP"
+habeny backup list
+
+step "Deleting the container"
+api DELETE "/agents/$CONTAINER" >/dev/null
+! lxc-ls | tr -s ' \n' '\n' | grep -qx "$CONTAINER" || fail "$CONTAINER still exists"
+
+step "Restarting the service keeps state (graceful stop, migrations, sign-in)"
+systemctl restart habeny
+for _ in $(seq 60); do
+    curl -sk --max-time 2 "$BASE/system/health" >/dev/null && break
+    sleep 1
+done
+api GET /auth/status | field 'd["data"]["user"]["username"]' | grep -qx admin || fail "session lost across restart"
+
+echo; echo "Integration test passed"

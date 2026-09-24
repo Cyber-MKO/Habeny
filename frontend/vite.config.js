@@ -27,4 +27,8 @@ export default defineConfig({
     outDir: "../static",
     emptyOutDir: true,
   },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.js"],
+  },
 });
