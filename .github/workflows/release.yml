@@ -51,7 +51,7 @@ jobs:
         run: |
           deploy/release-notes.sh "${TAG#v}" > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - uses: actions/setup-node@v4
