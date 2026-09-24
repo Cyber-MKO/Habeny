@@ -9,7 +9,6 @@ key file as well — e.g. root on this host — can still decrypt.
 import logging
 import os
 import threading
-from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 PREFIX = "enc:v1:"
 KEY_FILE = DATA_DIR / "secret.key"
 
-_fernet: Optional[Fernet] = None
+_fernet: Fernet | None = None
 _lock = threading.Lock()
 
 
@@ -53,18 +52,18 @@ def _cipher() -> Fernet:
         return _fernet
 
 
-def is_encrypted(value: Optional[str]) -> bool:
+def is_encrypted(value: str | None) -> bool:
     return isinstance(value, str) and value.startswith(PREFIX)
 
 
-def encrypt_secret(value: Optional[str]) -> Optional[str]:
+def encrypt_secret(value: str | None) -> str | None:
     """Encrypt for storage. None/"" and already-encrypted values pass through."""
     if not value or is_encrypted(value):
         return value
     return PREFIX + _cipher().encrypt(value.encode()).decode()
 
 
-def decrypt_secret(value: Optional[str]) -> Optional[str]:
+def decrypt_secret(value: str | None) -> str | None:
     """Decrypt a stored value. Legacy plaintext passes through; an undecryptable value
     (wrong/lost key) returns None so callers ask for it to be re-entered."""
     if not is_encrypted(value):
@@ -76,7 +75,7 @@ def decrypt_secret(value: Optional[str]) -> Optional[str]:
         return None
 
 
-def secret_hint(value: Optional[str]) -> Optional[str]:
+def secret_hint(value: str | None) -> str | None:
     """Last 4 characters, for display ("••••abcd"); None when unset."""
     plain = decrypt_secret(value)
     if not plain:

@@ -2,6 +2,7 @@
 WebSocket console sessions into running containers.
 """
 import asyncio
+import contextlib
 import fcntl
 import json
 import os
@@ -92,7 +93,5 @@ async def console_session(websocket: WebSocket, container_name: str):
         task.cancel()
 
     # Closing the PTY hangs up the session; the shell exits and is reaped by its parent
-    try:
+    with contextlib.suppress(OSError):
         os.close(master_fd)
-    except Exception:
-        pass

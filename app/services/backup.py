@@ -217,7 +217,10 @@ def _unpack(path: Path, into: Path) -> tuple[Path, dict]:
     try:
         with tarfile.open(path, "r:gz") as archive:
             members = _safe_members(archive)
-            archive.extractall(into, members=members)
+            # tarfile's "data" filter (Python 3.12, backported to 3.10.12/3.11.4) also refuses
+            # links, devices and unsafe modes; _safe_members already covers older Pythons
+            extra = {"filter": "data"} if hasattr(tarfile, "data_filter") else {}
+            archive.extractall(into, members=members, **extra)
     except (tarfile.TarError, OSError, EOFError) as e:
         raise BackupError(f"{path} isn't a readable backup: {e}") from e
     root = into / "habeny-backup"

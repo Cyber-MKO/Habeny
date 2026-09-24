@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, DataTable, Pill, Spinner, Modal, JsonBlock } from "../components/UI";
+import { PageHeader, DataTable, Spinner, JsonBlock } from "../components/UI";
 
 export default function SyslogConfigs() {
   const { toast } = useStore();

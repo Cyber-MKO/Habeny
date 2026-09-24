@@ -1,7 +1,6 @@
 """
 Benchmark run and comparison request models.
 """
-from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -11,18 +10,18 @@ from app.models.common import INSTALL_FIELD_CHECKS
 
 class BenchmarkStartRequest(BaseModel):
     scenario_id: str = "linear_scale"
-    name: Optional[str] = None
-    siem_type: Optional[str] = "none"
-    siem_ip: Optional[str] = None
-    siem_version: Optional[str] = None
-    siem_auth_key: Optional[str] = None
-    base_name: Optional[str] = None
-    memory_limit: Optional[str] = "256MB"
-    os_type: Optional[str] = "ubuntu_22_04"
-    agent_group: Optional[str] = "benchmark"
-    metric_interval: Optional[int] = None
-    failure_threshold: Optional[float] = None
-    manager_profile_id: Optional[str] = None  # fills unset SIEM fields (incl. the stored auth key) server-side
+    name: str | None = None
+    siem_type: str | None = "none"
+    siem_ip: str | None = None
+    siem_version: str | None = None
+    siem_auth_key: str | None = None
+    base_name: str | None = None
+    memory_limit: str | None = "256MB"
+    os_type: str | None = "ubuntu_22_04"
+    agent_group: str | None = "benchmark"
+    metric_interval: int | None = None
+    failure_threshold: float | None = None
+    manager_profile_id: str | None = None  # fills unset SIEM fields (incl. the stored auth key) server-side
 
     @field_validator('base_name')
     @classmethod
@@ -38,4 +37,4 @@ class BenchmarkStartRequest(BaseModel):
 
 
 class BenchmarkCompareRequest(BaseModel):
-    benchmark_ids: List[str]
+    benchmark_ids: list[str]

@@ -4,6 +4,7 @@ Tests for Pydantic model validation (app/models).
 Focus on validators — the shared helpers and edge cases.
 """
 import pytest
+from pydantic import ValidationError
 
 models = pytest.importorskip("app.models", reason="requires pydantic")
 
@@ -19,25 +20,25 @@ def test_agent_deployment_request_validates_hostname():
 
 
 def test_agent_deployment_request_rejects_invalid_ip():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         models.AgentDeploymentRequest(count=1, siem_ip="not a host!")
 
 
 def test_log_upload_rejects_relative_path():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         models.LogUploadRequest(content="x", destination_path="relative/path")
 
 
 def test_log_upload_rejects_path_traversal():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         models.LogUploadRequest(content="x", destination_path="/var/log/../../etc/passwd")
 
 
 def test_group_create_rejects_invalid_name():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         models.GroupCreateRequest(name="-bad-start")
 
 
 def test_bulk_operation_rejects_invalid_operation():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         models.BulkOperationRequest(container_names=["c1"], operation="explode")

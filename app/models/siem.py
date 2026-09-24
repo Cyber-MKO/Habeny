@@ -2,9 +2,8 @@
 SIEM-specific agent info and stats models.
 """
 from datetime import datetime
-from typing import Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import SIEMType
 
@@ -15,11 +14,11 @@ class WazuhAgentInfo(BaseModel):
     agent_name: str
     manager_host: str
     version: str
-    os: Dict[str, str]
+    os: dict[str, str]
     status: str
-    last_keep_alive: Optional[datetime] = None
+    last_keep_alive: datetime | None = None
     group: str
-    node_name: Optional[str] = None
+    node_name: str | None = None
 
 
 class OSSECAgentInfo(BaseModel):
@@ -28,7 +27,7 @@ class OSSECAgentInfo(BaseModel):
     agent_name: str
     ip_address: str
     status: str
-    last_keep_alive: Optional[datetime] = None
+    last_keep_alive: datetime | None = None
 
 
 class OSSIMAgentInfo(BaseModel):
@@ -47,8 +46,9 @@ class SIEMStats(BaseModel):
     connected_agents: int
     disconnected_agents: int
     connection_rate: float
-    average_eps: Optional[float] = None
-    total_events_24h: Optional[int] = None
-    
-    class Config:
-        use_enum_values = True
+    average_eps: float | None = None
+    total_events_24h: int | None = None
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+    )

@@ -12,7 +12,6 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
 
 from app.config import BENCHMARK_WORKERS, DB_PATH
 from app.services import lifecycle
@@ -304,7 +303,7 @@ def detect_bottlenecks(benchmark_id: str, phase: int, metrics: dict):
 # ── Benchmark Engine ─────────────────────────────────────────────────────
 
 # Active benchmarks tracked in-memory for WebSocket streaming
-active_benchmarks: Dict[str, dict] = {}
+active_benchmarks: dict[str, dict] = {}
 
 
 async def run_benchmark(benchmark_id: str, scenario_id: str, config: dict):
@@ -532,7 +531,7 @@ def _build_summary(benchmark_id: str, phase_results: list,
 
 # ── Comparison Engine ────────────────────────────────────────────────────
 
-def compare_benchmarks(benchmark_ids: List[str]) -> dict:
+def compare_benchmarks(benchmark_ids: list[str]) -> dict:
     """Compare two or more benchmarks side-by-side."""
     benchmarks = []
     with _conn() as c:
@@ -611,7 +610,7 @@ def compare_benchmarks(benchmark_ids: List[str]) -> dict:
 
 # ── Query Helpers ────────────────────────────────────────────────────────
 
-def get_benchmark(benchmark_id: str) -> Optional[dict]:
+def get_benchmark(benchmark_id: str) -> dict | None:
     with _conn() as c:
         row = c.execute("SELECT * FROM benchmarks WHERE benchmark_id=?", (benchmark_id,)).fetchone()
         if not row:

@@ -65,7 +65,7 @@ async def load_simulation(
         except TypeError:
             raise HTTPException(status_code=400, detail="Extra fields must be JSON serializable")
 
-        config_payload = jsonable_encoder(request.dict())
+        config_payload = jsonable_encoder(request.model_dump())
         config_payload.pop("agent_selector", None)
 
         simulation = {

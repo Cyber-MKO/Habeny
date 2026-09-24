@@ -18,7 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import jwt
 
@@ -55,7 +55,7 @@ class Settings:
         return any(self.role_groups.values())
 
 
-def settings() -> Optional[Settings]:
+def settings() -> Settings | None:
     """Current SSO settings (see app/config.py), or None when SSO is off."""
     issuer = config.get("HABENY_OIDC_ISSUER").rstrip("/")
     if not issuer:
@@ -84,7 +84,7 @@ def _ssl_context(cfg: Settings) -> ssl.SSLContext:
     return ssl.create_default_context(cafile=cfg.ca_bundle or None)
 
 
-def _http_json(cfg: Settings, url: str, data: Optional[dict] = None, headers: Optional[dict] = None) -> dict:
+def _http_json(cfg: Settings, url: str, data: dict | None = None, headers: dict | None = None) -> dict:
     if urllib.parse.urlsplit(url).scheme != "https" and not config.get("HABENY_OIDC_ALLOW_HTTP"):
         raise OIDCError(f"Refusing non-HTTPS identity provider URL: {url}")
     body = urllib.parse.urlencode(data).encode() if data is not None else None
@@ -160,7 +160,7 @@ class FlowStore:
             self._items[flow["state"]] = flow
         return flow
 
-    def pop(self, state: str) -> Optional[dict]:
+    def pop(self, state: str) -> dict | None:
         with self._lock:
             flow = self._items.pop(state, None)
         return flow if flow and flow["expires"] > time.monotonic() else None
@@ -245,7 +245,7 @@ def username_from(cfg: Settings, claims: dict) -> str:
     return name
 
 
-def role_from(cfg: Settings, claims: dict) -> Optional[str]:
+def role_from(cfg: Settings, claims: dict) -> str | None:
     """Role from group membership when group mapping is configured (highest wins; None if
     in no mapped group). Without group mapping, None: the caller uses the default role."""
     if not cfg.group_mapping:

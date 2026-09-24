@@ -2,16 +2,16 @@
 Container endpoints: deploy (+ live progress), list, stats, get, delete, bulk ops, start/stop, UTMstack syslog toggles.
 """
 import asyncio
+import contextlib
 import json
 import logging
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from app.config import DB_PATH, DEPLOY_WORKERS
+from app.config import DB_PATH
 from app.core.common import check_root
 from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
@@ -24,6 +24,7 @@ from app.services.deployment import (
     progress_finish,
     progress_start,
     run_deployment_workers,
+    worker_count,
 )
 from app.state import deployment_progress, deployment_progress_lock
 
@@ -87,14 +88,13 @@ async def deploy_agents(
                       if deployment.manager_profile_id else "siem_auth_key is required for UTMstack and Elastic deployments")
             raise HTTPException(status_code=400, detail=detail)
 
-        if deployment.agent_group:
-            if not group_exists(DB_PATH, deployment.agent_group):
-                if deployment.auto_create_group:
-                    create_group(DB_PATH, deployment.agent_group, "Auto-created during deployment")
-                    log_activity("group_auto_created", {"group": deployment.agent_group})
-                    progress_event(deployment_id, f"Created group '{deployment.agent_group}'")
-                else:
-                    raise HTTPException(status_code=400, detail="Container group not found")
+        if deployment.agent_group and not group_exists(DB_PATH, deployment.agent_group):
+            if deployment.auto_create_group:
+                create_group(DB_PATH, deployment.agent_group, "Auto-created during deployment")
+                log_activity("group_auto_created", {"group": deployment.agent_group})
+                progress_event(deployment_id, f"Created group '{deployment.agent_group}'")
+            else:
+                raise HTTPException(status_code=400, detail="Container group not found")
 
         # Log deployment request
         log_activity(
@@ -147,9 +147,11 @@ async def deploy_agents(
 
         # Deploy in parallel using multiprocessing, off the event loop so the
         # API (and progress polling) stays responsive during long deployments
-        progress_event(deployment_id, f"Launching {min(DEPLOY_WORKERS, len(agent_names))} deployment workers")
+        mode = getattr(deployment.parallel_mode, "value", deployment.parallel_mode)
+        workers = worker_count(mode, len(agent_names))
+        progress_event(deployment_id, f"Launching {workers} deployment worker{'s' if workers != 1 else ''} ({mode})")
         results, warnings = await asyncio.to_thread(
-            run_deployment_workers, deployment_id, agent_names, deployment_dict, agent_seq_ids
+            run_deployment_workers, deployment_id, agent_names, deployment_dict, agent_seq_ids, mode
         )
 
         elapsed_time = time.time() - start_time
@@ -218,9 +220,9 @@ def _all_agent_infos() -> list:
 
 @router.get("/agents", response_model=APIResponse)
 async def list_agents(
-    siem_type: Optional[str] = Query(None, description="Filter by SIEM type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    agent_group: Optional[str] = Query(None, description="Filter by container group"),
+    siem_type: str | None = Query(None, description="Filter by SIEM type"),
+    status: str | None = Query(None, description="Filter by status"),
+    agent_group: str | None = Query(None, description="Filter by container group"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0)
 ):
@@ -492,7 +494,7 @@ async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp")):
         # Auto-create a syslog config profile for this listener
         profile_name = f"{agent_id}-syslog-{proto}"
         config_id = str(uuid.uuid4())
-        try:
+        with contextlib.suppress(Exception):  # profile may already exist from a previous enable
             create_syslog_config(DB_PATH, config_id, {
                 "name": profile_name,
                 "description": f"Auto-created: syslog {proto.upper()} on {agent_id} port 7014",
@@ -501,8 +503,6 @@ async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp")):
                 "protocol": proto,
                 "siem_type": "utmstack",
             })
-        except Exception:
-            pass  # profile may already exist from a previous enable
 
         log_activity("utmstack_syslog_enabled", {"agent_id": agent_id, "protocol": proto})
         return APIResponse(success=True, message=f"Syslog {proto.upper()} enabled on {agent_id} (port 7014)", data={

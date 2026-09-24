@@ -7,7 +7,7 @@ import subprocess
 import time
 import uuid
 from functools import wraps
-from typing import Any, Dict, List
+from typing import Any
 
 from app.core.lxc_backend import attach_run
 
@@ -66,15 +66,15 @@ class PerformanceTimer:
         return 0.0
 
 
-def run_command(cmd: List[str], capture_output: bool = True, input_text: str = None,
-                timeout: int = 300, env: Dict[str, str] = None) -> Dict[str, Any]:
+def run_command(cmd: list[str], capture_output: bool = True, input_text: str = None,
+                timeout: int = 300, env: dict[str, str] = None) -> dict[str, Any]:
     """Run a shell command and return a result dict with success, stdout, stderr, returncode."""
     try:
         process_env = os.environ.copy()
         if env:
             process_env.update(env)
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "text": True, "check": True, "timeout": timeout, "env": process_env
         }
         if input_text is not None:
@@ -118,7 +118,7 @@ def run_command(cmd: List[str], capture_output: bool = True, input_text: str = N
         }
 
 
-def _attach_result(result: Dict[str, Any], timeout_msg: str) -> Dict[str, Any]:
+def _attach_result(result: dict[str, Any], timeout_msg: str) -> dict[str, Any]:
     if result.get("timed_out"):
         return {"success": False, "stdout": result["stdout"].strip(), "stderr": timeout_msg, "returncode": -1}
     return {
@@ -130,8 +130,8 @@ def _attach_result(result: Dict[str, Any], timeout_msg: str) -> Dict[str, Any]:
 
 
 @retry(max_attempts=3, delay=2.0)
-def execute_in_container(container_name: str, command: str, env: Dict[str, str] = None,
-                         timeout: int = 300) -> Dict[str, Any]:
+def execute_in_container(container_name: str, command: str, env: dict[str, str] = None,
+                         timeout: int = 300) -> dict[str, Any]:
     """
     Execute command in container using lxc-attach
 
@@ -151,8 +151,8 @@ def execute_in_container(container_name: str, command: str, env: Dict[str, str] 
         return {"success": False, "stdout": "", "stderr": str(e), "returncode": 1}
 
 
-def execute_in_container_shell(container_name: str, command: str, env: Dict[str, str] = None,
-                               timeout: int = 300) -> Dict[str, Any]:
+def execute_in_container_shell(container_name: str, command: str, env: dict[str, str] = None,
+                               timeout: int = 300) -> dict[str, Any]:
     """
     Execute shell script in container with better error handling
 

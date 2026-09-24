@@ -13,7 +13,6 @@ import logging
 import os
 import socket
 from pathlib import Path
-from typing import Optional
 
 from app import config
 from app.config import DATA_DIR
@@ -101,7 +100,7 @@ def listen_address() -> tuple[str, int]:
     return config.get("HABENY_HOST"), config.get("HABENY_PORT")
 
 
-def hsts_enabled() -> Optional[bool]:
+def hsts_enabled() -> bool | None:
     """Only with a real certificate: HSTS on a self-signed one would make the browser
     warning impossible to click through."""
     return tls_mode() not in ("off", "false", "0", "no") and uses_own_certificate()

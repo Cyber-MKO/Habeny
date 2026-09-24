@@ -6,7 +6,6 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
@@ -120,7 +119,7 @@ async def metrics_stream(websocket: WebSocket):
 
 
 @router.get("/metrics/benchmarks", response_model=APIResponse)
-async def get_benchmarks(since: Optional[str] = Query(None, description="ISO timestamp to filter from")):
+async def get_benchmarks(since: str | None = Query(None, description="ISO timestamp to filter from")):
     """Get deployment and simulation performance benchmarks with percentiles"""
     try:
         deploy_time = get_metric_summary(DB_PATH, "deployment", "container_deploy_time", since)
@@ -166,8 +165,8 @@ async def get_benchmarks(since: Optional[str] = Query(None, description="ISO tim
 @router.get("/metrics/history", response_model=APIResponse)
 async def get_metrics_history(
     metric_type: str = Query(..., description="e.g. system, deployment, api_latency"),
-    metric_name: Optional[str] = Query(None),
-    since: Optional[str] = Query(None),
+    metric_name: str | None = Query(None),
+    since: str | None = Query(None),
     limit: int = Query(500, ge=1, le=5000),
 ):
     """Get raw metrics history for charting"""

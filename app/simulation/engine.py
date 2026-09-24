@@ -1,7 +1,8 @@
 """
 SimulationEngine and profile-to-generator dispatch.
 """
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from typing import Any
 
 from app.core.shell import execute_in_container_shell
 
@@ -10,7 +11,7 @@ class SimulationEngine:
     """Engine for generating attack simulations"""
 
     @staticmethod
-    def generate_auth_bruteforce(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_auth_bruteforce(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate authentication brute force logs"""
         script = f"""#!/bin/bash
 END_TIME=$(($(date +%s) + {duration}))
@@ -31,7 +32,7 @@ echo "Generated $COUNT auth bruteforce events"
         return execute_in_container_shell(container_name, script, timeout=duration + 30)
 
     @staticmethod
-    def generate_web_attacks(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_web_attacks(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate web attack logs"""
         attacks = [
             "GET /admin/../../../etc/passwd HTTP/1.1",
@@ -66,7 +67,7 @@ echo "Generated $COUNT web attack events"
         return execute_in_container_shell(container_name, script, timeout=duration + 30)
 
     @staticmethod
-    def generate_malware_beacon(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_malware_beacon(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate malware C2 beacon logs"""
         c2_servers = [
             "185.220.100.240",
@@ -98,7 +99,7 @@ echo "Generated $COUNT malware beacon events"
         return execute_in_container_shell(container_name, script, timeout=duration + 30)
 
     @staticmethod
-    def generate_lateral_movement(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_lateral_movement(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate lateral movement logs"""
         script = f"""#!/bin/bash
 END_TIME=$(($(date +%s) + {duration}))
@@ -120,7 +121,7 @@ echo "Generated $COUNT lateral movement events"
         return execute_in_container_shell(container_name, script, timeout=duration + 30)
 
     @staticmethod
-    def generate_privilege_escalation(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_privilege_escalation(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate privilege escalation logs"""
         script = f"""#!/bin/bash
 END_TIME=$(($(date +%s) + {duration}))
@@ -144,7 +145,7 @@ echo "Generated $COUNT privilege escalation events"
         return execute_in_container_shell(container_name, script, timeout=duration + 30)
 
     @staticmethod
-    def generate_port_scan(container_name: str, duration: int, eps: int) -> Dict[str, Any]:
+    def generate_port_scan(container_name: str, duration: int, eps: int) -> dict[str, Any]:
         """Generate port scan logs"""
         script = f"""#!/bin/bash
 END_TIME=$(($(date +%s) + {duration}))

@@ -10,7 +10,6 @@ import secrets
 import struct
 import threading
 import time
-from typing import Optional
 from urllib.parse import quote, urlencode
 
 from app.config import DB_PATH
@@ -37,16 +36,16 @@ def _code_at(secret: str, step: int) -> str:
     return str(value % 10 ** DIGITS).zfill(DIGITS)
 
 
-def current_step(now: Optional[float] = None) -> int:
+def current_step(now: float | None = None) -> int:
     return int((time.time() if now is None else now) // PERIOD)
 
 
-def code_for(secret: str, now: Optional[float] = None) -> str:
+def code_for(secret: str, now: float | None = None) -> str:
     return _code_at(secret, current_step(now))
 
 
-def matching_step(secret: str, code: str, last_step: Optional[int] = None,
-                  now: Optional[float] = None) -> Optional[int]:
+def matching_step(secret: str, code: str, last_step: int | None = None,
+                  now: float | None = None) -> int | None:
     """The time step `code` is valid for, or None. Steps at or before `last_step`
     (already used) are refused, so a code can't be replayed."""
     code = "".join(code.split())
@@ -115,7 +114,7 @@ class ChallengeStore:
             self._items[token] = {"user_id": user_id, "expires": now + CHALLENGE_TTL, "attempts": 0}
         return token
 
-    def user_for(self, token: str) -> Optional[int]:
+    def user_for(self, token: str) -> int | None:
         with self._lock:
             item = self._items.get(token)
             if not item or item["expires"] <= time.monotonic():
@@ -142,7 +141,7 @@ challenges = ChallengeStore()
 
 # ── checking a user's second factor ─────────────────────────────────────
 
-def check_second_factor(user: dict, code: str) -> Optional[str]:
+def check_second_factor(user: dict, code: str) -> str | None:
     """Verify an authenticator code or an unused recovery code for a user with 2FA on.
     Returns "totp" or "recovery" (and marks it used), or None."""
     if not user.get("totp_enabled") or not user.get("totp_secret"):

@@ -3,7 +3,7 @@ UTMstack agent installer.
 """
 import logging
 import shlex
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.shell import PerformanceTimer, execute_in_container, execute_in_container_shell
 from app.core.validation import validate_container_name, validate_host, validate_token
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def install_utmstack_agent(container_name: str, utmstack_server: str,
                            auth_key: str,
-                           config_template_id: Optional[str] = None) -> Dict[str, Any]:
+                           config_template_id: str | None = None) -> dict[str, Any]:
     """Install UTMstack agent in a container."""
     validate_container_name(container_name)
     validate_host(utmstack_server)

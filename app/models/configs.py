@@ -2,9 +2,8 @@
 Configuration template import/export models.
 """
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import SIEMType
 
@@ -14,13 +13,13 @@ class ConfigImportRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Template name")
     siem_type: SIEMType = Field(..., description="SIEM type this config is for")
     content: str = Field(..., description="Configuration file content")
-    description: Optional[str] = Field(None, max_length=500, description="Template description")
-    version: Optional[str] = Field(None, description="Config version")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
-    
-    class Config:
-        use_enum_values = True
-        schema_extra = {
+    description: str | None = Field(None, max_length=500, description="Template description")
+    version: str | None = Field(None, description="Config version")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
             "example": {
                 "name": "High Security Wazuh Config",
                 "siem_type": "wazuh",
@@ -29,7 +28,8 @@ class ConfigImportRequest(BaseModel):
                 "version": "1.0",
                 "tags": ["production", "high-security"]
             }
-        }
+        },
+    )
 
 
 class ConfigTemplate(BaseModel):
@@ -38,18 +38,19 @@ class ConfigTemplate(BaseModel):
     name: str
     siem_type: SIEMType
     content: str
-    description: Optional[str] = None
-    version: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+    description: str | None = None
+    version: str | None = None
+    tags: list[str] = Field(default_factory=list)
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     usage_count: int = 0
-    
-    class Config:
-        use_enum_values = True
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+    )
 
 
 class ConfigExportResponse(BaseModel):
     """Response for config export"""
     template: ConfigTemplate
-    download_url: Optional[str] = None
+    download_url: str | None = None

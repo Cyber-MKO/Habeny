@@ -32,7 +32,7 @@ export default function LogUpload() {
       setAgents(a.data?.agents || []);
       setGroups(g.data?.groups || []);
       setSchedules(s.data?.schedules || []);
-    } catch {}
+    } catch { /* agents, groups and schedules are optional here; the form still works */ }
     setLoading(false);
   }, []);
 

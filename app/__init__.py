@@ -2,6 +2,7 @@
 Multi-SIEM Container Emulation Platform — application package.
 """
 import logging
+from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,9 @@ def create_app():
     from fastapi.middleware.cors import CORSMiddleware
 
     from app.config import CORS_ORIGINS, DEPLOY_WORKERS, check
-    from app.version import __version__
     from app.middleware import RequestContextMiddleware, StripApiPrefixMiddleware
     from app.routes import register_routes
+    from app.version import __version__
 
     check()  # stop with every configuration problem listed, before touching anything
     from app.services import instance
@@ -71,6 +72,7 @@ def create_app():
         title="Multi-SIEM Container Emulation Platform",
         description="LXC-based platform for deploying containers that run SIEM agents at scale",
         version=__version__,
+        lifespan=_lifespan,
     )
     logger.info(f"Initialized; up to {DEPLOY_WORKERS} containers deploy in parallel")
 
@@ -92,20 +94,23 @@ def create_app():
 
     from app.services import lifecycle
     from app.services.logs import interrupt_for_shutdown
-    from app.services.maintenance import maintenance
     from app.state import interrupt_running_simulations
     lifecycle.on_shutdown(interrupt_running_simulations)
     lifecycle.on_shutdown(interrupt_for_shutdown)
 
-    @app.on_event("startup")
-    async def startup_event():
-        maintenance.start()  # background housekeeping: see app/services/maintenance.py
-        from app.services.logs import resume_log_schedules
-        resume_log_schedules()
+    return app
 
-    @app.on_event("shutdown")
-    async def shutdown_event():
+
+@asynccontextmanager
+async def _lifespan(app):
+    """Background work that runs while the server does (not in tests' TestClient without `with`)."""
+    from app.services.logs import resume_log_schedules
+    from app.services.maintenance import maintenance
+
+    maintenance.start()  # housekeeping: see app/services/maintenance.py
+    resume_log_schedules()
+    try:
+        yield
+    finally:
         maintenance.stop()
         logger.info("Shutdown complete")
-
-    return app

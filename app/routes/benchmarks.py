@@ -2,7 +2,6 @@
 Benchmark scenarios, runs and comparisons.
 """
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
@@ -33,7 +32,7 @@ async def start_benchmark(request: BenchmarkStartRequest,
         if scenario_id not in bm_engine.SCENARIOS:
             raise HTTPException(status_code=400, detail=f"Unknown scenario: {scenario_id}")
         benchmark_id = str(uuid.uuid4())
-        cfg = {k: v for k, v in request.dict().items() if v not in (None, "")}
+        cfg = {k: v for k, v in request.model_dump().items() if v not in (None, "")}
         profile_id = cfg.pop("manager_profile_id", None)
         if profile_id:
             mgr = get_manager(DB_PATH, profile_id)
@@ -102,7 +101,7 @@ async def get_benchmark_detail(benchmark_id: str):
 
 @router.get("/benchmarks/{benchmark_id}/metrics", response_model=APIResponse)
 async def get_benchmark_metrics_endpoint(benchmark_id: str,
-                                         category: Optional[str] = None,
+                                         category: str | None = None,
                                          limit: int = Query(1000, ge=1, le=10000)):
     """Get time-series metrics for a benchmark"""
     metrics = bm_engine.get_benchmark_metrics(benchmark_id, category, limit)

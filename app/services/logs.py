@@ -5,7 +5,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.container import build_write_file_script
 from app.core.lxc_backend import lxc
@@ -81,7 +81,7 @@ echo "UTMstack filebeat config updated for {log_path}"
 """
 
 
-async def perform_log_upload(agent_id: str, log_upload: LogUploadRequest) -> Dict[str, Any]:
+async def perform_log_upload(agent_id: str, log_upload: LogUploadRequest) -> dict[str, Any]:
     script = _build_log_upload_script(log_upload)
     result = execute_in_container(agent_id, script, timeout=30)
 
@@ -103,7 +103,7 @@ async def perform_log_upload(agent_id: str, log_upload: LogUploadRequest) -> Dic
 
 
 async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploadRequest,
-                            interval_seconds: int, duration_seconds: Optional[int], indefinite: bool) -> None:
+                            interval_seconds: int, duration_seconds: int | None, indefinite: bool) -> None:
     start_time = time.time()
     scheduled_log_tasks[schedule_id]["status"] = "running"
     scheduled_log_tasks[schedule_id].setdefault("last_run", None)  # kept when resuming after a restart
@@ -123,10 +123,9 @@ async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploa
             if not result.get("success"):
                 scheduled_log_tasks[schedule_id]["last_error"] = result.get("stderr") or result.get("error")
 
-            if not indefinite and duration_seconds is not None:
-                if time.time() - start_time >= duration_seconds:
-                    scheduled_log_tasks[schedule_id]["status"] = "completed"
-                    break
+            if not indefinite and duration_seconds is not None and time.time() - start_time >= duration_seconds:
+                scheduled_log_tasks[schedule_id]["status"] = "completed"
+                break
 
             await asyncio.sleep(interval_seconds)
     except asyncio.CancelledError:
@@ -138,7 +137,7 @@ async def run_log_schedule(schedule_id: str, agent_id: str, log_upload: LogUploa
         log_activity("log_schedule_failed", {"schedule_id": schedule_id, "container_id": agent_id, "error": str(e)}, status="error")
 
 
-def schedule_public(schedule: Dict[str, Any]) -> Dict[str, Any]:
+def schedule_public(schedule: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in schedule.items() if k not in ("task", "request")}
 
 

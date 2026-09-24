@@ -5,7 +5,7 @@ import json
 import logging
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.config import AGENTS_DIR, DB_PATH
 from app.core.container import get_container_stats
@@ -17,7 +17,7 @@ from app.models import utc_now
 logger = logging.getLogger(__name__)
 
 
-def read_agent_metadata(agent_name: str) -> Dict[str, Any]:
+def read_agent_metadata(agent_name: str) -> dict[str, Any]:
     """Load persisted container metadata from the database if available."""
     data = get_agent_by_name(DB_PATH, agent_name)
     if not data:
@@ -27,7 +27,7 @@ def read_agent_metadata(agent_name: str) -> Dict[str, Any]:
     return data
 
 
-def write_agent_metadata(agent_name: str, metadata: Dict[str, Any]) -> None:
+def write_agent_metadata(agent_name: str, metadata: dict[str, Any]) -> None:
     """Persist container metadata to the database for later lookup."""
     payload = {**read_agent_metadata(agent_name), **metadata}
     if "agent_seq_id" in payload and "seq_id" not in payload:
@@ -75,7 +75,7 @@ def migrate_legacy_agent_metadata() -> None:
     """Migrate legacy container metadata JSON files into the database"""
     for legacy_file in AGENTS_DIR.glob("*.json"):
         try:
-            with open(legacy_file, "r") as f:
+            with open(legacy_file) as f:
                 legacy_data = json.load(f)
             agent_name = legacy_data.get("agent_name") or legacy_data.get("agent_id") or legacy_file.stem
             write_agent_metadata(agent_name, legacy_data)
@@ -89,10 +89,10 @@ def migrate_legacy_agent_metadata() -> None:
 # of each starting their own.
 CONTAINER_SCAN_TTL = 2.0
 _scan_lock = threading.Lock()
-_scan_cache: Dict[str, Any] = {"at": 0.0, "value": None}
+_scan_cache: dict[str, Any] = {"at": 0.0, "value": None}
 
 
-def container_state_summary() -> Dict[str, Any]:
+def container_state_summary() -> dict[str, Any]:
     """Names, total, counts by state, and `running` (anything not STOPPED, like lxc's
     Container.running) from a single pass over all containers. Blocking: call it via
     asyncio.to_thread from async code."""
@@ -113,12 +113,12 @@ def container_state_summary() -> Dict[str, Any]:
         return summary
 
 
-def container_counts() -> Dict[str, Any]:
+def container_counts() -> dict[str, Any]:
     """Dashboard totals: running/stopped from the shared state scan and SIEM type from
     stored metadata (one DB query), without attaching to any container. Blocking."""
     scan = container_state_summary()
     siem_types = get_agent_siem_types(DB_PATH)
-    by_siem: Dict[str, int] = {}
+    by_siem: dict[str, int] = {}
     for name in scan["names"]:
         siem_type = siem_types.get(name) or "unknown"
         by_siem[siem_type] = by_siem.get(siem_type, 0) + 1
@@ -130,7 +130,7 @@ def container_counts() -> Dict[str, Any]:
     }
 
 
-def get_containers_by_state() -> Dict[str, int]:
+def get_containers_by_state() -> dict[str, int]:
     """Get container counts by state"""
     return dict(container_state_summary()["by_state"])
 
@@ -232,7 +232,7 @@ def get_agent_info(container, detailed: bool = False) -> dict:
     return info
 
 
-def detect_siem_type(container_name: str) -> Optional[str]:
+def detect_siem_type(container_name: str) -> str | None:
     """Detect SIEM type by checking installed agent artifacts."""
     try:
         container = lxc.Container(container_name)

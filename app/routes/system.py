@@ -10,13 +10,13 @@ from multiprocessing import cpu_count
 from fastapi import APIRouter, HTTPException
 
 from app.config import BENCHMARK_WORKERS, DEPLOY_WORKERS
-from app.version import __version__
 from app.core.common import get_lxc_default_config_path, get_lxc_version
 from app.core.container import get_system_arch
 from app.models import APIResponse, HealthCheckResponse
 from app.services.agent_info import container_state_summary
 from app.services.simulation import list_simulation_profiles
 from app.state import PROCESS_STARTED_AT, simulations_db
+from app.version import __version__
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

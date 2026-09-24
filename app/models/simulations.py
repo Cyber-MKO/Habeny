@@ -2,9 +2,9 @@
 Simulation request/response/info models.
 """
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.agents import AgentSelector
 from app.models.common import validate_absolute_path
@@ -17,13 +17,13 @@ class SimulationStartRequest(BaseModel):
     agent_selector: AgentSelector = Field(..., description="Containers to target")
     duration: int = Field(default=300, ge=1, le=86400, description="Duration in seconds")
     eps_target: int = Field(default=100, ge=1, le=10000, description="Target events per second")
-    intensity: Optional[str] = Field(default="medium", description="Intensity level (low, medium, high)")
-    burst_mode: Optional[bool] = Field(default=False, description="Generate events in bursts")
-    custom_parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Profile-specific parameters")
-    
-    class Config:
-        use_enum_values = True
-        schema_extra = {
+    intensity: str | None = Field(default="medium", description="Intensity level (low, medium, high)")
+    burst_mode: bool | None = Field(default=False, description="Generate events in bursts")
+    custom_parameters: dict[str, Any] | None = Field(default_factory=dict, description="Profile-specific parameters")
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
             "example": {
                 "profile_id": "auth_bruteforce",
                 "agent_selector": {
@@ -35,7 +35,8 @@ class SimulationStartRequest(BaseModel):
                 "intensity": "high",
                 "burst_mode": True
             }
-        }
+        },
+    )
 
 
 class CustomLogSimulationRequest(BaseModel):
@@ -48,15 +49,16 @@ class CustomLogSimulationRequest(BaseModel):
     duration: int = Field(default=300, ge=1, le=86400, description="Duration in seconds")
     eps: int = Field(default=100, ge=1, le=10000, description="Events per second")
     seq_start: int = Field(default=1, ge=1, description="Starting sequence number")
-    start_time: Optional[datetime] = Field(default=None, description="Optional ISO start time")
-    extra_fields: Dict[str, Any] = Field(default_factory=dict, description="Extra JSON fields to include")
+    start_time: datetime | None = Field(default=None, description="Optional ISO start time")
+    extra_fields: dict[str, Any] = Field(default_factory=dict, description="Extra JSON fields to include")
 
-    @validator('file_path')
+    @field_validator('file_path')
+    @classmethod
     def validate_file_path(cls, v):
         return validate_absolute_path(v)
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "agent_selector": {"agent_group": "load-test", "count": 10},
                 "file_path": "/var/log/custom-eps.json",
@@ -68,7 +70,8 @@ class CustomLogSimulationRequest(BaseModel):
                 "seq_start": 1,
                 "extra_fields": {"severity": "info", "app": "simulator"}
             }
-        }
+        },
+    )
 
 
 class SimulationInfo(BaseModel):
@@ -76,37 +79,38 @@ class SimulationInfo(BaseModel):
     simulation_id: str
     profile_id: SimulationProfile
     status: SimulationStatus
-    target_agents: List[str]
+    target_agents: list[str]
     duration: int
     eps_target: int
-    intensity: Optional[str] = None
+    intensity: str | None = None
     burst_mode: bool = False
     started_at: datetime
-    completed_at: Optional[datetime] = None
-    stopped_at: Optional[datetime] = None
+    completed_at: datetime | None = None
+    stopped_at: datetime | None = None
     events_generated: int = 0
-    events_per_second_actual: Optional[float] = None
-    error: Optional[str] = None
-    custom_parameters: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        use_enum_values = True
+    events_per_second_actual: float | None = None
+    error: str | None = None
+    custom_parameters: dict[str, Any] | None = None
+
+    model_config = ConfigDict(
+        use_enum_values=True,
+    )
 
 
 class SimulationStopRequest(BaseModel):
     """Request to stop a simulation"""
     simulation_id: str
-    reason: Optional[str] = Field(None, description="Reason for stopping")
+    reason: str | None = Field(None, description="Reason for stopping")
 
 
 class SimulationListResponse(BaseModel):
     """Response for simulation list endpoint"""
-    simulations: List[SimulationInfo]
+    simulations: list[SimulationInfo]
     total: int
     running: int
     completed: int
     failed: int
-    available_profiles: List[str]
+    available_profiles: list[str]
 
 
 class SyslogSimulationRequest(BaseModel):
@@ -121,8 +125,8 @@ class SyslogSimulationRequest(BaseModel):
     device_name_prefix: str = Field(default="device", max_length=50, description="Device name prefix")
     facility: int = Field(default=1, ge=0, le=23, description="Syslog facility")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "target_ip": "172.17.0.1",
                 "target_port": 514,
@@ -134,4 +138,5 @@ class SyslogSimulationRequest(BaseModel):
                 "device_name_prefix": "edge",
                 "facility": 1
             }
-        }
+        },
+    )

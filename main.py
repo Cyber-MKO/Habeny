@@ -15,7 +15,6 @@ except (ValueError, OSError) as e:  # unreadable config file, invalid setting, u
     sys.exit(EX_CONFIG)
 
 from app import create_app  # noqa: E402  (logging must be configured first)
-
 from app.services.instance import AlreadyRunning  # noqa: E402
 
 try:

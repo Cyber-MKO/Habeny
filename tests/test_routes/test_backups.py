@@ -105,7 +105,7 @@ def test_backup_from_newer_habeny_is_refused(data, tmp_path):
     path = backup.create_backup()
     work = tmp_path / "unpacked"
     with tarfile.open(path) as archive:
-        archive.extractall(work)
+        archive.extractall(work, filter="data")
     root = work / "habeny-backup"
     manifest = json.loads((root / "manifest.json").read_text())
     manifest["schema_version"] = migrations.latest_version() + 1

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { PageHeader, StatCard, Pill, Spinner, JsonBlock, DataTable, Modal } from "../components/UI";
+import { PageHeader, StatCard, Pill, Spinner, DataTable } from "../components/UI";
 
 function VerdictBadge({ verdict }) {
   const color = verdict === "PASS" ? "var(--green)" : verdict === "FAIL" ? "var(--red)" : "var(--orange)";
@@ -66,17 +66,19 @@ export default function BenchmarkRunner() {
     return () => clearInterval(t);
   }, [benchmarks, load]);
 
+  const detailId = detail?.benchmark_id;
+  const detailRunning = detail?.status === "running";
   useEffect(() => {
-    if (!detail || detail.status !== "running") return;
+    if (!detailId || !detailRunning) return;
     const t = setInterval(async () => {
       try {
-        const res = await api.getBenchmark(detail.benchmark_id);
+        const res = await api.getBenchmark(detailId);
         setDetail(res.data);
         setLiveData(res.data?.live);
-      } catch {}
+      } catch { /* keep showing the last update; the next poll retries */ }
     }, 5000);
     return () => clearInterval(t);
-  }, [detail?.benchmark_id, detail?.status]);
+  }, [detailId, detailRunning]);
 
   const handleLaunch = async () => {
     setLaunching(true);
@@ -221,7 +223,7 @@ export default function BenchmarkRunner() {
             <button className="btn btn-primary" onClick={runCompare} disabled={compareIds.length < 2}>Compare Selected ({compareIds.length})</button>
           </div>
           <div className="card">
-            <DataTable
+            {loading && !benchmarks.length ? <Spinner /> : <DataTable
               columns={[
                 { key: "sel", label: "", render: (r) => <input type="checkbox" checked={compareIds.includes(r.benchmark_id)} onChange={() => toggleCompare(r.benchmark_id)} /> },
                 { key: "name", label: "Name", render: (r) => r.name || r.benchmark_id.slice(0, 8) },
@@ -239,7 +241,7 @@ export default function BenchmarkRunner() {
               ]}
               rows={benchmarks}
               emptyMsg="No benchmarks yet. Launch one from the Launch tab."
-            />
+            />}
           </div>
         </>
       )}

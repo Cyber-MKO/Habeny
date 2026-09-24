@@ -6,7 +6,7 @@ works unchanged whether it talks to LXC directly (as root) or through the helper
 import base64
 import os
 import socket
-from typing import Any, Optional
+from typing import Any
 
 from app.helper.protocol import DEFAULT_SOCKET, recv_message, send_message
 
@@ -23,7 +23,7 @@ def socket_path() -> str:
     return os.environ.get("HABENY_HELPER_SOCKET", DEFAULT_SOCKET)
 
 
-def _request(payload: dict, timeout: Optional[float], want_fds: int = 0):
+def _request(payload: dict, timeout: float | None, want_fds: int = 0):
     path = socket_path()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(timeout)
@@ -47,7 +47,7 @@ def _request(payload: dict, timeout: Optional[float], want_fds: int = 0):
     raise HelperError(response.get("error", "helper error"))
 
 
-def call(op: str, timeout: Optional[float] = 60, **kwargs) -> Any:
+def call(op: str, timeout: float | None = 60, **kwargs) -> Any:
     return _request({"op": op, **kwargs}, timeout)[0]
 
 
@@ -71,7 +71,7 @@ class Container:
     def _get(self, attr):
         return call("container_get", name=self.name, attr=attr)
 
-    def _call(self, method, *args, timeout: Optional[float] = 120):
+    def _call(self, method, *args, timeout: float | None = 120):
         return call("container_call", timeout=timeout, name=self.name, method=method, args=list(args))
 
     state = property(lambda self: self._get("state"))
@@ -121,7 +121,7 @@ class Container:
 
 # ── attach / console / config ───────────────────────────────────────────
 
-def attach_run(name: str, argv: list, env: Optional[dict] = None, input_bytes: Optional[bytes] = None,
+def attach_run(name: str, argv: list, env: dict | None = None, input_bytes: bytes | None = None,
                timeout: int = 300) -> dict:
     return call("attach", timeout=timeout + 30, name=name, argv=list(argv), env=env or {},
                 input_b64=base64.b64encode(input_bytes).decode() if input_bytes is not None else None,
@@ -136,5 +136,5 @@ def open_console(name: str, cols: int = 80, rows: int = 24) -> int:
     return fds[0]
 
 
-def read_container_config(name: str) -> Optional[str]:
+def read_container_config(name: str) -> str | None:
     return call("read_config", name=name)

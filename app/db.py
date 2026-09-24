@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.secrets import decrypt_secret, encrypt_secret, is_encrypted
 
@@ -32,19 +32,19 @@ def _connection(db_path: Path):
         conn.close()
 
 
-def _bool_to_int(value: Optional[bool]) -> Optional[int]:
+def _bool_to_int(value: bool | None) -> int | None:
     if value is None:
         return None
     return 1 if value else 0
 
 
-def _int_to_bool(value: Any) -> Optional[bool]:
+def _int_to_bool(value: Any) -> bool | None:
     if value is None:
         return None
     return bool(value)
 
 
-def _serialize_ip_addresses(value: Any) -> Optional[str]:
+def _serialize_ip_addresses(value: Any) -> str | None:
     if value is None:
         return None
     return json.dumps(value)
@@ -59,7 +59,7 @@ def _deserialize_ip_addresses(value: Any) -> Any:
         return value
 
 
-def get_agent_by_name(db_path: Path, agent_name: str) -> Optional[Dict[str, Any]]:
+def get_agent_by_name(db_path: Path, agent_name: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM agents WHERE agent_name = ?",
@@ -74,7 +74,7 @@ def get_agent_by_name(db_path: Path, agent_name: str) -> Optional[Dict[str, Any]
         return data
 
 
-def get_agent_siem_types(db_path: Path) -> Dict[str, Optional[str]]:
+def get_agent_siem_types(db_path: Path) -> dict[str, str | None]:
     """agent_name -> stored siem_type for every agent, in one query."""
     with _connection(db_path) as conn:
         return {r["agent_name"]: r["siem_type"] for r in conn.execute("SELECT agent_name, siem_type FROM agents")}
@@ -120,7 +120,7 @@ def mark_agents_interrupted(db_path: Path, from_status: str, to_status: str) -> 
         return cur.rowcount
 
 
-def upsert_agent(db_path: Path, agent_name: str, data: Dict[str, Any]) -> None:
+def upsert_agent(db_path: Path, agent_name: str, data: dict[str, Any]) -> None:
     with _connection(db_path) as conn:
         payload = dict(data)
         payload["agent_name"] = agent_name
@@ -134,7 +134,7 @@ def upsert_agent(db_path: Path, agent_name: str, data: Dict[str, Any]) -> None:
 
         columns = ", ".join(payload.keys())
         placeholders = ", ".join(["?"] * len(payload))
-        updates = ", ".join([f"{col}=excluded.{col}" for col in payload.keys() if col != "agent_name"])
+        updates = ", ".join([f"{col}=excluded.{col}" for col in payload if col != "agent_name"])
         conn.execute(
             f"""
             INSERT INTO agents ({columns})
@@ -156,7 +156,7 @@ def mark_agent_deleted(db_path: Path, agent_name: str) -> None:
         conn.commit()
 
 
-def create_group(db_path: Path, name: str, description: Optional[str] = None) -> Dict[str, Any]:
+def create_group(db_path: Path, name: str, description: str | None = None) -> dict[str, Any]:
     with _connection(db_path) as conn:
         now = utc_now()
         conn.execute(
@@ -170,7 +170,7 @@ def create_group(db_path: Path, name: str, description: Optional[str] = None) ->
         return {"name": name, "description": description, "created_at": now, "updated_at": now}
 
 
-def list_groups(db_path: Path) -> Dict[str, Any]:
+def list_groups(db_path: Path) -> dict[str, Any]:
     with _connection(db_path) as conn:
         rows = conn.execute(
             """
@@ -195,7 +195,7 @@ def group_exists(db_path: Path, name: str) -> bool:
         return row is not None
 
 
-def get_agents_in_group(db_path: Path, name: str) -> List[str]:
+def get_agents_in_group(db_path: Path, name: str) -> list[str]:
     with _connection(db_path) as conn:
         rows = conn.execute(
             """
@@ -207,7 +207,7 @@ def get_agents_in_group(db_path: Path, name: str) -> List[str]:
         return [row["agent_name"] for row in rows]
 
 
-def assign_agents_to_group(db_path: Path, name: str, agent_names: List[str]) -> int:
+def assign_agents_to_group(db_path: Path, name: str, agent_names: list[str]) -> int:
     with _connection(db_path) as conn:
         now = utc_now()
         before = conn.total_changes
@@ -224,7 +224,7 @@ def assign_agents_to_group(db_path: Path, name: str, agent_names: List[str]) -> 
         return conn.total_changes - before
 
 
-def remove_agents_from_group(db_path: Path, agent_names: List[str]) -> int:
+def remove_agents_from_group(db_path: Path, agent_names: list[str]) -> int:
     with _connection(db_path) as conn:
         now = utc_now()
         before = conn.total_changes
@@ -241,7 +241,7 @@ def remove_agents_from_group(db_path: Path, agent_names: List[str]) -> int:
         return conn.total_changes - before
 
 
-def rename_group(db_path: Path, old_name: str, new_name: str, description: Optional[str] = None) -> Dict[str, Any]:
+def rename_group(db_path: Path, old_name: str, new_name: str, description: str | None = None) -> dict[str, Any]:
     with _connection(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
         existing = conn.execute("SELECT name FROM groups WHERE name = ?", (old_name,)).fetchone()
@@ -296,7 +296,7 @@ def delete_group(db_path: Path, name: str) -> int:
 # siem_auth_key is stored encrypted (app.core.secrets); these functions return it
 # decrypted for internal use. API responses must go through a masking step.
 
-def _manager_row(row) -> Optional[Dict[str, Any]]:
+def _manager_row(row) -> dict[str, Any] | None:
     if not row:
         return None
     mgr = dict(row)
@@ -318,7 +318,7 @@ def encrypt_plaintext_manager_secrets(db_path: Path) -> int:
         return changed
 
 
-def create_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def create_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict[str, Any]:
     with _connection(db_path) as conn:
         now = utc_now()
         conn.execute(
@@ -338,25 +338,25 @@ def create_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Dict
         return {**data, "manager_id": manager_id, "created_at": now, "updated_at": now}
 
 
-def list_managers(db_path: Path) -> List[Dict[str, Any]]:
+def list_managers(db_path: Path) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute("SELECT * FROM managers ORDER BY name").fetchall()
         return [_manager_row(r) for r in rows]
 
 
-def get_manager(db_path: Path, manager_id: str) -> Optional[Dict[str, Any]]:
+def get_manager(db_path: Path, manager_id: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM managers WHERE manager_id = ?", (manager_id,)).fetchone()
         return _manager_row(row)
 
 
-def get_manager_by_name(db_path: Path, name: str) -> Optional[Dict[str, Any]]:
+def get_manager_by_name(db_path: Path, name: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM managers WHERE name = ?", (name,)).fetchone()
         return _manager_row(row)
 
 
-def update_manager(db_path: Path, manager_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def update_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         existing = conn.execute("SELECT * FROM managers WHERE manager_id = ?", (manager_id,)).fetchone()
         if not existing:
@@ -392,7 +392,7 @@ def delete_manager(db_path: Path, manager_id: str) -> bool:
 
 # ===== SYSLOG CONFIGS =====
 
-def create_syslog_config(db_path: Path, config_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def create_syslog_config(db_path: Path, config_id: str, data: dict[str, Any]) -> dict[str, Any]:
     with _connection(db_path) as conn:
         now = utc_now()
         conn.execute(
@@ -409,19 +409,19 @@ def create_syslog_config(db_path: Path, config_id: str, data: Dict[str, Any]) ->
         return {**data, "config_id": config_id, "enabled": True, "created_at": now, "updated_at": now}
 
 
-def list_syslog_configs(db_path: Path) -> List[Dict[str, Any]]:
+def list_syslog_configs(db_path: Path) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute("SELECT * FROM syslog_configs ORDER BY name").fetchall()
         return [dict(r) for r in rows]
 
 
-def get_syslog_config(db_path: Path, config_id: str) -> Optional[Dict[str, Any]]:
+def get_syslog_config(db_path: Path, config_id: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM syslog_configs WHERE config_id = ?", (config_id,)).fetchone()
         return dict(row) if row else None
 
 
-def update_syslog_config(db_path: Path, config_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def update_syslog_config(db_path: Path, config_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         existing = conn.execute("SELECT * FROM syslog_configs WHERE config_id = ?", (config_id,)).fetchone()
         if not existing:
@@ -456,7 +456,7 @@ def delete_syslog_config(db_path: Path, config_id: str) -> bool:
 # ===== METRICS =====
 
 def record_metric(db_path: Path, metric_type: str, metric_name: str,
-                  value: float, tags: Optional[str] = None) -> None:
+                  value: float, tags: str | None = None) -> None:
     with _connection(db_path) as conn:
         conn.execute(
             "INSERT INTO metrics (metric_type, metric_name, value, tags, recorded_at) VALUES (?, ?, ?, ?, ?)",
@@ -465,7 +465,7 @@ def record_metric(db_path: Path, metric_type: str, metric_name: str,
         conn.commit()
 
 
-def record_metrics_batch(db_path: Path, rows: List[tuple]) -> None:
+def record_metrics_batch(db_path: Path, rows: list[tuple]) -> None:
     """rows: list of (metric_type, metric_name, value, tags[, recorded_at]); without a time, now."""
     with _connection(db_path) as conn:
         now = utc_now()
@@ -476,8 +476,8 @@ def record_metrics_batch(db_path: Path, rows: List[tuple]) -> None:
         conn.commit()
 
 
-def prune_metrics(db_path: Path, before: str, metric_types: Optional[List[str]] = None,
-                  exclude_types: Optional[List[str]] = None, batch: int = 5000) -> int:
+def prune_metrics(db_path: Path, before: str, metric_types: list[str] | None = None,
+                  exclude_types: list[str] | None = None, batch: int = 5000) -> int:
     """Delete metric rows recorded before `before` (ISO time), a batch at a time so writers
     aren't blocked for long. Returns the number deleted."""
     where, params = "recorded_at < ?", [before]
@@ -505,9 +505,9 @@ def prune_expired_sessions(db_path: Path) -> int:
         return cur.rowcount
 
 
-def query_metrics(db_path: Path, metric_type: Optional[str] = None,
-                  metric_name: Optional[str] = None,
-                  since: Optional[str] = None, limit: int = 500) -> List[Dict[str, Any]]:
+def query_metrics(db_path: Path, metric_type: str | None = None,
+                  metric_name: str | None = None,
+                  since: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         sql = "SELECT * FROM metrics WHERE 1=1"
         params: list = []
@@ -527,7 +527,7 @@ def query_metrics(db_path: Path, metric_type: Optional[str] = None,
 
 
 def get_metric_summary(db_path: Path, metric_type: str, metric_name: str,
-                       since: Optional[str] = None) -> Dict[str, Any]:
+                       since: str | None = None) -> dict[str, Any]:
     with _connection(db_path) as conn:
         sql = "SELECT COUNT(*) as cnt, AVG(value) as avg, MIN(value) as min, MAX(value) as max FROM metrics WHERE metric_type = ? AND metric_name = ?"
         params: list = [metric_type, metric_name]
@@ -559,7 +559,7 @@ def count_users(db_path: Path) -> int:
         return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 
-def create_first_user(db_path: Path, username: str, password_hash: str) -> Optional[Dict[str, Any]]:
+def create_first_user(db_path: Path, username: str, password_hash: str) -> dict[str, Any] | None:
     """Create a user only if none exist yet (first-run setup). Returns None if one already exists."""
     with _connection(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")  # serialize concurrent setup attempts
@@ -575,7 +575,7 @@ def create_first_user(db_path: Path, username: str, password_hash: str) -> Optio
         return {"id": cur.lastrowid, "username": username, "is_admin": True, "role": "admin", "created_at": now}
 
 
-def _user_row(row) -> Optional[Dict[str, Any]]:
+def _user_row(row) -> dict[str, Any] | None:
     if not row:
         return None
     user = dict(row)
@@ -585,19 +585,19 @@ def _user_row(row) -> Optional[Dict[str, Any]]:
     return user
 
 
-def get_user_by_username(db_path: Path, username: str) -> Optional[Dict[str, Any]]:
+def get_user_by_username(db_path: Path, username: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         return _user_row(row)
 
 
-def get_user_by_id(db_path: Path, user_id: int) -> Optional[Dict[str, Any]]:
+def get_user_by_id(db_path: Path, user_id: int) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return _user_row(row)
 
 
-def list_users(db_path: Path) -> List[Dict[str, Any]]:
+def list_users(db_path: Path) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
             "SELECT id, username, is_admin, role, totp_enabled, oidc_subject, created_at, last_login_at FROM users"
@@ -606,7 +606,7 @@ def list_users(db_path: Path) -> List[Dict[str, Any]]:
         return [_user_row(r) for r in rows]
 
 
-def create_user(db_path: Path, username: str, password_hash: str, role: str) -> Optional[Dict[str, Any]]:
+def create_user(db_path: Path, username: str, password_hash: str, role: str) -> dict[str, Any] | None:
     """Create a user. Returns None if the username is taken (case-insensitive)."""
     with _connection(db_path) as conn:
         now = utc_now()
@@ -626,13 +626,13 @@ def create_user(db_path: Path, username: str, password_hash: str, role: str) -> 
 SSO_ONLY_PASSWORD = "!sso"
 
 
-def get_user_by_oidc_subject(db_path: Path, subject: str) -> Optional[Dict[str, Any]]:
+def get_user_by_oidc_subject(db_path: Path, subject: str) -> dict[str, Any] | None:
     with _connection(db_path) as conn:
         row = conn.execute("SELECT * FROM users WHERE oidc_subject = ?", (subject,)).fetchone()
         return _user_row(row)
 
 
-def create_sso_user(db_path: Path, username: str, subject: str, role: str) -> Optional[Dict[str, Any]]:
+def create_sso_user(db_path: Path, username: str, subject: str, role: str) -> dict[str, Any] | None:
     """Create an account for a single sign-on identity. None if the username is taken."""
     with _connection(db_path) as conn:
         now = utc_now()
@@ -689,7 +689,7 @@ def delete_user(db_path: Path, user_id: int) -> bool:
         return True
 
 
-def delete_user_sessions(db_path: Path, user_id: int, keep_token_hash: Optional[str] = None) -> None:
+def delete_user_sessions(db_path: Path, user_id: int, keep_token_hash: str | None = None) -> None:
     """Sign a user out everywhere (optionally except one session)."""
     with _connection(db_path) as conn:
         conn.execute(
@@ -707,7 +707,7 @@ def set_pending_totp(db_path: Path, user_id: int, encrypted_secret: str) -> None
         conn.commit()
 
 
-def enable_totp(db_path: Path, user_id: int, step: int, recovery_hashes: List[str]) -> None:
+def enable_totp(db_path: Path, user_id: int, step: int, recovery_hashes: list[str]) -> None:
     with _connection(db_path) as conn:
         conn.execute(
             "UPDATE users SET totp_enabled = 1, totp_last_step = ?, recovery_codes = ? WHERE id = ?",
@@ -737,7 +737,7 @@ def claim_totp_step(db_path: Path, user_id: int, step: int) -> bool:
         return cur.rowcount == 1
 
 
-def set_recovery_codes(db_path: Path, user_id: int, recovery_hashes: List[str]) -> None:
+def set_recovery_codes(db_path: Path, user_id: int, recovery_hashes: list[str]) -> None:
     with _connection(db_path) as conn:
         conn.execute("UPDATE users SET recovery_codes = ? WHERE id = ?", (json.dumps(recovery_hashes), user_id))
         conn.commit()
@@ -765,7 +765,7 @@ def update_user_last_login(db_path: Path, user_id: int) -> None:
 
 
 def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str,
-                   ip: Optional[str] = None, user_agent: Optional[str] = None) -> None:
+                   ip: str | None = None, user_agent: str | None = None) -> None:
     with _connection(db_path) as conn:
         now = utc_now()
         conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
@@ -777,14 +777,14 @@ def create_session(db_path: Path, token_hash: str, user_id: int, expires_at: str
         conn.commit()
 
 
-def touch_session(db_path: Path, token_hash: str, ip: Optional[str]) -> None:
+def touch_session(db_path: Path, token_hash: str, ip: str | None) -> None:
     with _connection(db_path) as conn:
         conn.execute("UPDATE sessions SET last_seen_at = ?, ip = COALESCE(?, ip) WHERE token_hash = ?",
                      (utc_now(), ip, token_hash))
         conn.commit()
 
 
-def list_user_sessions(db_path: Path, user_id: int) -> List[Dict[str, Any]]:
+def list_user_sessions(db_path: Path, user_id: int) -> list[dict[str, Any]]:
     with _connection(db_path) as conn:
         rows = conn.execute(
             """
@@ -796,7 +796,7 @@ def list_user_sessions(db_path: Path, user_id: int) -> List[Dict[str, Any]]:
         return [dict(r) for r in rows]
 
 
-def get_session_user(db_path: Path, token_hash: str) -> Optional[Dict[str, Any]]:
+def get_session_user(db_path: Path, token_hash: str) -> dict[str, Any] | None:
     """Return the user for a live (unexpired) session, or None."""
     with _connection(db_path) as conn:
         row = conn.execute(

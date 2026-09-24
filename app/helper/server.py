@@ -17,6 +17,7 @@ Environment:
     HABENY_HELPER_USER    user allowed to connect besides root (default "habeny")
 """
 import base64
+import contextlib
 import fcntl
 import grp
 import logging
@@ -155,7 +156,7 @@ def op_read_config(req):
     container = _container(req.get("name"))
     path = container.config_file_name
     try:
-        with open(path, "r", errors="replace") as f:
+        with open(path, errors="replace") as f:
             return f.read(1 << 20)
     except FileNotFoundError:
         return None
@@ -262,10 +263,8 @@ class Handler(socketserver.BaseRequestHandler):
             send_message(sock, {"ok": False, "kind": "refused", "error": str(e)})
         except Exception as e:  # report, don't crash the helper
             logger.exception("Helper operation failed")
-            try:
+            with contextlib.suppress(OSError):
                 send_message(sock, {"ok": False, "kind": "error", "error": f"{type(e).__name__}: {e}"})
-            except OSError:
-                pass
 
 
 class HelperServer(socketserver.ThreadingUnixStreamServer):
@@ -287,10 +286,8 @@ def serve(path: str = None, group: str = None) -> HelperServer:
     finally:
         os.umask(old_umask)
     group = group or os.environ.get("HABENY_HELPER_USER", "habeny")
-    try:
+    with contextlib.suppress(KeyError, PermissionError):
         os.chown(path, 0, grp.getgrnam(group).gr_gid)
-    except (KeyError, PermissionError):
-        pass
     logger.info(f"Habeny LXC helper listening on {path} (allowed uids: {sorted(server.allowed_uids)})")
     return server
 

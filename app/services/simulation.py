@@ -8,7 +8,6 @@ import random
 import socket
 import time
 from datetime import datetime
-from typing import List
 
 from fastapi.encoders import jsonable_encoder
 
@@ -16,6 +15,7 @@ from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container, execute_in_container_shell
 from app.models import AgentSelector, CustomLogSimulationRequest, SyslogSimulationRequest, utc_now
 from app.services.activity import log_activity
+from app.services.agent_info import read_agent_metadata
 from app.services.logs import escape_bash_single_quotes, escape_json_string
 from app.state import simulations_db
 
@@ -71,7 +71,7 @@ echo "Generated $COUNT custom events"
     return script
 
 
-def list_simulation_profiles() -> List[str]:
+def list_simulation_profiles() -> list[str]:
     """List available simulation profiles"""
     return [
         "auth_bruteforce",
@@ -83,27 +83,36 @@ def list_simulation_profiles() -> List[str]:
     ]
 
 
-def select_agents_for_simulation(selector: AgentSelector) -> List[str]:
-    """Select containers based on selector criteria"""
-    all_containers = lxc.list_containers()
+def select_agents_for_simulation(selector: AgentSelector) -> list[str]:
+    """The running containers matching every criterion given (agent_ids, siem_type,
+    agent_group, tags, status), then a random `count` of them if set."""
+    wanted_ids = set(selector.agent_ids or [])
+    siem_type = getattr(selector.siem_type, "value", selector.siem_type)
+    status = getattr(selector.status, "value", selector.status)
     selected = []
-
-    # Filter by labels/tags (simplified - use metadata in production)
-    for name in all_containers:
-        container = lxc.Container(name)
-        if not container.running:
+    for name in lxc.list_containers():
+        if wanted_ids and name not in wanted_ids:
             continue
-
-        # Add filtering logic based on selector
+        if not lxc.Container(name).running:
+            continue  # only running containers can generate events
+        if status and status != "running":
+            continue
+        if siem_type or selector.agent_group or selector.tags:
+            meta = read_agent_metadata(name)
+            if siem_type and meta.get("siem_type") != siem_type:
+                continue
+            if selector.agent_group and meta.get("agent_group") != selector.agent_group:
+                continue
+            if selector.tags and not set(selector.tags) & set(meta.get("tags") or []):
+                continue
         selected.append(name)
 
     if selector.count:
         selected = random.sample(selected, min(selector.count, len(selected)))
-
     return selected
 
 
-async def run_simulation(simulation_id: str, profile_id: str, agents: List[str],
+async def run_simulation(simulation_id: str, profile_id: str, agents: list[str],
                         duration: int, eps_target: int):
     """Run simulation on selected containers"""
     try:
@@ -153,7 +162,7 @@ async def run_simulation(simulation_id: str, profile_id: str, agents: List[str],
 
 async def run_custom_log_simulation(
     simulation_id: str,
-    containers: List[str],
+    containers: list[str],
     config: CustomLogSimulationRequest
 ) -> None:
     try:
@@ -172,7 +181,7 @@ async def run_custom_log_simulation(
         results = await asyncio.gather(*tasks, return_exceptions=True)
         errors = []
         success_count = 0
-        for container_name, result in zip(containers, results):
+        for container_name, result in zip(containers, results, strict=True):
             if isinstance(result, Exception):
                 errors.append({"container": container_name, "error": str(result)})
                 continue
@@ -307,7 +316,7 @@ def run_syslog_simulation(simulation_id: str, request: SyslogSimulationRequest) 
         per_device_base = request.eps // request.device_count
         remainder = request.eps % request.device_count
 
-        for second in range(request.duration):
+        for _second in range(request.duration):
             status = simulations_db.get(simulation_id, {}).get("status")
             if status != "running":
                 break

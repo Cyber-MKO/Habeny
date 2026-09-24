@@ -15,7 +15,6 @@ import pty
 import struct
 import subprocess
 import termios
-from typing import Optional
 
 from app import config
 
@@ -29,7 +28,7 @@ else:
     raise RuntimeError(f"Unknown HABENY_LXC_BACKEND: {MODE!r} (use 'direct' or 'helper')")
 
 
-def attach_run(name: str, argv: list, env: Optional[dict] = None, input_bytes: Optional[bytes] = None,
+def attach_run(name: str, argv: list, env: dict | None = None, input_bytes: bytes | None = None,
                timeout: int = 300) -> dict:
     """Run argv inside a container. Returns returncode, stdout, stderr (text), timed_out."""
     if MODE == "helper":
@@ -72,11 +71,11 @@ def open_console(name: str, cols: int = 80, rows: int = 24) -> int:
     return master_fd
 
 
-def read_container_config(name: str) -> Optional[str]:
+def read_container_config(name: str) -> str | None:
     if MODE == "helper":
         return lxc.read_container_config(name)
     try:
-        with open(lxc.Container(name).config_file_name, "r", errors="replace") as f:
+        with open(lxc.Container(name).config_file_name, errors="replace") as f:
             return f.read(1 << 20)
     except OSError:
         return None

@@ -6,7 +6,6 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
@@ -165,7 +164,7 @@ async def get_report(report_id: str):
 
 
 @router.get("/reports/{report_id}/download")
-async def download_report(report_id: str, format: Optional[str] = Query(None)):
+async def download_report(report_id: str, format: str | None = Query(None)):
     """Download report in the requested format (json, csv, pdf)."""
     try:
         requested = (format or "json").lower()

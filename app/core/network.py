@@ -6,7 +6,6 @@ import os
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional
 
 from app.core.lxc_backend import lxc
 from app.core.shell import run_command
@@ -19,7 +18,7 @@ def _is_wifi_interface(iface: str) -> bool:
     return os.path.isdir(f"/sys/class/net/{iface}/wireless") or iface.startswith("wl")
 
 
-def get_host_interface() -> Optional[str]:
+def get_host_interface() -> str | None:
     """Return a wired host interface suitable for macvlan.
 
     Checks the default route first; if that's WiFi, scans for any wired
@@ -67,9 +66,7 @@ def configure_container_macvlan(container, host_interface: str) -> bool:
     """
     if not container.defined or container.running:
         return False
-    mac = "00:16:3e:%02x:%02x:%02x" % (
-        random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
-    )
+    mac = "00:16:3e:" + ":".join(f"{random.randint(0, 255):02x}" for _ in range(3))
     container.clear_config_item("lxc.net.0")
     container.set_config_item("lxc.net.0.type", "macvlan")
     container.set_config_item("lxc.net.0.macvlan.mode", "bridge")
@@ -83,12 +80,12 @@ def configure_container_macvlan(container, host_interface: str) -> bool:
 def wait_for_network(container, timeout: int = 30, check_interval: int = 1) -> bool:
     """
     Wait for container network to be ready
-    
+
     Args:
         container: LXC container object
         timeout: Maximum wait time in seconds
         check_interval: Time between checks in seconds
-    
+
     Returns:
         True if network is ready, False if timeout
     """
@@ -109,15 +106,15 @@ def wait_for_network(container, timeout: int = 30, check_interval: int = 1) -> b
     return False
 
 
-def wait_for_network_batch(containers: List, timeout: int = 30, max_workers: int = 10) -> Dict[str, bool]:
+def wait_for_network_batch(containers: list, timeout: int = 30, max_workers: int = 10) -> dict[str, bool]:
     """
     Wait for multiple containers' networks in parallel
-    
+
     Args:
         containers: List of LXC container objects
         timeout: Maximum wait time per container
         max_workers: Maximum concurrent workers
-    
+
     Returns:
         Dict mapping container names to network ready status
     """
@@ -140,14 +137,14 @@ def wait_for_network_batch(containers: List, timeout: int = 30, max_workers: int
     return results
 
 
-def get_container_ips(container_name: str, timeout: int = 30) -> List[str]:
+def get_container_ips(container_name: str, timeout: int = 30) -> list[str]:
     """
     Get container IP addresses with retry logic
-    
+
     Args:
         container_name: Name of the container
         timeout: Maximum wait time
-    
+
     Returns:
         List of IP addresses
     """

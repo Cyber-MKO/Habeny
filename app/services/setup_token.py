@@ -3,11 +3,11 @@ One-time token that protects first-run setup: without it, whoever reaches the se
 first could create the admin account. Only someone with access to the server (its log
 or data directory) can read the token.
 """
+import contextlib
 import hmac
 import logging
 import os
 import secrets
-from typing import Optional
 
 from app.config import DATA_DIR, DB_PATH
 from app.db import count_users
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 TOKEN_FILE = DATA_DIR / "setup-token"
 
 
-def ensure_setup_token() -> Optional[str]:
+def ensure_setup_token() -> str | None:
     """Create (once) and announce the setup token while no account exists."""
     if count_users(DB_PATH) > 0:
         remove_setup_token()
@@ -44,7 +44,5 @@ def check_setup_token(candidate: str) -> bool:
 
 
 def remove_setup_token() -> None:
-    try:
+    with contextlib.suppress(FileNotFoundError):
         TOKEN_FILE.unlink()
-    except FileNotFoundError:
-        pass

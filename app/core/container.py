@@ -9,7 +9,7 @@ import shlex
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container_shell, run_command
@@ -43,10 +43,10 @@ def get_system_arch() -> str:
 def parse_memory_limit(memory_str: str) -> str:
     """
     Parse memory string like '512MB' to bytes as string
-    
+
     Args:
         memory_str: Memory specification (e.g., "512MB", "2GB")
-    
+
     Returns:
         Memory in bytes as string
     """
@@ -74,10 +74,10 @@ def parse_memory_limit(memory_str: str) -> str:
 def validate_container_name(name: str) -> bool:
     """
     Validate container name according to LXC naming rules
-    
+
     Args:
         name: Container name to validate
-    
+
     Returns:
         True if valid, False otherwise
     """
@@ -85,13 +85,13 @@ def validate_container_name(name: str) -> bool:
     return bool(re.match(pattern, name)) and len(name) <= 50
 
 
-def get_container_stats(container_name: str) -> Dict[str, Any]:
+def get_container_stats(container_name: str) -> dict[str, Any]:
     """
     Get comprehensive container statistics
-    
+
     Args:
         container_name: Name of the container
-    
+
     Returns:
         Dict with memory, cpu, network, and process stats
     """
@@ -149,14 +149,14 @@ def get_container_stats(container_name: str) -> Dict[str, Any]:
     return stats
 
 
-def get_container_stats_batch(container_names: List[str], max_workers: int = 10) -> Dict[str, Dict[str, Any]]:
+def get_container_stats_batch(container_names: list[str], max_workers: int = 10) -> dict[str, dict[str, Any]]:
     """
     Get stats for multiple containers in parallel
-    
+
     Args:
         container_names: List of container names
         max_workers: Maximum concurrent workers
-    
+
     Returns:
         Dict mapping container names to their stats
     """
@@ -178,16 +178,16 @@ def get_container_stats_batch(container_names: List[str], max_workers: int = 10)
     return results
 
 
-def generate_config(name: str, memory_limit: str, cpu_shares: int, network_config: Dict) -> str:
+def generate_config(name: str, memory_limit: str, cpu_shares: int, network_config: dict) -> str:
     """
     Generate LXC configuration file content
-    
+
     Args:
         name: Container name
         memory_limit: Memory limit (e.g., "512MB")
         cpu_shares: CPU shares allocation
         network_config: Additional network configuration
-    
+
     Returns:
         Configuration file content as string
     """
@@ -227,7 +227,7 @@ lxc.tty.max = 2
     return config
 
 
-def setup_agent_health_check(container_name: str) -> Dict[str, Any]:
+def setup_agent_health_check(container_name: str) -> dict[str, Any]:
     """
     Install a health check script and cron job inside the container.
 
@@ -453,7 +453,7 @@ def is_container_running(name: str) -> bool:
     return container.running
 
 
-def get_container_state(name: str) -> Optional[str]:
+def get_container_state(name: str) -> str | None:
     """Get container state"""
     if not container_exists(name):
         return None
@@ -513,16 +513,16 @@ def build_write_file_script(path: str, content: str, append: bool = False) -> st
 
 
 def inject_logs_to_container(container_name: str, log_content: str,
-                            destination_path: str, append: bool = False) -> Dict[str, Any]:
+                            destination_path: str, append: bool = False) -> dict[str, Any]:
     """
     Inject log content into a container
-    
+
     Args:
         container_name: Name of the container
         log_content: Log content to inject
         destination_path: Destination file path
         append: Whether to append or overwrite
-    
+
     Returns:
         Dict with success status
     """
@@ -548,16 +548,16 @@ def inject_logs_to_container(container_name: str, log_content: str,
         }
 
 
-def distribute_logs_to_agents(agent_names: List[str], log_files: List[Dict[str, str]],
-                              strategy: str = "round_robin") -> Dict[str, Any]:
+def distribute_logs_to_agents(agent_names: list[str], log_files: list[dict[str, str]],
+                              strategy: str = "round_robin") -> dict[str, Any]:
     """
     Distribute log files to multiple containers
-    
+
     Args:
         agent_names: List of container names
         log_files: List of dicts with 'path' and 'content'
         strategy: Distribution strategy (round_robin, random, all)
-    
+
     Returns:
         Dict with distribution results
     """
