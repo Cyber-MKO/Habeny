@@ -828,11 +828,12 @@ sudo habeny license status           # exit status 1 when new work is refused
   `systemd-machine-id-setup` on the clone. Moving to new hardware needs a new license.
 - Backups include the license file.
 
-**Builds without a vendor key have licensing off** (`app/licensing_key.py` is empty in
-this repository): every feature works and the License page says a license isn't required.
-The vendor makes a signing key once with `python3 tools/license_tool.py keygen`, adds the
-printed public key to `app/licensing_key.py` for release builds, and issues licenses with
-`tools/license_tool.py sign`. The private key must never be committed (`*.pem` is
+**Licensing is on in every build**, including installs from a git checkout, because
+`app/licensing_key.py` holds Habeny Platform's public key. (With that list empty, licensing
+is off and the License page says a license isn't required.) The vendor keeps the matching
+private key offline, encrypted with a passphrase (`HABENY_LICENSE_KEY_PASSWORD`), and
+issues licenses with `tools/license_tool.py sign`. For development, run the trial or issue
+yourself a license for the dev machine. The private key must never be committed (`*.pem` is
 ignored). Release builds leave `tools/` out.
 
 Like any offline check, this keeps honest customers honest. Someone with root and the

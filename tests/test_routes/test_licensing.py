@@ -223,3 +223,9 @@ def test_server_id_without_machine_id(monkeypatch, tmp_path):
     first = licensing.server_id()
     monkeypatch.setattr(licensing, "_generated_id", None)
     assert licensing.server_id() == first and (tmp_path / "server-id").is_file()  # saved, survives restarts
+
+
+def test_built_in_public_keys_are_valid():
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    for key in licensing_key.PUBLIC_KEYS:
+        Ed25519PublicKey.from_public_bytes(base64.b64decode(key, validate=True))

@@ -35,8 +35,9 @@ taken before it instead.
 - **Per-server licenses**, checked offline: `habeny license request|install|status` and
   Settings → License. A 30-day trial, then new deployments, simulations, benchmarks and
   log uploads need a license; viewing and managing existing containers always work.
-  Licensing stays off in builds without a vendor public key, which includes source
-  builds from this repository.
+  **Upgrading:** existing installs start a 30-day trial counted from their first
+  account, so an install older than 30 days needs a license right away to keep
+  deploying. Run `habeny license request` and send the server ID to Habeny Platform.
 - `THIRD_PARTY_NOTICES.txt` in every release (and linked from About Habeny): the bundled
   Python and npm packages with their licenses. The build fails on a copyleft or unknown
   license.
