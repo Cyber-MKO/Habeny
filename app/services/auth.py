@@ -231,7 +231,8 @@ async def require_access(conn: HTTPConnection) -> dict[str, Any]:
     user = await require_user(conn)
     path = conn.scope.get("path", "")
     if conn.scope["type"] == "websocket":
-        needed = "operator" if path.startswith("/ws/console") else "viewer"
+        # the console (here, or on another host through the relay) needs operator
+        needed = "operator" if path.startswith("/ws/console") or "/ws/console/" in path else "viewer"
     elif conn.scope.get("method") in ("GET", "HEAD", "OPTIONS") or path in READ_ONLY_POSTS:
         needed = "viewer"
     else:

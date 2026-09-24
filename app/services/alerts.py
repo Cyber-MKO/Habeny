@@ -6,6 +6,7 @@ Alerts: conditions someone should act on. Shown in the UI, exported to Prometheu
 - lxc_unavailable: container operations can't reach LXC (e.g. the helper is down)
 - backup_failed: the last scheduled backup failed
 - deploy_failed: the last deployment had failures (clears after one that fully succeeds)
+- host_unreachable: another Habeny server managed from this console doesn't answer
 
 Conditions are checked every minute by the maintenance task; deployment and backup
 results set or clear their alerts as they happen.
@@ -24,6 +25,7 @@ LABELS = {
     "lxc_unavailable": "LXC unavailable",
     "backup_failed": "Backup failed",
     "deploy_failed": "Deployment failed",
+    "host_unreachable": "Host unreachable",
 }
 
 
@@ -122,6 +124,9 @@ def check() -> None:
                      details={"error": str(e)[:300]})
     else:
         manager.clear("lxc_unavailable", message="LXC is reachable again")
+
+    from app.services import hosts
+    hosts.check_all()
 
 
 def deployment_finished(deployment_id: str, requested: int, successful: int, failed: int, error: str | None) -> None:

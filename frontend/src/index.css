@@ -965,3 +965,9 @@ fieldset.field legend { font-size: 12px; font-weight: 500; color: var(--text-dim
 .header-alerts.warning { background: var(--orange-soft); color: var(--orange); }
 .input-narrow { width: 110px; }
 .table-scroll { max-height: 420px; overflow-y: auto; }
+.host-scope { display: contents; }
+.host-switcher { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.host-switcher label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.header-host { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--text); }
+.fingerprint { display: block; margin-top: 8px; font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+.steps { margin: 0 0 12px; padding-left: 18px; line-height: 1.6; color: var(--text-dim); font-size: 13px; }

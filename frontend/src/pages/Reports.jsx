@@ -15,7 +15,6 @@ export default function Reports() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const BASE = import.meta.env.VITE_API_URL || "/api";
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -81,9 +80,9 @@ export default function Reports() {
                   <td>
                     <div className="btn-group">
                       <button className="btn btn-sm btn-secondary" onClick={() => { setFetchId(rid); handleFetch(); }}>View</button>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=json`} target="_blank" rel="noopener noreferrer">JSON</a>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
-                      <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${rid}/download?format=pdf`} target="_blank" rel="noopener noreferrer">PDF</a>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "json")} target="_blank" rel="noopener noreferrer">JSON</a>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "csv")} target="_blank" rel="noopener noreferrer">CSV</a>
+                      <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(rid, "pdf")} target="_blank" rel="noopener noreferrer">PDF</a>
                     </div>
                   </td>
                 </tr>
@@ -98,7 +97,7 @@ export default function Reports() {
         <div className="card">
           <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Result</span>
-            {reportId && <a className="btn btn-sm btn-secondary" href={`${BASE}/reports/${reportId}/download?format=${form.format}`} target="_blank" rel="noopener noreferrer">Download {form.format.toUpperCase()}</a>}
+            {reportId && <a className="btn btn-sm btn-secondary" href={api.reportDownloadUrl(reportId, form.format)} target="_blank" rel="noopener noreferrer">Download {form.format.toUpperCase()}</a>}
           </div>
           <JsonBlock data={result.data?.report || result} />
         </div>

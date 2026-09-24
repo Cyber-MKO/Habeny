@@ -3,9 +3,31 @@ const BASE = import.meta.env.VITE_API_URL || "/api";
 // Fired when the API rejects a request because the session is missing or expired
 export const UNAUTHORIZED_EVENT = "habeny:unauthorized";
 
+// Another Habeny server ("host") chosen in the host switcher: its API calls and WebSockets
+// go through this server's relay. Accounts, tokens, teams, hosts, notifications and backups
+// always stay with this server.
+let currentHost = null;
+const LOCAL_ONLY = ["/auth", "/users", "/hosts", "/teams", "/notifications", "/system/backups"];
+
+export function setApiHost(id) {
+  currentHost = id || null;
+}
+
+export function hostPath(path) {
+  if (!currentHost || LOCAL_ONLY.some((p) => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`))) return path;
+  return `/hosts/${currentHost}/api${path}`;
+}
+
+// WebSocket URL for a path such as /ws/metrics, on the chosen host
+export function wsUrl(path) {
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const base = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).host : window.location.host;
+  return `${proto}://${base}${currentHost ? `/hosts/${currentHost}` : ""}${path}`;
+}
+
 async function request(path, opts = {}) {
   const { method = "GET", body, params } = opts;
-  let url = `${BASE}${path}`;
+  let url = `${BASE}${hostPath(path)}`;
   if (params) {
     const qs = new URLSearchParams(params).toString();
     if (qs) url += `?${qs}`;
@@ -105,11 +127,17 @@ export const api = {
 
   generateReport: (body) => request("/reports/generate", { method: "POST", body }),
   getReport: (id) => request(`/reports/${id}`),
+  reportDownloadUrl: (id, format) => `${BASE}${hostPath(`/reports/${encodeURIComponent(id)}/download`)}?format=${format}`,
 
   getActivity: (params) => request("/activity/logs", { params }),
   getActivityFacets: () => request("/activity/facets"),
   verifyActivity: () => request("/activity/verify"),
-  activityExportUrl: (params) => `${BASE}/activity/export?${new URLSearchParams(params)}`,
+  activityExportUrl: (params) => `${BASE}${hostPath("/activity/export")}?${new URLSearchParams(params)}`,
+  getHosts: () => request("/hosts"),
+  getHostsOverview: () => request("/hosts/overview"),
+  addHost: (body) => request("/hosts", { method: "POST", body }),
+  updateHost: (id, body) => request(`/hosts/${id}`, { method: "PUT", body }),
+  removeHost: (id) => request(`/hosts/${id}`, { method: "DELETE" }),
   getSiemStats: (type) => request(`/siem/${type}/stats`),
 
   uploadLogs: (id, body) => request(`/agents/${id}/logs/upload`, { method: "POST", body }),

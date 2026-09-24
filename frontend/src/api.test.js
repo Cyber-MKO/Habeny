@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, UNAUTHORIZED_EVENT } from "./api";
+import { api, setApiHost, UNAUTHORIZED_EVENT, wsUrl } from "./api";
 
 function respond(status, body, headers = {}) {
   // A fresh Response per call: a body can only be read once
@@ -47,5 +47,28 @@ describe("api", () => {
 
   it("encodes backup names in download links", () => {
     expect(api.backupDownloadUrl("a b.tar.gz")).toBe("/api/system/backups/a%20b.tar.gz");
+  });
+});
+
+describe("working on another host", () => {
+  afterEach(() => setApiHost(null));
+
+  it("sends the host's API calls through this server's relay", async () => {
+    const fetch = respond(200, { data: {} });
+    setApiHost(7);
+    await api.getAgents({ limit: 5 });
+    await api.getMyTokens();
+    await api.getHosts();
+    await api.getBackups();
+    expect(fetch.mock.calls.map((c) => c[0])).toEqual([
+      "/api/hosts/7/api/agents?limit=5",
+      "/api/users/me/tokens", // accounts, hosts and backups stay with this server
+      "/api/hosts",
+      "/api/system/backups",
+    ]);
+    expect(api.reportDownloadUrl("r1", "pdf")).toBe("/api/hosts/7/api/reports/r1/download?format=pdf");
+    expect(wsUrl("/ws/metrics")).toMatch(/^ws:\/\/[^/]+\/hosts\/7\/ws\/metrics$/);
+    setApiHost(null);
+    expect(wsUrl("/ws/metrics")).toMatch(/^ws:\/\/[^/]+\/ws\/metrics$/);
   });
 });

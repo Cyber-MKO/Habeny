@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import "xterm/css/xterm.css";
+import { wsUrl } from "../api";
 
 export default function Terminal({ containerName, onClose }) {
   const termRef = useRef(null);
@@ -26,11 +27,7 @@ export default function Terminal({ containerName, onClose }) {
     fitAddon.fit();
     xtermRef.current = term;
 
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const host = import.meta.env.VITE_API_URL
-      ? new URL(import.meta.env.VITE_API_URL).host
-      : window.location.host;
-    const ws = new WebSocket(`${proto}://${host}/ws/console/${containerName}`);
+    const ws = new WebSocket(wsUrl(`/ws/console/${encodeURIComponent(containerName)}`));
     wsRef.current = ws;
 
     ws.onopen = () => {

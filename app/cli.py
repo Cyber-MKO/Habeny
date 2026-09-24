@@ -8,6 +8,7 @@ as the service user with the service's settings.
   habeny backup create|list|verify FILE|restore FILE
   habeny prune [--dry-run]
   habeny token create USER NAME [--role R] [--expires-days N]|list|revoke ID
+  habeny tls fingerprint
   habeny audit verify|export [--format csv|jsonl] [--since D] [--until D] [--user U] [--action A]
 """
 import argparse
@@ -254,6 +255,19 @@ def cmd_token(args) -> int:
     return 2
 
 
+def cmd_tls(args) -> int:
+    from app.tls import certificate_fingerprint, tls_mode
+    if tls_mode() == "off":
+        print("TLS is off here (HABENY_TLS=off): the reverse proxy in front has the certificate", file=sys.stderr)
+        return 1
+    fingerprint = certificate_fingerprint()
+    if not fingerprint:
+        print("No certificate yet: it's created when Habeny first starts", file=sys.stderr)
+        return 1
+    print(fingerprint)
+    return 0
+
+
 def cmd_audit(args) -> int:
     from app.services import audit
 
@@ -329,9 +343,13 @@ def main(argv=None) -> int:
     p_aexport.add_argument("--user")
     p_aexport.add_argument("--action", dest="action_filter", help="exact, or a prefix ending in *")
 
+    p_tls = sub.add_parser("tls", help="this server's certificate")
+    p_tls.add_argument("action", choices=["fingerprint"], help="SHA-256 fingerprint, to confirm when adding "
+                       "this server as a host in another console")
+
     args = parser.parse_args(argv)
     handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
-                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit}
+                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit, "tls": cmd_tls}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head

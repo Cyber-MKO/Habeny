@@ -23,6 +23,7 @@ def register_routes(app: FastAPI) -> None:
         configs,
         console,
         groups,
+        hosts,
         logs,
         managers,
         metrics,
@@ -40,6 +41,7 @@ def register_routes(app: FastAPI) -> None:
 
     app.include_router(monitoring.public_router)  # health probes: no sign-in
     for module in (
+        hosts,  # its WebSocket relay must come before the local /ws routes
         monitoring,
         system,
         metrics,
