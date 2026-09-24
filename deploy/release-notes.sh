@@ -14,3 +14,12 @@ notes="$(awk -v v="$VERSION" '
     exit 1
 }
 echo "$notes" | sed -e '/./,$!d'  # without leading blank lines
+DOCS="https://github.com/Cyber-MKO/Habeny/blob/v$VERSION"
+cat <<EOF
+
+---
+**Installing and upgrading:** [administrator guide]($DOCS/docs/admin-guide.md) (read
+"Upgrading and rolling back" first; the upgrade backs up the database automatically).
+Check downloads against \`SHA256SUMS\`. What's needed to run it:
+[requirements]($DOCS/docs/requirements.md). Help: [support]($DOCS/SUPPORT.md).
+EOF

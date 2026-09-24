@@ -51,7 +51,7 @@
 #HABENY_BACKUP_INTERVAL_HOURS=24
 # Full backups to keep (the oldest are deleted)
 #HABENY_BACKUP_KEEP=14
-# Where full backups go (default: DATA_DIR/backups). Outside the data directory, also allow it in systemd (see README)
+# Where full backups go (default: DATA_DIR/backups). Outside the data directory, also allow it in systemd (see the admin guide, Backups)
 #HABENY_BACKUP_DIR=
 
 # ── Accounts ────────────────────────────────────────────────────

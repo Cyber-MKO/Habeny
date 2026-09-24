@@ -4,8 +4,9 @@
 
 Please **don't open a public issue** for security problems.
 
-Report privately through GitHub: on the repository page open **Security → Report a
-vulnerability** (GitHub private vulnerability reporting). Include:
+Report privately, either through GitHub (on the repository page, **Security → Report a
+vulnerability**) or by email to **mustaphakasim001@gmail.com** with a subject starting
+`[SECURITY]`. Include:
 
 - what an attacker can do, and what access they need first (network access only, a
   viewer account, an operator account, a shell on the host, ...)
@@ -27,8 +28,10 @@ ask us not to.
 
 ## Supported versions
 
-Security fixes go into the latest release on `main`. Upgrade with `git pull` and
-`sudo ./deploy/install.sh`.
+Security fixes are released for the current minor version and the previous one (for
+example 2.2.x and 2.1.x); see [SUPPORT.md](SUPPORT.md#supported-versions). Upgrade by
+installing the new release's `.deb` (`sudo apt install ./habeny_<version>_all.deb`) or with
+`sudo ./deploy/install.sh` from its tarball.
 
 ## Scope
 
@@ -45,7 +48,7 @@ don't disrupt systems you don't own.
 
 ## How Habeny is secured
 
-A summary for reviewers and administrators. The README has the settings.
+A summary for reviewers and administrators. The [administrator guide](docs/admin-guide.md) has the settings.
 
 - **Privilege separation:** the web app runs as the unprivileged `habeny` user under
   systemd sandboxing. Container operations go through `habeny-helper`, a small root

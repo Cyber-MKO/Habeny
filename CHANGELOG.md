@@ -41,11 +41,20 @@ taken before it instead.
 - `THIRD_PARTY_NOTICES.txt` in every release (and linked from About Habeny): the bundled
   Python and npm packages with their licenses. The build fails on a copyleft or unknown
   license.
+- **Customer documentation** in `docs/` (shipped in `/opt/habeny/docs`): requirements and
+  sizing, an administrator guide, a user guide, an API guide with examples, a generated API
+  reference, and troubleshooting.
+- **Support:** `habeny support-bundle` collects diagnostics for a support request (no
+  secrets, database or uploaded logs). SUPPORT.md explains how to get help, the severity
+  levels and the supported versions; draft support terms are in `docs/legal/`. GitHub issue
+  templates are added, and release notes now link the upgrade guide and support.
 - Legal and privacy documents: `LICENSE`, a draft EULA, a sourced review of the SIEM
   vendors' licenses and trademarks (`docs/legal/`), and `docs/privacy.md`, which lists
   what Habeny stores, for how long and what it connects to.
 
 ### Changed
+- The README is now for developers. Installation and operations moved to
+  `docs/admin-guide.md`.
 - `HABENY_HISTORY_RETENTION_DAYS` now also deletes finished benchmarks and their metrics,
   which were kept forever.
 - Confirmations use accessible in-page dialogs instead of the browser's `confirm()`;

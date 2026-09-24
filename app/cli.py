@@ -10,6 +10,7 @@ as the service user with the service's settings.
   habeny token create USER NAME [--role R] [--expires-days N]|list|revoke ID
   habeny tls fingerprint
   habeny license request|status|install FILE
+  habeny support-bundle [--out DIR]
   habeny audit verify|export [--format csv|jsonl] [--since D] [--until D] [--user U] [--action A]
 """
 import argparse
@@ -93,7 +94,7 @@ def example_config() -> str:
 
 
 def docs_table() -> str:
-    """The README's configuration table."""
+    """The configuration table in docs/admin-guide.md."""
     rows = ["| Setting | Default | Description |", "|---|---|---|"]
     for setting in config.SETTINGS:
         default = f"`{setting.default}`" if setting.default else ""
@@ -322,6 +323,15 @@ def cmd_license(args) -> int:
     return 0 if info["allows_new_work"] else 1
 
 
+def cmd_support_bundle(args) -> int:
+    from app.services import support
+    path = support.create(Path(args.out))
+    print(f"Support bundle: {path}")
+    print("It holds diagnostics only (no passwords, keys, license file, database or uploaded logs).")
+    print("Look through it before sending it: server.log can name users, client IPs and containers.")
+    return 0
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="habeny", description="Habeny administration")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -387,10 +397,13 @@ def main(argv=None) -> int:
     p_linstall = license_sub.add_parser("install", help="install a license file (- reads standard input)")
     p_linstall.add_argument("file")
 
+    p_support = sub.add_parser("support-bundle", help="collect diagnostics to send to Habeny support")
+    p_support.add_argument("--out", default="/tmp", help="directory to write the bundle to (default /tmp)")
+
     args = parser.parse_args(argv)
     handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
                 "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit, "tls": cmd_tls,
-                "license": cmd_license}
+                "license": cmd_license, "support-bundle": cmd_support_bundle}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head

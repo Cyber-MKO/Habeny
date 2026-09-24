@@ -106,7 +106,7 @@ def create_backup(label: str = "manual") -> Path:
         raise BackupError(f"Can't create the backup directory {directory}: {e}") from e
     if not os.access(directory, os.W_OK):
         raise BackupError(f"The backup directory {directory} isn't writable by this service "
-                          "(outside the data directory, systemd needs ReadWritePaths for it; see README)")
+                          "(outside the data directory, systemd needs ReadWritePaths for it; see the administrator guide, Backups)")
 
     with _lock, tempfile.TemporaryDirectory(dir=directory, prefix=".backup-") as tmp:
         stage = Path(tmp) / "habeny-backup"

@@ -3,7 +3,7 @@ Single sign-on with OpenID Connect (Microsoft Entra ID, Okta, Google Workspace, 
 Authentik, ...): the authorization code flow with PKCE, ID token verification, and
 mapping IdP users and groups to Habeny accounts and roles.
 
-Configured with HABENY_OIDC_* environment variables (see README); off unless
+Configured with HABENY_OIDC_* environment variables (see docs/admin-guide.md); off unless
 HABENY_OIDC_ISSUER is set.
 """
 import base64

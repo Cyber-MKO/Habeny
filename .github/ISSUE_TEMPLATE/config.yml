@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Customer support
+    url: https://github.com/Cyber-MKO/Habeny/blob/main/SUPPORT.md
+    about: Questions, and help with a problem. Send logs and support bundles by email (mustaphakasim001@gmail.com), not in issues.
+  - name: Security vulnerability
+    url: https://github.com/Cyber-MKO/Habeny/security/advisories/new
+    about: Report privately. Never in a public issue. See SECURITY.md.
+  - name: Documentation
+    url: https://github.com/Cyber-MKO/Habeny/tree/main/docs
+    about: Admin, user and API guides, and troubleshooting.
