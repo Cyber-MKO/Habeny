@@ -112,7 +112,14 @@ def test_label_values_are_escaped():
 
 # ── alerts ──────────────────────────────────────────────────────────────
 
-def test_disk_alert_fires_and_clears(client, monkeypatch):
+@pytest.fixture()
+def lxc_reachable(monkeypatch):
+    """CI runs unprivileged: without this, the check rightly raises lxc_unavailable too."""
+    from app.core import lxc_backend
+    monkeypatch.setattr(lxc_backend, "has_lxc_access", lambda: True)
+
+
+def test_disk_alert_fires_and_clears(client, monkeypatch, lxc_reachable):
     usage = {"data": {"path": "/var/lib/habeny", "free": 4, "total": 100}}
     monkeypatch.setattr(telemetry, "disk_usage", lambda: usage)
     monkeypatch.setenv("HABENY_ALERT_DISK_PERCENT", "10")
@@ -125,15 +132,15 @@ def test_disk_alert_fires_and_clears(client, monkeypatch):
     assert client.get("/system/alerts").json()["data"]["alerts"] == []
 
 
-def test_lxc_alert(monkeypatch):
+def test_lxc_alert(monkeypatch, lxc_reachable):
     from app.core import lxc_backend
 
     def broken():
         raise ConnectionRefusedError("helper socket refused")
-    monkeypatch.setattr(lxc_backend.lxc, "list_containers", broken)
-    alerts.check()
+    with monkeypatch.context() as m:
+        m.setattr(lxc_backend.lxc, "list_containers", broken)
+        alerts.check()
     assert any(a["name"] == "lxc_unavailable" for a in alerts.manager.active())
-    monkeypatch.undo()
     alerts.check()
     assert not any(a["name"] == "lxc_unavailable" for a in alerts.manager.active())
 

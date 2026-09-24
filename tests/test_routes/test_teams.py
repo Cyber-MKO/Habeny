@@ -24,6 +24,15 @@ def _make_container(name):
     return name
 
 
+@pytest.fixture(autouse=True)
+def lxc_access(app):
+    """CI runs unprivileged; these tests are about teams, not the root check."""
+    from app.core.common import check_root
+    app.dependency_overrides[check_root] = lambda: True
+    yield
+    app.dependency_overrides.pop(check_root, None)
+
+
 @pytest.fixture()
 def world(app, client):
     """Teams red and blue; operators alice (red), bob (blue), carol (no team); one container each,
