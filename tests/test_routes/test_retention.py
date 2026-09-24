@@ -129,3 +129,21 @@ def test_snapshots_are_saved_at_most_once_per_sample_interval(db, monkeypatch):
     for _ in range(5):
         metrics.shared_metrics_payload()
     assert _count(db, "system") == 4  # METRICS_SAMPLE_SECONDS (60) hasn't passed
+
+
+def test_finished_benchmarks_are_pruned(db, monkeypatch):
+    monkeypatch.setenv("HABENY_HISTORY_RETENTION_DAYS", "365")
+    rows = [("bm-old", "completed", _ago(400)), ("bm-new", "completed", _ago(1)), ("bm-running", "running", None)]
+    for bid, status, completed in rows:
+        db.execute("INSERT INTO benchmarks (benchmark_id, scenario_id, status, completed_at, created_at) "
+                   "VALUES (?, 'linear_scale', ?, ?, ?)", (bid, status, completed, _ago(500)))
+        db.execute("INSERT INTO benchmark_metrics (benchmark_id, category, metric_name, value, recorded_at) "
+                   "VALUES (?, 'c', 'm', 1, ?)", (bid, _ago(400)))
+    db.commit()
+    assert maintenance.prune()["benchmarks"] >= 1
+    left = {r[0] for r in db.execute("SELECT benchmark_id FROM benchmarks WHERE benchmark_id LIKE 'bm-%'")}
+    assert left == {"bm-new", "bm-running"}
+    assert db.execute("SELECT COUNT(*) FROM benchmark_metrics WHERE benchmark_id = 'bm-old'").fetchone()[0] == 0
+    db.execute("DELETE FROM benchmarks WHERE benchmark_id LIKE 'bm-%'")
+    db.execute("DELETE FROM benchmark_metrics WHERE benchmark_id LIKE 'bm-%'")
+    db.commit()

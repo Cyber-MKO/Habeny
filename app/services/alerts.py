@@ -7,6 +7,7 @@ Alerts: conditions someone should act on. Shown in the UI, exported to Prometheu
 - backup_failed: the last scheduled backup failed
 - deploy_failed: the last deployment had failures (clears after one that fully succeeds)
 - host_unreachable: another Habeny server managed from this console doesn't answer
+- license: the license expires soon, has expired, or the trial is ending (see licensing.py)
 
 Conditions are checked every minute by the maintenance task; deployment and backup
 results set or clear their alerts as they happen.
@@ -26,6 +27,7 @@ LABELS = {
     "backup_failed": "Backup failed",
     "deploy_failed": "Deployment failed",
     "host_unreachable": "Host unreachable",
+    "license": "License",
 }
 
 
@@ -125,8 +127,9 @@ def check() -> None:
     else:
         manager.clear("lxc_unavailable", message="LXC is reachable again")
 
-    from app.services import hosts
+    from app.services import hosts, licensing
     hosts.check_all()
+    licensing.check_alert()
 
 
 def deployment_finished(deployment_id: str, requested: int, successful: int, failed: int, error: str | None) -> None:

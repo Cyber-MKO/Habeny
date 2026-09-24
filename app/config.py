@@ -131,8 +131,8 @@ SETTINGS: list[Setting] = [
             "saved (seconds)", "Retention and backups", _int(5, 3600)),
     Setting("HABENY_METRICS_RETENTION_DAYS", "30", "Keep system and API-latency samples this many days "
             "(0: forever)", "Retention and backups", _int(0, 3650)),
-    Setting("HABENY_HISTORY_RETENTION_DAYS", "365", "Keep the activity log (audit trail), deployment results "
-            "and finished jobs this many days (0: forever)", "Retention and backups", _int(0, 3650)),
+    Setting("HABENY_HISTORY_RETENTION_DAYS", "365", "Keep the activity log (audit trail), deployment results, "
+            "finished jobs and benchmarks this many days (0: forever)", "Retention and backups", _int(0, 3650)),
     Setting("HABENY_REPORT_RETENTION_DAYS", "0", "Delete generated report files after this many days "
             "(0: keep)", "Retention and backups", _int(0, 3650)),
     Setting("HABENY_BACKUP_INTERVAL_HOURS", "24", "Take a full backup this often (hours; 0: no scheduled "

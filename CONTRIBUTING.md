@@ -47,6 +47,16 @@ variables, so they can be translated. Add the French translation to
 New pages should pass an axe-core check (see [docs/accessibility.md](docs/accessibility.md)):
 labelled controls, `<h1>` page title, dialogs through `Modal`/`useConfirm`.
 
+## Dependencies and licenses
+
+A new Python or npm runtime dependency ends up in customers' hands, so its license must
+allow bundling in proprietary software: MIT, BSD, Apache-2.0, ISC, PSF, MPL-2.0 and
+similar are fine; GPL, AGPL, SSPL, the Elastic License or no license are not (LGPL only
+for Python packages). The tests and CI check this with `deploy/third_party_notices.py`;
+run `python3 deploy/third_party_notices.py --summary` to see the list. Don't add SIEM
+agents or other vendor binaries to the repository or the release: Habeny downloads them
+on the customer's server (see `docs/legal/siem-vendors.md`).
+
 ## Versions and releases
 
 Habeny uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.

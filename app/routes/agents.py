@@ -17,7 +17,7 @@ from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
 from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
-from app.services import tenancy
+from app.services import licensing, tenancy
 from app.services.activity import log_activity
 from app.services.agent_info import container_counts, delete_agent_metadata, get_agent_info, write_agent_metadata
 from app.services.auth import current_user
@@ -85,6 +85,7 @@ async def deploy_agents(
     progress_start(deployment_id, deployment.count, str(getattr(deployment.siem_type, "value", deployment.siem_type)))
     progress_event(deployment_id, f"Deployment request received ({deployment.count} container{'s' if deployment.count != 1 else ''})")
     try:
+        licensing.require()
         start_time = time.time()
 
         # If a manager profile is specified, load it and fill in any fields
@@ -156,6 +157,7 @@ async def deploy_agents(
         # (names that already exist fail to deploy and keep their owner)
         existing = set(await asyncio.to_thread(lxc.list_containers))
         new_names = [n for n in agent_names if n not in existing]
+        licensing.require(adding=len(new_names), existing=len(existing))
         tenancy.check_quota(user, len(new_names), list(existing))
         tenancy.record(new_names, user)
 

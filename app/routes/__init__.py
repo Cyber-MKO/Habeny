@@ -24,6 +24,7 @@ def register_routes(app: FastAPI) -> None:
         console,
         groups,
         hosts,
+        licensing,
         logs,
         managers,
         metrics,
@@ -64,5 +65,6 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(backups.router)  # admins only (checked by the router)
     app.include_router(monitoring.admin_router)  # notification channels: admins only
     app.include_router(teams.router)  # teams and limits: admins only
+    app.include_router(licensing.router)  # status: any user; installing: admins
     app.include_router(auth.router)
     static.register(app)

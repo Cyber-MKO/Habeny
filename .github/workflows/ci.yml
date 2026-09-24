@@ -54,6 +54,8 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - name: Licenses of bundled npm packages
+        run: python3 deploy/third_party_notices.py --only npm --summary
 
   package:
     name: Package build
@@ -79,6 +81,8 @@ jobs:
           dpkg-deb --contents "$deb" | grep >/dev/null './opt/habeny/static/index.html'
           dpkg-deb --contents "$deb" | grep >/dev/null './lib/systemd/system/habeny.service'
           tar -tzf dist/habeny-*.tar.gz | grep >/dev/null 'static/.habeny-build'
+          tar -tzf dist/habeny-*.tar.gz | grep >/dev/null 'THIRD_PARTY_NOTICES.txt'
+          dpkg-deb --contents "$deb" | grep >/dev/null './opt/habeny/static/THIRD_PARTY_NOTICES.txt'
 
   audit:
     name: Dependency audit

@@ -6,3 +6,8 @@ static/
 .coverage
 coverage.xml
 htmlcov/
+
+# License signing keys (tools/license_tool.py): never commit
+*.pem
+*.license
+THIRD_PARTY_NOTICES.txt

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.lxc_backend import lxc
 from app.models import APIResponse, LogScheduleRequest, LogUploadRequest, utc_now
-from app.services import tenancy
+from app.services import licensing, tenancy
 from app.services.activity import log_activity
 from app.services.auth import current_user
 from app.services.logs import perform_log_upload, run_log_schedule, schedule_public
@@ -21,6 +21,7 @@ router = APIRouter()
 async def schedule_log_upload(agent_id: str, schedule: LogScheduleRequest,
                               user: dict | None = Depends(current_user)):
     """Schedule periodic log uploads to a container."""
+    licensing.require()
     try:
         if agent_id not in lxc.list_containers() or not tenancy.can_see(user, agent_id):
             raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")
@@ -107,6 +108,7 @@ async def list_log_schedules(user: dict | None = Depends(current_user)):
 async def upload_logs_to_agent(agent_id: str, log_upload: LogUploadRequest,
                                user: dict | None = Depends(current_user)):
     """Upload log content to a container"""
+    licensing.require()
     try:
         if agent_id not in lxc.list_containers() or not tenancy.can_see(user, agent_id):
             raise HTTPException(status_code=404, detail=f"Container {agent_id} not found")

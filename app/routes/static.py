@@ -2,11 +2,21 @@
 Serves the built React SPA. Registered last: its catch-all route must not shadow the API.
 """
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, PlainTextResponse
 
-from app.config import STATIC_DIR
+from app.config import ROOT_DIR, STATIC_DIR
 
 
 def register(app: FastAPI) -> None:
+    @app.get("/THIRD_PARTY_NOTICES.txt", include_in_schema=False)
+    async def third_party_notices():
+        """Open-source licenses of the bundled packages (written by release builds)."""
+        for path in (STATIC_DIR / "THIRD_PARTY_NOTICES.txt", ROOT_DIR / "THIRD_PARTY_NOTICES.txt"):
+            if path.is_file():
+                return FileResponse(path, media_type="text/plain; charset=utf-8")
+        return PlainTextResponse("This install wasn't built from a release, so it has no THIRD_PARTY_NOTICES.txt. "
+                                 "Generate it with: python3 deploy/third_party_notices.py\n", status_code=404)
+
     if not STATIC_DIR.is_dir():
         return
 

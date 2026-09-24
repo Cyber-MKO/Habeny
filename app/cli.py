@@ -9,6 +9,7 @@ as the service user with the service's settings.
   habeny prune [--dry-run]
   habeny token create USER NAME [--role R] [--expires-days N]|list|revoke ID
   habeny tls fingerprint
+  habeny license request|status|install FILE
   habeny audit verify|export [--format csv|jsonl] [--since D] [--until D] [--user U] [--action A]
 """
 import argparse
@@ -289,6 +290,38 @@ def cmd_audit(args) -> int:
     return 2
 
 
+def cmd_license(args) -> int:
+    import socket
+
+    from app.services import licensing
+    from app.services.activity import log_activity
+    from app.version import __version__
+    if args.action == "request":
+        print("Send this to your Habeny vendor to get a license for this server:\n")
+        print(f"  Server ID:  {licensing.server_id()}")
+        print(f"  Host name:  {socket.gethostname()}")
+        print(f"  Version:    Habeny {__version__}")
+        return 0
+    if args.action == "install":
+        _schema_current()
+        text = sys.stdin.read() if args.file == "-" else Path(args.file).read_text()
+        payload = licensing.install(text)
+        log_activity("license_installed", {"license": payload["id"], "customer": payload["customer"],
+                                           "expires": payload.get("expires"),
+                                           "max_containers": payload.get("max_containers")}, user="cli")
+        print(f"Installed license {payload['id']} for {payload['customer']}.")
+    info = licensing.status_info()
+    print(f"State:      {info['state']}")
+    print(f"Server ID:  {info['server_id']}")
+    if info["license"]:
+        lic = info["license"]
+        print(f"License:    {lic['id']} for {lic['customer']} (issued {lic['issued']})")
+        print(f"Expires:    {lic['expires'] or 'never'}")
+        print(f"Containers: {lic['max_containers'] or 'no limit'}")
+    print(info["message"])
+    return 0 if info["allows_new_work"] else 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="habeny", description="Habeny administration")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -347,9 +380,17 @@ def main(argv=None) -> int:
     p_tls.add_argument("action", choices=["fingerprint"], help="SHA-256 fingerprint, to confirm when adding "
                        "this server as a host in another console")
 
+    p_license = sub.add_parser("license", help="this server's license")
+    license_sub = p_license.add_subparsers(dest="action", required=True)
+    license_sub.add_parser("request", help="print what the vendor needs to issue a license (the server ID)")
+    license_sub.add_parser("status", help="the license and its state (exit status 1: new work is refused)")
+    p_linstall = license_sub.add_parser("install", help="install a license file (- reads standard input)")
+    p_linstall.add_argument("file")
+
     args = parser.parse_args(argv)
     handlers = {"version": cmd_version, "config": cmd_config, "db": cmd_db, "backup": cmd_backup,
-                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit, "tls": cmd_tls}
+                "prune": cmd_prune, "token": cmd_token, "audit": cmd_audit, "tls": cmd_tls,
+                "license": cmd_license}
     try:
         return handlers[args.command](args)
     except BrokenPipeError:  # output piped into e.g. head

@@ -39,7 +39,7 @@ NAME = re.compile(r"^habeny-backup-\d{8}-\d{6}-[a-z-]+\.tar\.gz$")
 FORMAT_VERSION = 1
 # Data directories included (relative to DATA_DIR); agent-cache is a re-downloadable package cache
 DIRECTORIES = ["reports", "configs", "agents", "tls", "logs"]
-FILES = ["secret.key"]
+FILES = ["secret.key", "license.key", "server-id"]  # server-id: only where there is no machine ID
 
 _lock = threading.Lock()  # one backup at a time
 

@@ -17,6 +17,11 @@ to stress-test and validate your SIEM infrastructure.
 | **Elastic** | elastic-agent | Fleet enrollment token |
 | **None** | — | Bare container (no agent) |
 
+Habeny doesn't ship these agents: when you deploy, your server downloads each one from its
+publisher (or, for UTMstack, from your UTMstack server), under the publisher's license.
+See [docs/legal/siem-vendors.md](docs/legal/siem-vendors.md). The names are trademarks of
+their owners.
+
 ## Requirements
 
 - **Ubuntu 22.04+ or Debian 12+** host (x86_64), with root access
@@ -143,7 +148,7 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_BENCHMARK_WORKERS` | CPU count | Parallel workers for benchmark runs (default: CPU count) |
 | `HABENY_METRICS_SAMPLE_SECONDS` | `60` | How often the system metrics shown in history charts are saved (seconds) |
 | `HABENY_METRICS_RETENTION_DAYS` | `30` | Keep system and API-latency samples this many days (0: forever) |
-| `HABENY_HISTORY_RETENTION_DAYS` | `365` | Keep the activity log (audit trail), deployment results and finished jobs this many days (0: forever) |
+| `HABENY_HISTORY_RETENTION_DAYS` | `365` | Keep the activity log (audit trail), deployment results, finished jobs and benchmarks this many days (0: forever) |
 | `HABENY_REPORT_RETENTION_DAYS` | `0` | Delete generated report files after this many days (0: keep) |
 | `HABENY_BACKUP_INTERVAL_HOURS` | `24` | Take a full backup this often (hours; 0: no scheduled backups) |
 | `HABENY_BACKUP_KEEP` | `14` | Full backups to keep (the oldest are deleted) |
@@ -350,7 +355,7 @@ A background task prunes old data hourly, so the disk doesn't fill up over time
 | Data | Kept | Setting |
 |---|---|---|
 | System metrics (saved once a minute) and API latency samples | 30 days | `HABENY_METRICS_RETENTION_DAYS` |
-| Audit trail (activity log), deployment results, finished jobs | 365 days | `HABENY_HISTORY_RETENTION_DAYS` |
+| Audit trail (activity log), deployment results, finished jobs, benchmarks | 365 days | `HABENY_HISTORY_RETENTION_DAYS` |
 | Generated report files | forever | `HABENY_REPORT_RETENTION_DAYS` |
 | Full backups | newest 14 | `HABENY_BACKUP_KEEP` |
 | Expired sign-in sessions and API tokens | removed | |
@@ -358,6 +363,10 @@ A background task prunes old data hourly, so the disk doesn't fill up over time
 `0` keeps data forever. System metrics are recorded once per `HABENY_METRICS_SAMPLE_SECONDS`
 however many dashboards are open. They used to be recorded per viewer every 5 seconds,
 about 13 MB per open dashboard per day, kept forever.
+
+What Habeny stores (including uploaded logs), where, for how long and what it connects
+to is listed in [docs/privacy.md](docs/privacy.md). Habeny sends no telemetry or crash
+reports anywhere.
 
 Simulations, reports, deployments, log schedules and config templates are stored in the
 database, so a restart doesn't lose them. Anything that was running when Habeny stopped
@@ -634,6 +643,9 @@ npm run build      # outputs to ../static/
 ├── main.py                  # Entry point: logging setup + create_app()
 ├── deploy/                  # Installer, package/release builds, systemd units, example config
 ├── start.sh                 # Run from a checkout (development)
+├── docs/                    # Accessibility, privacy, legal drafts (EULA, SIEM vendors)
+├── tools/license_tool.py    # Vendor only: signing keys and license files (not shipped)
+├── LICENSE                  # Proprietary license notice
 ├── app/                     # FastAPI application
 │   ├── __init__.py          # create_app(): storage init, middleware, routers
 │   ├── config.py            # Every setting: type, default, description; config file loading
@@ -649,7 +661,6 @@ npm run build      # outputs to ../static/
 │   ├── services/            # Deployment, simulations, reporting, logs, benchmarks, ...
 │   ├── core/                # Shell/lxc-attach, container, network, resources, helpers
 │   ├── installers/          # One module per SIEM agent + batch dispatcher, package cache
-│   ├── simulation/          # Attack simulation engine
 │   └── models/              # Pydantic models by domain (import from app.models)
 ├── requirements.txt         # Python dependencies
 ├── ruff.toml                # Python linter config (ruff)
@@ -662,7 +673,7 @@ npm run build      # outputs to ../static/
 │   │   ├── store.jsx        # Global state context
 │   │   ├── pages/           # Page components
 │   │   └── components/      # Reusable UI components
-│   └── .eslintrc.cjs        # JavaScript linter config
+│   └── eslint.config.js     # JavaScript linter config
 │
 ├── tests/                   # Test suite
 │   ├── test_db.py           # Database layer tests
@@ -687,6 +698,7 @@ All endpoints accept a signed-in session or `Authorization: Bearer <API token>`.
 - `GET /users/tokens`, `DELETE /users/tokens/{id}` — Everyone's tokens
 - `GET|POST /teams`, `PUT|DELETE /teams/{id}`, `POST /teams/assign` — Teams, moving containers
 - `PUT /users/{id}/team` — A user's team and personal limit
+- `GET /license` (any user), `POST /license` — This server's license
 - `GET|POST /notifications/channels`, `PUT|DELETE /notifications/channels/{id}`, `POST …/{id}/test`
 
 ### Hosts
@@ -787,6 +799,52 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md). It also summarizes ho
 secured. The brief for an independent security review is in
 [docs/security-review-scope.md](docs/security-review-scope.md).
 
-## License
+## Licensing
 
-Proprietary — Habeny Platform.
+Habeny is proprietary software of Habeny Platform: see [LICENSE](LICENSE) and the
+[EULA](docs/legal/EULA.md) (a draft awaiting legal review). It includes open-source
+packages under their own licenses; release builds list them, with their license texts, in
+`THIRD_PARTY_NOTICES.txt`, also linked from **About Habeny** in the UI.
+
+### License keys
+
+Each server needs a license file, checked offline (nothing is sent anywhere):
+
+```bash
+sudo habeny license request          # prints this server's ID: send it to your vendor
+sudo habeny license install FILE     # or Settings → License → Install (admins)
+sudo habeny license status           # exit status 1 when new work is refused
+```
+
+- A new install runs as a **30-day trial**, counted from its first account.
+- A license names the server, an expiry date (or none) and optionally a container limit.
+- From 30 days before expiry, and for a **14-day grace period** after it, a warning shows
+  in the header and a `license` alert goes to notification channels (also in the trial's
+  last week).
+- Without a valid license (trial over, expired past the grace period, or a license for
+  another server), Habeny refuses **new work**: deployments, simulations, benchmarks and
+  log uploads (HTTP 402). Everything stays viewable, and existing containers can still
+  be started, stopped, deleted and used from the console, so no data is held hostage.
+- The server ID is a hash of `/etc/machine-id`. Cloned VMs share it until you run
+  `systemd-machine-id-setup` on the clone. Moving to new hardware needs a new license.
+- Backups include the license file.
+
+**Builds without a vendor key have licensing off** (`app/licensing_key.py` is empty in
+this repository): every feature works and the License page says a license isn't required.
+The vendor makes a signing key once with `python3 tools/license_tool.py keygen`, adds the
+printed public key to `app/licensing_key.py` for release builds, and issues licenses with
+`tools/license_tool.py sign`. The private key must never be committed (`*.pem` is
+ignored). Release builds leave `tools/` out.
+
+Like any offline check, this keeps honest customers honest. Someone with root and the
+source can remove it; the EULA covers that.
+
+### Third-party licenses
+
+`deploy/third_party_notices.py` writes `THIRD_PARTY_NOTICES.txt` from the Python packages
+of `requirements.txt` (with all their dependencies) and the npm packages bundled into the
+frontend. `deploy/build-release.sh` runs it, so every release carries a current list. It
+also **enforces the license policy**: the build, the Python tests and the frontend CI job
+fail on a copyleft (GPL, AGPL, SSPL…), source-available (Elastic, BUSL) or unknown license,
+so a Dependabot update can't bring one in unnoticed. LGPL is allowed for Python packages.
+`python3 deploy/third_party_notices.py --summary` prints the current list.

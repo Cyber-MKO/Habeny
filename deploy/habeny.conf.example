@@ -43,7 +43,7 @@
 #HABENY_METRICS_SAMPLE_SECONDS=60
 # Keep system and API-latency samples this many days (0: forever)
 #HABENY_METRICS_RETENTION_DAYS=30
-# Keep the activity log (audit trail), deployment results and finished jobs this many days (0: forever)
+# Keep the activity log (audit trail), deployment results, finished jobs and benchmarks this many days (0: forever)
 #HABENY_HISTORY_RETENTION_DAYS=365
 # Delete generated report files after this many days (0: keep)
 #HABENY_REPORT_RETENTION_DAYS=0

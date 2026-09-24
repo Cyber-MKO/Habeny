@@ -1018,3 +1018,11 @@ h2.section-title { margin-top: 0; }
 .language-picker.compact { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 12px; color: var(--text-dim); }
 .language-picker.compact .select { width: auto; padding: 4px 8px; font-size: 12px; }
 .auth-page { flex-direction: column; }
+
+.kv-table { width: auto; margin: 12px 0; }
+.kv-table th, .kv-table td { background: none; padding: 6px 24px 6px 0; vertical-align: top; }
+.kv-table td { word-break: break-word; }
+.page-stack { display: flex; flex-direction: column; gap: 16px; }
+.license-form .field + .field { margin-top: 12px; }
+.license-form .btn { margin-top: 12px; }
+.about-legal { margin-top: 16px; font-size: 12px; color: var(--text-dim); }

@@ -8,6 +8,8 @@
 #   habeny_VERSION_all.deb                   Debian/Ubuntu package
 #   habeny-wheels-VERSION-cpXY-x86_64.tar.gz Python packages for offline installs
 #   SHA256SUMS
+# Each includes THIRD_PARTY_NOTICES.txt (deploy/third_party_notices.py), which also fails
+# the build when a bundled dependency's license isn't allowed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,11 +29,17 @@ mkdir -p "$RELEASE"
 
 echo "==> Source ($COMMIT)"
 git -C "$ROOT" archive HEAD | tar -x -C "$RELEASE"
-rm -rf "$RELEASE/.github"
+rm -rf "$RELEASE/.github" "$RELEASE/tools"  # tools/: vendor-only (license signing)
 
 echo "==> Prebuilt frontend"
 cp -a "$ROOT/static" "$RELEASE/static"
 echo "Habeny $VERSION ($COMMIT, built $(date -u +%Y-%m-%d))" > "$RELEASE/static/.habeny-build"
+
+echo "==> Third-party notices (and license policy check)"
+python3 -m venv "$STAGE/venv"
+"$STAGE/venv/bin/pip" install -q -r "$ROOT/requirements.txt"
+"$STAGE/venv/bin/python" "$ROOT/deploy/third_party_notices.py" --out "$RELEASE/THIRD_PARTY_NOTICES.txt"
+cp "$RELEASE/THIRD_PARTY_NOTICES.txt" "$RELEASE/static/THIRD_PARTY_NOTICES.txt"
 
 echo "==> habeny-$VERSION.tar.gz"
 tar -C "$STAGE" -czf "$OUT_DIR/habeny-$VERSION.tar.gz" "habeny-$VERSION"

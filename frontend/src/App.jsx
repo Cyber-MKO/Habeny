@@ -27,6 +27,7 @@ import Monitoring from "./pages/Monitoring";
 import Notifications from "./pages/Notifications";
 import Teams from "./pages/Teams";
 import Hosts from "./pages/Hosts";
+import License, { LicenseBanner } from "./pages/License";
 import { HostProvider, HostSwitcher, useHosts } from "./hosts";
 import { api } from "./api";
 import { t } from "./i18n";
@@ -74,6 +75,7 @@ const NAV = [
     section: t("Settings"),
     items: [
       { to: "/account", label: t("Account"), icon: "M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" },
+      { to: "/license", label: t("License"), icon: "M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" },
       { to: "/teams", label: t("Teams"), minRole: "admin", icon: "M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" },
       { to: "/notifications", label: t("Notifications"), minRole: "admin", icon: "M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" },
     ],
@@ -124,8 +126,14 @@ function AboutModal({ onClose }) {
       <div className="about-meta">
         <span><strong>{t("Version")}</strong> {__APP_VERSION__}</span>
         <span><strong>{t("Runtime")}</strong> {t("LXC containers")}</span>
-        <span><strong>{t("Telemetry")}</strong> {t("Live over WebSocket")}</span>
+        <span><strong>{t("Live metrics")}</strong> {t("Over WebSocket, from this server only")}</span>
       </div>
+      <p className="about-legal">
+        {t("Proprietary software © Habeny Platform.")}{" "}
+        <NavLink to="/license" onClick={onClose}>{t("License")}</NavLink>
+        {" · "}
+        <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">{t("Open-source licenses")}</a>
+      </p>
     </Modal>
   );
 }
@@ -145,7 +153,7 @@ function Toasts() {
   );
 }
 
-const TITLES = { "/": t("Dashboard"), "/system": t("System Info"), "/managers": t("Managers"), "/agents": t("Containers"), "/deploy": t("Deploy"), "/groups": t("Groups"), "/bulk": t("Bulk Operations"), "/logs": t("Log Upload"), "/syslog-config": t("Syslog Config"), "/simulations": t("Simulations"), "/benchmark-runner": t("Benchmark Runner"), "/benchmarks": t("Perf Metrics"), "/siem": t("SIEM Stats"), "/reports": t("Reports"), "/configs": t("Configs"), "/activity": t("Activity Log"), "/account": t("Account"), "/monitoring": t("Monitoring"), "/notifications": t("Notifications"), "/teams": t("Teams"), "/hosts": t("Hosts") };
+const TITLES = { "/": t("Dashboard"), "/system": t("System Info"), "/managers": t("Managers"), "/agents": t("Containers"), "/deploy": t("Deploy"), "/groups": t("Groups"), "/bulk": t("Bulk Operations"), "/logs": t("Log Upload"), "/syslog-config": t("Syslog Config"), "/simulations": t("Simulations"), "/benchmark-runner": t("Benchmark Runner"), "/benchmarks": t("Perf Metrics"), "/siem": t("SIEM Stats"), "/reports": t("Reports"), "/configs": t("Configs"), "/activity": t("Activity Log"), "/account": t("Account"), "/monitoring": t("Monitoring"), "/notifications": t("Notifications"), "/teams": t("Teams"), "/hosts": t("Hosts"), "/license": t("License") };
 
 // Which server the pages are showing, when it isn't this one
 function CurrentHost() {
@@ -271,6 +279,7 @@ function AppShell({ user }) {
             </div>
             <CurrentHost />
             <AlertBadge />
+            <LicenseBanner />
             {user.role === "viewer" && <span className="header-readonly" title={t("Viewer role: read-only access")}>{t("Read-only")}</span>}
             <NavLink to="/account" className="header-user" title={t("Account settings")}>{user.username}</NavLink>
             <button type="button" className="btn btn-secondary btn-sm" onClick={logout}>{t("Sign out")}</button>
@@ -298,6 +307,7 @@ function AppShell({ user }) {
             <Route path="/account" element={<Account />} />
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/hosts" element={<Hosts />} />
+            <Route path="/license" element={<License />} />
             {user.is_admin && <Route path="/notifications" element={<Notifications />} />}
             {user.is_admin && <Route path="/teams" element={<Teams />} />}
           </Routes>
