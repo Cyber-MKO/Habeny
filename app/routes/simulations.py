@@ -1,13 +1,17 @@
 """
 Attack, custom-log and syslog simulation endpoints.
 """
+import asyncio
 import json
 import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel
 
+from app.config import DB_PATH
+from app.db import get_manager
 from app.models import (
     APIResponse,
     CustomLogSimulationRequest,
@@ -15,12 +19,13 @@ from app.models import (
     SyslogSimulationRequest,
     utc_now,
 )
-from app.services import licensing, tenancy
+from app.services import detection, licensing, tenancy
 from app.services.activity import log_activity
 from app.services.auth import current_user
 from app.services.simulation import (
     list_simulation_profiles,
     run_custom_log_simulation,
+    run_detection_check,
     run_simulation,
     run_syslog_simulation,
     select_agents_for_simulation,
@@ -195,6 +200,15 @@ async def start_simulation(
         if not target_agents:
             raise HTTPException(status_code=400, detail="No containers match the selector")
 
+        detection_plan = None
+        if simulation_request.detection_profile_id:
+            manager = get_manager(DB_PATH, simulation_request.detection_profile_id)
+            if not detection.configured(manager):
+                raise HTTPException(status_code=400, detail="That manager profile has no detection API set "
+                                    "(Managers page; Wazuh and Elastic profiles, set by admins)")
+            detection_plan = {"status": "waiting", "manager_profile_id": manager["manager_id"],
+                              "manager_name": manager["name"], "siem": manager["siem_type"]}
+
         simulation = {
             "simulation_id": simulation_id,
             "profile_id": simulation_request.profile_id,
@@ -206,6 +220,8 @@ async def start_simulation(
             "events_generated": 0,
             **tenancy.stamp(user),
         }
+        if detection_plan:
+            simulation["detection"] = detection_plan
 
         simulations_db[simulation_id] = simulation
 
@@ -269,3 +285,28 @@ async def stop_simulation(simulation_id: str, user: dict | None = Depends(curren
         raise
     except Exception as e:
         return APIResponse(success=False, message="Failed to stop simulation", error=str(e))
+
+
+class DetectionCheckRequest(BaseModel):
+    manager_profile_id: str | None = None  # default: the profile chosen when the simulation started
+
+
+@router.post("/simulations/{simulation_id}/detection", response_model=APIResponse)
+async def check_simulation_detection(simulation_id: str, body: DetectionCheckRequest | None = None,
+                                     user: dict | None = Depends(current_user)):
+    """Ask the SIEM now what it detected for a finished attack simulation (again, or for the first time)."""
+    sim = simulations_db.get(simulation_id)
+    if sim is None or not tenancy.same_team(user, sim.get("team_id")):
+        raise HTTPException(status_code=404, detail=f"Simulation {simulation_id} not found")
+    if not sim.get("profile_id") or not sim.get("target_agents"):
+        raise HTTPException(status_code=400, detail="Detection checks are for attack simulations")
+    if sim.get("status") == "running":
+        raise HTTPException(status_code=409, detail="The simulation is still running")
+    profile_id = (body.manager_profile_id if body else None) or (sim.get("detection") or {}).get("manager_profile_id")
+    if not profile_id:
+        raise HTTPException(status_code=400, detail="Choose the manager profile whose SIEM to ask")
+    result = await asyncio.to_thread(run_detection_check, simulation_id, profile_id)
+    if result["status"] != "done":
+        raise HTTPException(status_code=502, detail=result.get("error") or "The detection check failed")
+    return APIResponse(success=True, message=f"{result['detected']} of {result['containers']} containers detected",
+                       data=result)

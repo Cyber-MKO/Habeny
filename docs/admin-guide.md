@@ -19,6 +19,7 @@ licensing, backups, upgrades and monitoring. For using the interface, see the
 - [Logs](#logs)
 - [Audit trail](#audit-trail)
 - [Data retention](#data-retention)
+- [Checking detections](#checking-detections)
 - [Several LXC hosts](#several-lxc-hosts)
 - [Security checklist](#security-checklist)
 - [Getting help](#getting-help)
@@ -215,6 +216,7 @@ that used `/etc/default/habeny` moves its settings into the new file.
 | `HABENY_SMTP_USER` |  | Mail server user name (empty: no login) |
 | `HABENY_SMTP_PASSWORD` |  | Mail server password |
 | `HABENY_SMTP_FROM` |  | Sender address (default: habeny@<host name>) |
+| `HABENY_DETECTION_DELAY_SECONDS` | `120` | After an attack simulation, wait this long for the SIEM to index its alerts before checking what it detected (seconds) |
 | `HABENY_DATA_DIR` | `/var/lib/lxc-siem-platform` | Database, keys, reports and logs *(set by the installer)* |
 | `HABENY_LXC_BACKEND` |  | `helper` (unprivileged app + root helper) or `direct` (app runs as root); default: direct when root, else helper *(set by the installer)* |
 | `HABENY_HELPER_SOCKET` | `/run/habeny/helper.sock` | The helper's Unix socket *(set by the installer)* |
@@ -552,6 +554,35 @@ is shown as **interrupted**, and log schedules resume by themselves for the time
 left. Interrupted deployments and simulations aren't restarted automatically: a
 half-created container needs deleting first, and an attack simulation replayed hours
 later would muddy SIEM test results.
+
+## Checking detections
+
+After an attack simulation, Habeny can ask the SIEM which alerts it raised (see the
+[user guide](user-guide.md#checking-what-the-siem-detected)). It uses the SIEM's
+Elasticsearch-compatible search API, read-only. Set it up per SIEM, as an admin, on the
+manager profile (Fleet → Managers → Edit → **Detection API**):
+
+| SIEM | Search API URL | Account needs to read |
+|---|---|---|
+| Wazuh | the Wazuh indexer, usually `https://<indexer>:9200` | `wazuh-alerts-*` |
+| Elastic | Elasticsearch, usually `https://<host>:9200` | `.alerts-security.alerts-*` and `logs-*` |
+
+- Use a dedicated read-only account. For Wazuh, create an indexer user with a role that can
+  read `wazuh-alerts-*` (for example in the Wazuh dashboard: Indexer management → Security).
+  For Elastic, a user with a read role on those indices, or an **API key** (leave the user
+  name empty and paste the key in its base64 form).
+- **Test detection connection** checks the URL and credentials. The Wazuh indexer
+  usually has a self-signed certificate: the test shows its SHA-256 fingerprint; check it
+  (e.g. `openssl s_client -connect indexer:9200 </dev/null | openssl x509 -noout -fingerprint -sha256`)
+  and **Trust this certificate**. From then on, connections must present that certificate.
+- The password or API key is stored encrypted, like SIEM auth keys, and never shown again.
+  Only admins can set or change the connection, because it makes this server connect to
+  that address with those credentials. Operators can use it for their simulations.
+- The Habeny server must reach the search API (TCP 9200 by default).
+- `HABENY_DETECTION_DELAY_SECONDS` (default 120) is how long Habeny waits after a run for the
+  SIEM to index its alerts. Raise it for a busy SIEM; a check can always be run again later.
+- What is stored: per simulation, the rule ids, names, levels and counts, and per container
+  whether and when it was detected. No event contents are copied from the SIEM.
 
 ## Several LXC hosts
 

@@ -3,6 +3,7 @@ Report generation — metrics/findings aggregation and CSV/PDF rendering.
 """
 import csv
 import json
+import statistics
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -29,6 +30,23 @@ def normalize_dt(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def summarize_detections(detections: list[dict]) -> list[dict]:
+    """Detection performance per attack profile and SIEM: runs, mean detection rate and
+    median time to detection, so SIEMs can be compared on the same attacks."""
+    groups: dict[tuple, list[dict]] = {}
+    for d in detections:
+        groups.setdefault((d.get("profile"), d.get("siem")), []).append(d)
+    rows = []
+    for (profile, siem), runs in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
+        rates = [r["detection_rate"] for r in runs if r.get("detection_rate") is not None]
+        ttds = [r["median_ttd_seconds"] for r in runs if r.get("median_ttd_seconds") is not None]
+        rows.append({"profile": profile, "siem": siem, "runs": len(runs),
+                     "detection_rate": round(sum(rates) / len(rates), 1) if rates else None,
+                     "median_ttd_seconds": statistics.median(ttds) if ttds else None,
+                     "missed_rules": sorted({m for r in runs for m in r.get("missed_rules") or []})})
+    return rows
+
+
 def generate_report_csv(report_data: dict[str, Any], report_file: Path) -> None:
     """Generate a CSV report file."""
     rows = [["section", "key", "value"]]
@@ -49,6 +67,13 @@ def generate_report_csv(report_data: dict[str, Any], report_file: Path) -> None:
     metrics = report_data.get("metrics", {})
     for key, value in metrics.items():
         rows.append(["metrics", key, json.dumps(value)])
+
+    for row in report_data.get("detection_summary", []):
+        key = f"{row.get('profile')}.{row.get('siem')}"
+        rows.append(["detection", f"{key}.runs", row.get("runs")])
+        rows.append(["detection", f"{key}.detection_rate", row.get("detection_rate")])
+        rows.append(["detection", f"{key}.median_ttd_seconds", row.get("median_ttd_seconds")])
+        rows.append(["detection", f"{key}.missed_rules", " ".join(row.get("missed_rules") or [])])
 
     findings = report_data.get("findings", [])
     for idx, finding in enumerate(findings, start=1):
@@ -122,6 +147,23 @@ def generate_report_pdf(report_data: dict[str, Any], agent_status_counts: dict[s
         img_buf.seek(0)
         story.append(Paragraph("Containers by Status", styles["Heading3"]))
         story.append(Image(img_buf, width=400, height=240))
+        story.append(Spacer(1, 12))
+
+    if report_data.get("detection_summary"):
+        story.append(Paragraph("What the SIEMs detected", styles["Heading3"]))
+        det_rows = [["Attack profile", "SIEM", "Runs", "Detected", "Median time", "Missed rules"]]
+        for row in report_data["detection_summary"]:
+            det_rows.append([str(row.get("profile")), str(row.get("siem")), str(row.get("runs")),
+                             "—" if row.get("detection_rate") is None else f"{row['detection_rate']}%",
+                             "—" if row.get("median_ttd_seconds") is None else f"{row['median_ttd_seconds']} s",
+                             ", ".join(row.get("missed_rules") or []) or "—"])
+        det_table = Table(det_rows, colWidths=[110, 60, 40, 60, 70, 160])
+        det_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5f5")),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ]))
+        story.append(det_table)
         story.append(Spacer(1, 12))
 
     if summary.get("simulations_in_range"):

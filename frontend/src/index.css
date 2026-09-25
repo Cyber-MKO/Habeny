@@ -1026,3 +1026,6 @@ h2.section-title { margin-top: 0; }
 .license-form .field + .field { margin-top: 12px; }
 .license-form .btn { margin-top: 12px; }
 .about-legal { margin-top: 16px; font-size: 12px; color: var(--text-dim); }
+.detection-fields { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px 16px; margin: 16px 0 0; }
+.detection-fields legend { padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.detection-test { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }

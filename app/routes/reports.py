@@ -24,6 +24,7 @@ from app.services.reporting import (
     generate_report_csv,
     generate_report_pdf,
     normalize_dt,
+    summarize_detections,
 )
 from app.state import report_files, reports_db, simulations_db
 
@@ -61,6 +62,7 @@ async def generate_report(report_request: ReportGenerateRequest, user: dict | No
         start_time = normalize_dt(report_request.start_time)
         end_time = normalize_dt(report_request.end_time)
         simulations_in_range = []
+        detections = []
         simulations_by_type = {}
         syslog_targets = {}
         for sim in simulations_db.values():
@@ -75,6 +77,16 @@ async def generate_report(report_request: ReportGenerateRequest, user: dict | No
                 continue
             if start_time <= sim_time <= end_time:
                 simulations_in_range.append(sim.get("simulation_id"))
+                found = sim.get("detection") or {}
+                if found.get("status") == "done":
+                    detections.append({
+                        "simulation_id": sim.get("simulation_id"), "profile": sim.get("profile_id"),
+                        "siem": found.get("siem"), "started_at": started_at,
+                        "detected": found.get("detected"), "containers": found.get("containers"),
+                        "detection_rate": found.get("detection_rate"),
+                        "median_ttd_seconds": (found.get("ttd_seconds") or {}).get("median"),
+                        "missed_rules": found.get("missed") or [],
+                    })
 
             sim_type = sim.get("simulation_type") or sim.get("profile_id") or "unknown"
             simulations_by_type[sim_type] = simulations_by_type.get(sim_type, 0) + 1
@@ -101,6 +113,8 @@ async def generate_report(report_request: ReportGenerateRequest, user: dict | No
                 "simulations_by_type": simulations_by_type,
                 "syslog_targets": syslog_targets
             },
+            "detections": detections,
+            "detection_summary": summarize_detections(detections),
             "metrics": build_report_metrics(start_time.isoformat()),
             "findings": build_report_findings(agents_by_status),
             **tenancy.stamp(user),

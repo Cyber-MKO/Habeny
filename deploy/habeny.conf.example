@@ -112,6 +112,10 @@
 # Sender address (default: habeny@<host name>)
 #HABENY_SMTP_FROM=
 
+# ── Simulations ─────────────────────────────────────────────────
+# After an attack simulation, wait this long for the SIEM to index its alerts before checking what it detected (seconds)
+#HABENY_DETECTION_DELAY_SECONDS=120
+
 # Set by the installer in the systemd units (reinstall to change):
 #   HABENY_DATA_DIR (default /var/lib/lxc-siem-platform)
 #   HABENY_LXC_BACKEND (default automatic)

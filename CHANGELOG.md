@@ -12,6 +12,14 @@ The release workflow publishes a version's section here as its release notes.
 `GET /api/system/info` instead.
 
 ### Added
+- **Checking what the SIEM detected.** After an attack simulation, Habeny asks the SIEM's
+  search API (Wazuh indexer, Elasticsearch) which alerts fired for the target containers:
+  detection rate, time to detection, rules that fired, and, for Wazuh, the expected rules
+  that never fired. Set up per manager profile by admins (read-only account, pinned
+  certificate for a self-signed endpoint); chosen per simulation; checked again on demand
+  (`POST /api/simulations/{id}/detection`). Reports compare detection per attack profile
+  and SIEM. `HABENY_DETECTION_DELAY_SECONDS` sets how long to wait for the SIEM first.
+  **Upgrading:** migration v0008 adds the settings to manager profiles.
 - `GET /api/reports` lists the reports you can see; the Reports page's history uses it.
 
 ### Removed

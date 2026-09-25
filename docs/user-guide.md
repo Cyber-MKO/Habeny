@@ -12,6 +12,7 @@ to them and measure how your SIEM copes. For installing and running the server, 
 - [Deploying containers](#deploying-containers)
 - [Managing containers](#managing-containers)
 - [Sending test traffic](#sending-test-traffic)
+- [Checking what the SIEM detected](#checking-what-the-siem-detected)
 - [Measuring: benchmarks, metrics and reports](#measuring-benchmarks-metrics-and-reports)
 - [Activity, monitoring and hosts](#activity-monitoring-and-hosts)
 - [Administration pages](#administration-pages)
@@ -152,6 +153,38 @@ file, for example `/var/log/auth.log`, where the agent picks it up:
 **Testing → Syslog Config** saves syslog destinations (address, port, protocol), tests
 that one is reachable, and turns on the syslog listener (port 7014) in UTMstack containers.
 
+## Checking what the SIEM detected
+
+Sending attacks is only half the test: Habeny can also ask the SIEM which alerts it raised,
+for **Wazuh** (the Wazuh indexer) and **Elastic** (Elasticsearch). An admin first sets the
+**detection API** on the SIEM's manager profile (Fleet → Managers; see the
+[administrator guide](admin-guide.md#checking-detections)).
+
+1. On **Testing → Simulations → Attack**, choose the profile under **Check what the SIEM
+   detected**, then start the simulation.
+2. After the run, Habeny waits for the SIEM to index its alerts (2 minutes by default), then
+   asks it. The **Detected** column shows the result, e.g. `4/5 (80%)`.
+3. **Detections** opens the details: which containers were detected and how fast, which
+   rules fired, and which expected rules never fired. **Check now** asks again, for example
+   after a slow SIEM caught up, or asks another SIEM's profile.
+
+How it's counted:
+
+- **Wazuh:** a container counts as detected when one of the rules the attack profile should
+  trigger fired for it (for SSH brute force, rules 5710 or 5712; the details list them all).
+  Alerts on other rules are shown but don't count. Rules the profile should trigger that
+  never fired on any container are listed as **missed**: a gap in your rules or agent
+  configuration.
+- **Elastic:** which rules fire depends on the detection rules enabled in Kibana, so any
+  alert on a container counts. Habeny also counts the **events received** from the
+  containers, which shows whether the logs arrive at all.
+- **Time to detection** is from the start of the run to the first matching alert.
+- Containers are matched by name: agents register with their container's name (the Wazuh
+  agent name, the Elastic host name).
+
+Reports include a **What the SIEMs detected** table: detection rate, time to detection and
+missed rules per attack profile and SIEM, so you can compare SIEMs on the same attacks.
+
 ## Measuring: benchmarks, metrics and reports
 
 **Testing → Benchmark Runner** (operators) runs a multi-phase benchmark: choose a scenario
@@ -199,13 +232,14 @@ For admins; the [administrator guide](admin-guide.md) has the details.
 
 **Check what your SIEM detects**
 
-1. Save a manager profile for your test SIEM manager.
+1. Save a manager profile for your test SIEM manager, with its detection API (admins).
 2. Deploy 5–10 containers with that profile into a new group.
 3. Wait until the containers show the agent service running and SIEM Stats shows them
    connected.
-4. Run an attack simulation (e.g. `auth_bruteforce`, medium) against the group.
-5. Look for the alerts in your SIEM, and generate a report in Habeny for the same time
-   range to compare.
+4. Run an attack simulation (e.g. SSH brute force) against the group, checking detections
+   with that profile.
+5. Read the **Detected** result and its details, and generate a report to compare runs and
+   SIEMs.
 
 **Load-test ingestion**
 

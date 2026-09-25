@@ -165,6 +165,17 @@ curl -sS -H "Authorization: Bearer $HABENY_TOKEN" "$HABENY/simulations" | jq '.d
 curl -sS -X POST -H "Authorization: Bearer $HABENY_TOKEN" "$HABENY/simulations/$SIM/stop"
 ```
 
+**Check what the SIEM detected**
+
+Pass `detection_profile_id` (a manager profile with a detection API) when starting an attack
+simulation. The result appears under `detection` in `GET /simulations` once the SIEM has been
+asked. To ask (again) now:
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $HABENY_TOKEN" -H "Content-Type: application/json" \
+  "$HABENY/simulations/$SIM/detection" -d '{}' | jq '.data | {detection_rate, detected, containers, ttd_seconds, missed}'
+```
+
 **Upload log lines into a container**
 
 ```bash

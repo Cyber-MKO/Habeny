@@ -30,7 +30,8 @@ In short:
 | **Deployments, benchmarks**: settings, per-container results, timings (SIEM auth keys are removed from stored benchmark settings) | `records`, `benchmarks`, `benchmark_*` | `HABENY_HISTORY_RETENTION_DAYS` after they finish | lower the setting |
 | **Metrics**: CPU, memory, disk, API latency samples | `metrics` | `HABENY_METRICS_RETENTION_DAYS` (default 30) | lower the setting |
 | **Reports** (PDF/CSV/JSON) | `DATA_DIR/reports` | `HABENY_REPORT_RETENTION_DAYS` (default 0: kept) | Reports page; set the setting |
-| **SIEM manager profiles**: addresses, versions, auth keys (encrypted with `secret.key`) | `managers` | until deleted | Managers page |
+| **SIEM manager profiles**: addresses, versions, auth keys and detection API credentials (encrypted with `secret.key`) | `managers` | until deleted | Managers page |
+| **Detection results**: per simulation, rule ids, names, levels and counts, and when each container was detected (no event contents) | `records` | `HABENY_HISTORY_RETENTION_DAYS` | lower the setting |
 | **Configuration templates, syslog configs, groups** | database and `DATA_DIR/configs` | until deleted | their pages |
 | **Notification channels**: webhook/Slack URLs, email addresses (secrets encrypted) | `notification_channels` | until deleted | Notifications page |
 | **Other hosts**: address, pinned certificate fingerprint, API token (encrypted) | `hosts` | until removed | Hosts page |
@@ -61,6 +62,7 @@ Habeny connects only to:
 | OpenID Connect provider | SSO sign-in | `HABENY_OIDC_*` |
 | Slack, webhooks, mail server | notifications | Notifications page, `HABENY_SMTP_*` |
 | Other Habeny servers | the Hosts feature | Hosts page |
+| SIEM search APIs (Wazuh indexer, Elasticsearch) | detection checks after attack simulations: Habeny sends the target container names and the run's time window, and reads back alert counts and rule names | manager profiles' detection API (admins) |
 
 Habeny sends no data to Habeny Platform or any other third party on its own. Firewalls
 can block everything not on this list.
