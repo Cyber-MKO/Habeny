@@ -63,7 +63,6 @@ function Performance() {
   if (!perf) return <Spinner />;
   const dep = perf.deployment || {};
   const dt = dep.deploy_time_seconds || {};
-  const lat = perf.api_latency_ms?.deploy_endpoint || {};
   const sim = perf.simulations || {};
   return (
     <>
@@ -86,8 +85,6 @@ function Performance() {
           <StatCard label={t("Success Rate")} value={`${dep.success_rate_percent ?? 0}%`} color={dep.success_rate_percent >= 90 ? "green" : "orange"} />
           <StatCard label={t("Avg Deploy Time")} value={`${dt.avg ?? 0}s`} meta={`P50: ${dt.p50 ?? 0}s`} />
           <StatCard label={t("P90 Deploy Time")} value={`${dt.p90 ?? 0}s`} color={dt.p90 > 300 ? "red" : "green"} meta={`P99: ${dt.p99 ?? 0}s`} />
-          <StatCard label={t("Deploy API latency")} value={`${lat.avg ?? 0}ms`} meta={`P50 ${lat.p50 ?? 0} · P90 ${lat.p90 ?? 0} · P99 ${lat.p99 ?? 0} ms`}
-            color={lat.p99 > 10000 ? "red" : lat.p90 > 5000 ? "orange" : undefined} />
         </div>
       </section>
 

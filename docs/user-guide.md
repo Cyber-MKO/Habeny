@@ -213,7 +213,7 @@ host CPU load, memory or disk, deployment failures, API latency, the SIEM manage
 agents disconnecting. Benchmarks create real containers; delete
 them afterwards.
 
-**Monitoring** shows deployment performance (success rate, deployment times, API latency),
+**Monitoring** shows deployment performance (success rate, deployment times),
 simulation totals, and history charts for CPU, memory, disk and running containers. The
 **Dashboard**'s SIEM rows show, per SIEM type, how many agents run and reach their manager,
 and what the SIEM detected in the latest checked attack simulation.

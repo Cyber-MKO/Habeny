@@ -916,5 +916,7 @@
   "— pick a destination, or enter it below —": "— choisissez une destination, ou saisissez-la ci-dessous —",
   "SIEM targets with a syslog port": "Cibles SIEM avec un port syslog",
   "UTMstack containers listening for syslog": "Conteneurs UTMstack à l'écoute du syslog",
-  "Give a SIEM target a syslog port on the SIEM Targets page, or turn on a UTMstack container's listener in its details.": "Donnez un port syslog à une cible SIEM sur la page Cibles SIEM, ou activez l'écoute d'un conteneur UTMstack dans ses détails."
+  "Give a SIEM target a syslog port on the SIEM Targets page, or turn on a UTMstack container's listener in its details.": "Donnez un port syslog à une cible SIEM sur la page Cibles SIEM, ou activez l'écoute d'un conteneur UTMstack dans ses détails.",
+  "Advanced": "Avancé",
+  "Values for the built-in event format: the source and destination addresses in each event, and the first event's sequence number.": "Valeurs du format d'événement intégré : les adresses source et destination de chaque événement, et le numéro de séquence du premier événement."
 }

@@ -240,13 +240,19 @@ export default function Simulations() {
             <div className="field"><label htmlFor="simulations-duration-s-2">{t("Duration (s)")}</label><input id="simulations-duration-s-2" className="input" type="number" value={customForm.duration} onChange={(e) => setCustomForm((p) => ({ ...p, duration: e.target.value }))} /></div>
             <div className="field"><label htmlFor="simulations-file-path">{t("File Path")}</label><input id="simulations-file-path" className="input" value={customForm.file_path} onChange={(e) => setCustomForm((p) => ({ ...p, file_path: e.target.value }))} /></div>
             <div className="field"><label htmlFor="simulations-message">{t("Message")}</label><input id="simulations-message" className="input" value={customForm.message} onChange={(e) => setCustomForm((p) => ({ ...p, message: e.target.value }))} /></div>
-            <div className="field"><label htmlFor="simulations-source-ip">{t("Source IP")}</label><input id="simulations-source-ip" className="input" value={customForm.src_ip} onChange={(e) => setCustomForm((p) => ({ ...p, src_ip: e.target.value }))} /></div>
-            <div className="field"><label htmlFor="simulations-dest-ip">{t("Dest IP")}</label><input id="simulations-dest-ip" className="input" value={customForm.dest_ip} onChange={(e) => setCustomForm((p) => ({ ...p, dest_ip: e.target.value }))} /></div>
-            <div className="field"><label htmlFor="simulations-seq-start">{t("Seq Start")}</label><input id="simulations-seq-start" className="input" type="number" value={customForm.seq_start} onChange={(e) => setCustomForm((p) => ({ ...p, seq_start: e.target.value }))} /></div>
             <div className="field"><label htmlFor="simulations-start-time-optional">{t("Start Time (optional)")}</label><input id="simulations-start-time-optional" className="input" type="datetime-local" value={customForm.start_time} onChange={(e) => setCustomForm((p) => ({ ...p, start_time: e.target.value }))} /></div>
             <div className="field"><label htmlFor="simulations-extra-fields-json">{t("Extra Fields (JSON)")}</label><input id="simulations-extra-fields-json" className="input" value={customForm.extra_fields} onChange={(e) => setCustomForm((p) => ({ ...p, extra_fields: e.target.value }))} placeholder={t("{\"severity\":\"info\"}")} /></div>
           </div>
           <SelectorFields f={customForm} setF={setCustomForm} />
+          <details className="advanced-fields">
+            <summary>{t("Advanced")}</summary>
+            <p className="auth-hint">{t("Values for the built-in event format: the source and destination addresses in each event, and the first event's sequence number.")}</p>
+            <div className="form-grid">
+              <div className="field"><label htmlFor="simulations-source-ip">{t("Source IP")}</label><input id="simulations-source-ip" className="input" value={customForm.src_ip} onChange={(e) => setCustomForm((p) => ({ ...p, src_ip: e.target.value }))} /></div>
+              <div className="field"><label htmlFor="simulations-dest-ip">{t("Dest IP")}</label><input id="simulations-dest-ip" className="input" value={customForm.dest_ip} onChange={(e) => setCustomForm((p) => ({ ...p, dest_ip: e.target.value }))} /></div>
+              <div className="field"><label htmlFor="simulations-seq-start">{t("Seq Start")}</label><input id="simulations-seq-start" className="input" type="number" value={customForm.seq_start} onChange={(e) => setCustomForm((p) => ({ ...p, seq_start: e.target.value }))} /></div>
+            </div>
+          </details>
           <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>{t("Start Custom Simulation")}</button>
         </form>
       )}

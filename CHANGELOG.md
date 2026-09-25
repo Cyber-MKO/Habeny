@@ -40,6 +40,10 @@ The release workflow publishes a version's section here as its release notes.
   also has the history charts and performance numbers from Perf Metrics. The System, Perf
   Metrics and SIEM Stats pages are gone; their old addresses open the Dashboard or
   Monitoring.
+- The deploy endpoint's API latency is no longer shown in the interface; it's Habeny's own
+  engineering metric, and stays in the Prometheus metrics (`/api/metrics`).
+- The custom EPS simulation's source IP, destination IP and first sequence number are under
+  **Advanced**: they only fill the built-in event format.
 - Managers is renamed **SIEM Targets**, and the Syslog Config page is merged into it. The
   UTMstack syslog listener (port 7014) is turned on and off in the container's Details.
 
