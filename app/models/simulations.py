@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.agents import AgentSelector
 from app.models.common import validate_absolute_path
-from app.models.enums import SimulationProfile, SimulationStatus, SyslogDeviceType, SyslogProtocol
+from app.models.enums import SimulationProfile, SyslogDeviceType, SyslogProtocol
 
 
 class SimulationStartRequest(BaseModel):
@@ -68,29 +68,6 @@ class CustomLogSimulationRequest(BaseModel):
                 "extra_fields": {"severity": "info", "app": "simulator"}
             }
         },
-    )
-
-
-class SimulationInfo(BaseModel):
-    """Simulation information"""
-    simulation_id: str
-    profile_id: SimulationProfile
-    status: SimulationStatus
-    target_agents: list[str]
-    duration: int
-    eps_target: int
-    intensity: str | None = None
-    burst_mode: bool = False
-    started_at: datetime
-    completed_at: datetime | None = None
-    stopped_at: datetime | None = None
-    events_generated: int = 0
-    events_per_second_actual: float | None = None
-    error: str | None = None
-    custom_parameters: dict[str, Any] | None = None
-
-    model_config = ConfigDict(
-        use_enum_values=True,
     )
 
 

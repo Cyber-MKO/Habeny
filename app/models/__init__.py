@@ -58,7 +58,6 @@ from app.models.reports import (
 )
 from app.models.simulations import (
     CustomLogSimulationRequest,
-    SimulationInfo,
     SimulationStartRequest,
     SyslogSimulationRequest,
 )
@@ -92,7 +91,6 @@ __all__ = [
     "AgentSelector",
     "SimulationStartRequest",
     "CustomLogSimulationRequest",
-    "SimulationInfo",
     "SyslogSimulationRequest",
     "ManagerProfileCreate",
     "ManagerProfileUpdate",
