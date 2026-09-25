@@ -18,6 +18,7 @@ agents register with the container name (Wazuh agent name, Elastic host name).
 import base64
 import json
 import logging
+import re
 import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -148,10 +149,20 @@ def _parse_time(value: Any) -> datetime | None:
         return None
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(value / 1000, timezone.utc)
+    text = str(value).replace("Z", "+00:00")
+    # Wazuh writes "+0000"; fromisoformat before Python 3.11 needs "+00:00".
+    text = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", text)
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return datetime.fromisoformat(text)
     except ValueError:
         return None
+
+
+def _first(bucket: dict) -> datetime | None:
+    """A min aggregation's time: the epoch value, else its formatted string."""
+    first = bucket.get("first") or {}
+    value = first.get("value")
+    return _parse_time(value if isinstance(value, (int, float)) else first.get("value_as_string"))
 
 
 def _dig(source: dict, dotted: str) -> Any:
@@ -195,7 +206,7 @@ def check(manager: dict, profile_id: str, containers: list[str], started_at: str
             continue
         row = per_container[name]
         row["alerts"] = bucket["doc_count"]
-        rule_times = {str(r["key"]): _parse_time(r["first"].get("value_as_string") or r["first"].get("value"))
+        rule_times = {str(r["key"]): _first(r)
                       for r in (bucket.get("rules") or {}).get("buckets", [])}
         relevant = [t for rid, t in rule_times.items() if t and (not expected or rid in expected)]
         if relevant:
@@ -244,7 +255,7 @@ def _ingestion(manager: dict, fields: dict, containers: list[str], start: dateti
     except DetectionError as e:
         return {"error": str(e)}
     buckets = ((result.get("aggregations") or {}).get("hosts") or {}).get("buckets", [])
-    firsts = [_parse_time(b["first"].get("value_as_string") or b["first"].get("value")) for b in buckets]
+    firsts = [_first(b) for b in buckets]
     lags = [max(0.0, (t - start).total_seconds()) for t in firsts if t]
     total = (result.get("hits") or {}).get("total") or {}
     return {"events": total.get("value", 0) if isinstance(total, dict) else total,

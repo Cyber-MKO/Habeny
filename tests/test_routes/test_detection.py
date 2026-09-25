@@ -127,6 +127,16 @@ def test_missed_expected_rules_are_listed(siem):
     assert result["detected"] == 0 and sorted(result["missed"]) == ["5302", "5401", "5405"]
 
 
+def test_alert_times_parse_in_every_format_the_siems_send():
+    expected = datetime(2026, 9, 24, 10, 0, 0, 123000, tzinfo=timezone.utc)
+    for value in ("2026-09-24T10:00:00.123+0000", "2026-09-24T10:00:00.123Z",
+                  "2026-09-24T10:00:00.123+00:00", expected.timestamp() * 1000):
+        assert detection._parse_time(value) == expected
+    # The epoch value wins over a formatted string.
+    assert detection._first({"first": {"value": expected.timestamp() * 1000,
+                                       "value_as_string": "unparseable"}}) == expected
+
+
 def test_elastic_counts_any_alert_and_measures_ingestion(siem):
     def answer(path, body):
         if path.startswith("/logs-*"):
