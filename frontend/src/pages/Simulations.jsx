@@ -89,7 +89,7 @@ export default function Simulations() {
   const { metrics } = useMetricsSocket();
   const [sims, setSims] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [syslogConfigs, setSyslogConfigs] = useState([]);
+  const [listeners, setListeners] = useState(null);
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState("attack");
@@ -97,8 +97,14 @@ export default function Simulations() {
 
   useEffect(() => {
     api.getManagers().then((r) => setManagers(r.data?.managers || [])).catch(() => {});
-    api.getSyslogConfigs().then((r) => setSyslogConfigs(r.data?.configs || [])).catch(() => {});
   }, []);
+  // UTMstack containers listening for syslog: only needed on the Syslog tab (listing containers is slow)
+  useEffect(() => {
+    if (tab !== "syslog" || listeners !== null) return;
+    api.getAgents({ siem_type: "utmstack", status: "running", limit: 1000 })
+      .then((r) => setListeners((r.data?.agents || []).filter((a) => a.syslog_listener && a.ip_addresses?.[0])))
+      .catch(() => setListeners([]));
+  }, [tab, listeners]);
 
   const [form, setForm] = useState({
     profile_id: "auth_bruteforce", duration: 300, eps_target: 100, detection_profile_id: "",
@@ -217,7 +223,7 @@ export default function Simulations() {
                 <option value="">{t("Don't check")}</option>
                 {detectionManagers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type})</option>)}
               </select>
-              <span id="simulations-detection-about" className="auth-hint">{detectionManagers.length ? t("After the run, Habeny asks this SIEM which alerts fired for the targets.") : t("Set a detection API on a Wazuh or Elastic manager profile (admins) to check detections.")}</span>
+              <span id="simulations-detection-about" className="auth-hint">{detectionManagers.length ? t("After the run, Habeny asks this SIEM which alerts fired for the targets.") : t("Set a detection API on a Wazuh or Elastic SIEM target (admins) to check detections.")}</span>
             </div>
             <div className="field"><label htmlFor="simulations-eps-target">{t("Events per second, per container")}</label><input id="simulations-eps-target" className="input" type="number" value={form.eps_target} onChange={(e) => setForm((p) => ({ ...p, eps_target: e.target.value }))} /></div>
           </div>
@@ -250,16 +256,27 @@ export default function Simulations() {
           <div className="section-title">{t("Syslog Simulation")}</div>
           <div className="form-grid">
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="simulations-use-syslog-config-profile">{t("Use Syslog Config Profile")}</label>
-              <select id="simulations-use-syslog-config-profile" className="select" onChange={(e) => {
-                const cfg = syslogConfigs.find((x) => x.config_id === e.target.value);
-                if (cfg) setSysForm((p) => ({ ...p, target_ip: cfg.target_ip, target_port: cfg.target_port || 514, protocol: cfg.protocol || "tcp" }));
-                if (!cfg) { const m = managers.find((x) => x.manager_id === e.target.value); if (m?.siem_ip) setSysForm((p) => ({ ...p, target_ip: m.siem_ip })); }
+              <label htmlFor="simulations-syslog-destination">{t("Send to")}</label>
+              <select id="simulations-syslog-destination" className="select" defaultValue="" onChange={(e) => {
+                const [kind, id] = e.target.value.split(":");
+                const m = kind === "target" && managers.find((x) => x.manager_id === id);
+                if (m) setSysForm((p) => ({ ...p, target_ip: m.siem_ip, target_port: m.syslog_port, protocol: m.syslog_protocol || "tcp" }));
+                const a = kind === "listener" && (listeners || []).find((x) => x.agent_name === id);
+                if (a) setSysForm((p) => ({ ...p, target_ip: a.ip_addresses[0], target_port: 7014, protocol: a.syslog_listener }));
               }}>
-                <option value="">{t("— select to auto-fill —")}</option>
-                {syslogConfigs.map((c) => <option key={c.config_id} value={c.config_id}>{c.name} ({c.target_ip}:{c.target_port} {(c.protocol||"tcp").toUpperCase()})</option>)}
-                {managers.filter((m) => m.siem_ip).map((m) => <option key={m.manager_id} value={m.manager_id}>{t("[Manager]")} {m.name} ({m.siem_ip})</option>)}
+                <option value="">{t("— pick a destination, or enter it below —")}</option>
+                <optgroup label={t("SIEM targets with a syslog port")}>
+                  {managers.filter((m) => m.siem_ip && m.syslog_port).map((m) => (
+                    <option key={m.manager_id} value={`target:${m.manager_id}`}>{m.name} ({m.siem_ip}:{m.syslog_port} {(m.syslog_protocol || "tcp").toUpperCase()})</option>
+                  ))}
+                </optgroup>
+                {listeners?.length > 0 && (
+                  <optgroup label={t("UTMstack containers listening for syslog")}>
+                    {listeners.map((a) => <option key={a.agent_name} value={`listener:${a.agent_name}`}>{a.agent_name} ({a.ip_addresses[0]}:7014 {a.syslog_listener.toUpperCase()})</option>)}
+                  </optgroup>
+                )}
               </select>
+              <p className="auth-hint">{t("Give a SIEM target a syslog port on the SIEM Targets page, or turn on a UTMstack container's listener in its details.")}</p>
             </div>
             <div className="field"><label htmlFor="simulations-target-ip">{t("Target IP")}</label><input id="simulations-target-ip" className="input" value={sysForm.target_ip} onChange={(e) => setSysForm((p) => ({ ...p, target_ip: e.target.value }))} required /></div>
             <div className="field"><label htmlFor="simulations-port">{t("Port")}</label><input id="simulations-port" className="input" type="number" value={sysForm.target_port} onChange={(e) => setSysForm((p) => ({ ...p, target_port: e.target.value }))} /></div>

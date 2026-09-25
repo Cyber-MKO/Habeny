@@ -136,7 +136,6 @@ class AgentInfo(BaseModel):
     created_at: datetime | None = None
     stats: dict[str, Any] | None = None
     siem_connectivity: SIEMConnectivity | None = None
-    tags: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(
         use_enum_values=True,

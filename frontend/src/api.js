@@ -144,7 +144,7 @@ export const api = {
   addHost: (body) => request("/hosts", { method: "POST", body }),
   updateHost: (id, body) => request(`/hosts/${id}`, { method: "PUT", body }),
   removeHost: (id) => request(`/hosts/${id}`, { method: "DELETE" }),
-  getSiemStats: (type) => request(`/siem/${type}/stats`),
+  getSiemSummary: () => request("/siem/summary"),
 
   uploadLogs: (id, body) => request(`/agents/${id}/logs/upload`, { method: "POST", body }),
 
@@ -160,11 +160,7 @@ export const api = {
   getMetricsHistory: (params) => request("/metrics/history", { params }),
   getSystemMetrics: () => request("/metrics/system"),
 
-  getSyslogConfigs: () => request("/syslog-configs"),
-  createSyslogConfig: (body) => request("/syslog-configs", { method: "POST", body }),
-  updateSyslogConfig: (id, body) => request(`/syslog-configs/${id}`, { method: "PUT", body }),
-  deleteSyslogConfig: (id) => request(`/syslog-configs/${id}`, { method: "DELETE" }),
-  testSyslogConnectivity: (params) => request("/syslog-configs/test-connectivity", { params }),
+  testSyslog: (managerId) => request(`/managers/${managerId}/syslog/test`, { method: "POST" }),
   enableUtmSyslog: (id, protocol) => request(`/agents/${id}/enable-syslog?protocol=${protocol}`, { method: "POST" }),
   disableUtmSyslog: (id, protocol) => request(`/agents/${id}/disable-syslog?protocol=${protocol}`, { method: "POST" }),
 

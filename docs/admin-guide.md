@@ -292,7 +292,7 @@ Admins create teams on the **Teams** page to separate teams or customers:
 - **Limits:** a team's container limit caps its total; a personal limit caps what one user
   creates. Both are checked before deployments and benchmarks.
 
-Manager profiles, syslog configs, groups and config templates are shared by everyone. The
+SIEM targets (manager profiles), groups and config templates are shared by everyone. The
 host-wide dashboard figures (CPU, memory) stay visible to all.
 
 ### Single sign-on (OpenID Connect)
@@ -560,7 +560,7 @@ later would muddy SIEM test results.
 After an attack simulation, Habeny can ask the SIEM which alerts it raised (see the
 [user guide](user-guide.md#checking-what-the-siem-detected)). It uses the SIEM's
 Elasticsearch-compatible search API, read-only. Set it up per SIEM, as an admin, on the
-manager profile (Fleet → Managers → Edit → **Detection API**):
+SIEM target (Fleet → SIEM Targets → Edit → **Detection API**):
 
 | SIEM | Search API URL | Account needs to read |
 |---|---|---|

@@ -46,8 +46,6 @@ from app.models.operations import (
 from app.models.profiles import (
     ManagerProfileCreate,
     ManagerProfileUpdate,
-    SyslogConfigCreate,
-    SyslogConfigUpdate,
 )
 from app.models.reports import (
     Report,
@@ -94,8 +92,6 @@ __all__ = [
     "SyslogSimulationRequest",
     "ManagerProfileCreate",
     "ManagerProfileUpdate",
-    "SyslogConfigCreate",
-    "SyslogConfigUpdate",
     "ConfigImportRequest",
     "ConfigTemplate",
     "LogUploadRequest",

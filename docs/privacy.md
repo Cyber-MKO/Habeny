@@ -30,9 +30,9 @@ In short:
 | **Deployments, benchmarks**: settings, per-container results, timings (SIEM auth keys are removed from stored benchmark settings) | `records`, `benchmarks`, `benchmark_*` | `HABENY_HISTORY_RETENTION_DAYS` after they finish | lower the setting |
 | **Metrics**: CPU, memory, disk, API latency samples | `metrics` | `HABENY_METRICS_RETENTION_DAYS` (default 30) | lower the setting |
 | **Reports** (PDF/CSV/JSON) | `DATA_DIR/reports` | `HABENY_REPORT_RETENTION_DAYS` (default 0: kept) | Reports page; set the setting |
-| **SIEM manager profiles**: addresses, versions, auth keys and detection API credentials (encrypted with `secret.key`) | `managers` | until deleted | Managers page |
+| **SIEM targets** (manager profiles): addresses, versions, syslog ports, auth keys and detection API credentials (encrypted with `secret.key`) | `managers` | until deleted | SIEM Targets page |
 | **Detection results**: per simulation, rule ids, names, levels and counts, and when each container was detected (no event contents) | `records` | `HABENY_HISTORY_RETENTION_DAYS` | lower the setting |
-| **Configuration templates, syslog configs, groups** | database and `DATA_DIR/configs` | until deleted | their pages |
+| **Configuration templates, groups** | database and `DATA_DIR/configs` | until deleted | their pages |
 | **Notification channels**: webhook/Slack URLs, email addresses (secrets encrypted) | `notification_channels` | until deleted | Notifications page |
 | **Other hosts**: address, pinned certificate fingerprint, API token (encrypted) | `hosts` | until removed | Hosts page |
 | **Containers**: agent configuration, SIEM enrollment keys, uploaded logs, anything the agents collect | `/var/lib/lxc/<name>` | until the container is deleted | Containers page, Bulk Ops |
@@ -58,7 +58,7 @@ Habeny connects only to:
 |---|---|---|
 | Agent download servers: packages.wazuh.com, artifacts.elastic.co, updates.atomicorp.com, and the OS image and package mirrors the containers use | deploying agents | the SIEM type chosen (see [legal/siem-vendors.md](legal/siem-vendors.md)) |
 | SIEM managers, the UTMStack server, Elastic Fleet | the agents enroll and send events; simulations send traffic | manager profiles, deploy and simulation forms |
-| Syslog targets | syslog simulations | the simulation form |
+| Syslog targets | syslog simulations, and **Test syslog port** | SIEM targets' syslog ports, the simulation form |
 | OpenID Connect provider | SSO sign-in | `HABENY_OIDC_*` |
 | Slack, webhooks, mail server | notifications | Notifications page, `HABENY_SMTP_*` |
 | Other Habeny servers | the Hosts feature | Hosts page |

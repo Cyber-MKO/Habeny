@@ -213,7 +213,7 @@ export default function Deploy() {
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="form-grid">
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="deploy-manager-profile">{t("Manager Profile")}</label>
+              <label htmlFor="deploy-manager-profile">{t("SIEM Target")}</label>
               <select id="deploy-manager-profile" className="select" value={form.manager_profile_id} onChange={(e) => applyManager(e.target.value)}>
                 <option value="">{t("— Manual configuration —")}</option>
                 {managers.map((m) => <option key={m.manager_id} value={m.manager_id}>{m.name} ({m.siem_type} — {m.siem_ip || t("no IP")})</option>)}

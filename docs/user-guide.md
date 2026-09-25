@@ -25,8 +25,10 @@ to them and measure how your SIEM copes. For installing and running the server, 
 - **SIEM agent:** the Wazuh, OSSEC, Elastic or UTMStack agent Habeny installs in a
   container, enrolled with your SIEM manager. A container can also run **no agent** (a
   bare container), for example to act as a syslog source.
-- **Manager profile:** saved settings for one SIEM manager (type, address, version,
-  enrollment key, group, resources), so a deployment is a couple of clicks.
+- **SIEM target** (also called a manager profile): one SIEM you test, saved once. It holds
+  what deploying agents needs (type, address, version, enrollment key, group, resources),
+  optionally the port the SIEM receives syslog on, and, for Wazuh and Elastic, the search API
+  Habeny asks what the SIEM detected.
 - **Group:** a named set of containers, for bulk operations, simulations and reports.
 - **Simulation:** generated activity sent through the containers to your SIEM: attack
   patterns, log events at a chosen rate, or syslog from simulated network devices.
@@ -61,15 +63,19 @@ authenticator app (or one of your recovery codes).
   license warnings, and **Read-only** if you're a viewer.
 - If your organization manages several Habeny servers, the **Server** menu at the top of the
   sidebar switches between them. A banner shows when you're on another server.
-- **Dashboard:** containers by SIEM type and state, live resource use, quick actions and
-  recent activity.
-- **System:** the server's platform, resources, container counts and available images.
+- **Dashboard:** everything at a glance: active alerts, the fleet (containers, running,
+  stopped, simulations), the host (platform status, CPU load, memory, disk), a row per SIEM
+  (containers, agents running, agents reaching their manager, and the latest detection
+  check), quick actions and recent activity. **Server details** at the bottom lists the
+  version, LXC, workers, and the supported SIEMs, OS images and simulation profiles.
+- **Monitoring:** alerts, the host's history (CPU, memory, disk, running containers),
+  deployment and simulation performance, and the endpoints for external monitoring.
 
 ## Deploying containers
 
 **Fleet → Deploy** (operators):
 
-1. Pick a **manager profile** to fill in the SIEM settings, or choose **Manual
+1. Pick a **SIEM target** to fill in the SIEM settings, or choose **Manual
    configuration** and enter them:
    - **SIEM type:** Wazuh, OSSEC, UTMstack, Elastic, or None (bare container).
    - **Manager IP** (the SIEM server's address), **version** and, for UTMstack and Elastic,
@@ -86,8 +92,18 @@ so the second deployment of the same agent is faster. If your team or you have a
 **container limit**, or the server's license has one, a deployment that would exceed it is
 refused with the reason.
 
-**Manager profiles** (Fleet → Managers) save a SIEM manager's settings. Auth keys are
-stored encrypted and only their last 4 characters are ever shown again.
+**SIEM targets** (Fleet → SIEM Targets) save each SIEM's settings: the agent settings above,
+and optionally:
+
+- **Syslog port** and protocol: where the SIEM receives syslog, at its address. Syslog
+  simulations can then pick the target as their destination; **Test syslog port** checks it
+  can be reached. For a SIEM Habeny doesn't deploy agents for, choose the type **Other
+  (syslog only)**.
+- **Detection API** (admins; Wazuh and Elastic): see
+  [Checking what the SIEM detected](#checking-what-the-siem-detected).
+
+Auth keys and detection passwords are stored encrypted; only the last 4 characters of an
+auth key are ever shown again.
 
 **Configs** (Insights → Configs) holds agent configuration templates, for example an
 `ossec.conf` for Wazuh with your own settings. Import one, then pick it when deploying.
@@ -138,7 +154,8 @@ you to type "delete" to confirm.
   number of events per second, for load testing ingestion.
 - **Syslog simulation:** send syslog from simulated routers, switches, firewalls or IDS
   devices (or a mix) to a SIEM's syslog port over TCP or UDP, at a chosen rate and for a
-  chosen time.
+  chosen time. **Send to** lists the SIEM targets that have a syslog port, and UTMstack
+  containers whose syslog listener is on; or enter an address and port.
 
 Running simulations are listed with their progress; **Stop** ends one early. Simulations
 generate real traffic to your SIEM: point them at test systems.
@@ -150,14 +167,15 @@ file, for example `/var/log/auth.log`, where the agent picks it up:
   indefinitely). Target one container or a whole group.
 - **Active Schedules** lists repeating uploads; **Stop** ends one.
 
-**Testing → Syslog Config** saves syslog destinations (address, port, protocol), tests
-that one is reachable, and turns on the syslog listener (port 7014) in UTMstack containers.
+**UTMstack syslog listener:** a UTMstack container's agent can receive syslog itself, on port
+7014. Turn it on in the container's **Details** (Fleet → Containers), and the container
+appears under **Send to** in syslog simulations.
 
 ## Checking what the SIEM detected
 
 Sending attacks is only half the test: Habeny can also ask the SIEM which alerts it raised,
 for **Wazuh** (the Wazuh indexer) and **Elastic** (Elasticsearch). An admin first sets the
-**detection API** on the SIEM's manager profile (Fleet → Managers; see the
+**detection API** on the SIEM's target (Fleet → SIEM Targets; see the
 [administrator guide](admin-guide.md#checking-detections)).
 
 1. On **Testing → Simulations → Attack**, choose the profile under **Check what the SIEM
@@ -195,11 +213,10 @@ host CPU load, memory or disk, deployment failures, API latency, the SIEM manage
 agents disconnecting. Benchmarks create real containers; delete
 them afterwards.
 
-**Insights → Perf Metrics:** deployment performance, API latency, simulation throughput,
-and live and historical memory, CPU and running-container charts.
-
-**Insights → SIEM Stats:** for each SIEM type, how many agents there are and how many are
-connected.
+**Monitoring** shows deployment performance (success rate, deployment times, API latency),
+simulation totals, and history charts for CPU, memory, disk and running containers. The
+**Dashboard**'s SIEM rows show, per SIEM type, how many agents run and reach their manager,
+and what the SIEM detected in the latest checked attack simulation.
 
 **Insights → Reports:** generate a report for a time range, optionally limited to
 certain SIEMs or simulations, as **JSON**, **CSV** or **PDF**, with a summary, automated
@@ -213,7 +230,8 @@ downloaded again.
   text, and export what matches as CSV or JSON Lines. Admins can **Verify integrity** to
   check that no entry was altered or removed.
 - **Monitoring:** active alerts (low disk space, LXC unavailable, failed backup or
-  deployment, unreachable host, license) and the addresses monitoring systems use.
+  deployment, unreachable host, license), history and performance charts, and the
+  addresses monitoring systems use.
 - **Hosts:** the other Habeny servers you can manage from here, with their status, version,
   containers and alerts. Pick one to work on it.
 
@@ -232,10 +250,10 @@ For admins; the [administrator guide](admin-guide.md) has the details.
 
 **Check what your SIEM detects**
 
-1. Save a manager profile for your test SIEM manager, with its detection API (admins).
+1. Add a SIEM target for your test SIEM, with its detection API (admins).
 2. Deploy 5–10 containers with that profile into a new group.
-3. Wait until the containers show the agent service running and SIEM Stats shows them
-   connected.
+3. Wait until the containers show the agent service running and the Dashboard's SIEM row
+   shows them reaching the manager.
 4. Run an attack simulation (e.g. SSH brute force) against the group, checking detections
    with that profile.
 5. Read the **Detected** result and its details, and generate a report to compare runs and
@@ -246,7 +264,7 @@ For admins; the [administrator guide](admin-guide.md) has the details.
 1. Deploy containers with the agent you want to measure.
 2. Run a custom EPS log simulation, raising the rate step by step, or a syslog simulation
    straight to the SIEM.
-3. Watch Perf Metrics here and your SIEM's own ingestion metrics; note the rate where
+3. Watch Monitoring here and your SIEM's own ingestion metrics; note the rate where
    events start arriving late or getting dropped.
 
 **Measure how fast you can scale**

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, NavLink, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import { MetricsProvider, useMetricsSocket } from "./ws";
 import { useStore } from "./store";
 import { Modal, Spinner } from "./components/UI";
@@ -13,14 +13,10 @@ import Groups from "./pages/Groups";
 import BulkOps from "./pages/BulkOps";
 import LogUpload from "./pages/LogUpload";
 import Simulations from "./pages/Simulations";
-import SiemStats from "./pages/SiemStats";
 import Reports from "./pages/Reports";
 import Activity from "./pages/Activity";
 import Configs from "./pages/Configs";
-import SystemInfo from "./pages/SystemInfo";
 import Managers from "./pages/Managers";
-import SyslogConfigs from "./pages/SyslogConfigs";
-import Benchmarks from "./pages/Benchmarks";
 import BenchmarkRunner from "./pages/BenchmarkRunner";
 import Account from "./pages/Account";
 import Monitoring from "./pages/Monitoring";
@@ -37,7 +33,6 @@ const NAV = [
     section: t("Overview"),
     items: [
       { to: "/", label: t("Dashboard"), icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" },
-      { to: "/system", label: t("System"), icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
       { to: "/activity", label: t("Activity"), icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
       { to: "/hosts", label: t("Hosts"), icon: "M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" },
       { to: "/monitoring", label: t("Monitoring"), icon: "M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" },
@@ -50,7 +45,7 @@ const NAV = [
       { to: "/deploy", label: t("Deploy"), minRole: "operator", icon: "M12 4v16m8-8H4" },
       { to: "/groups", label: t("Groups"), icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
       { to: "/bulk", label: t("Bulk Ops"), minRole: "operator", icon: "M4 6h16M4 12h16M4 18h16" },
-      { to: "/managers", label: t("Managers"), icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
+      { to: "/managers", label: t("SIEM Targets"), icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
     ],
   },
   {
@@ -58,15 +53,12 @@ const NAV = [
     items: [
       { to: "/simulations", label: t("Simulations"), icon: "M13 10V3L4 14h7v7l9-11h-7z" },
       { to: "/logs", label: t("Log Upload"), minRole: "operator", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-      { to: "/syslog-config", label: t("Syslog Config"), icon: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
       { to: "/benchmark-runner", label: t("Benchmark Runner"), minRole: "operator", icon: "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" },
     ],
   },
   {
     section: t("Insights"),
     items: [
-      { to: "/benchmarks", label: t("Perf Metrics"), icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
-      { to: "/siem", label: t("SIEM Stats"), icon: "M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" },
       { to: "/reports", label: t("Reports"), icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
       { to: "/configs", label: t("Configs"), icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
     ],
@@ -153,7 +145,7 @@ function Toasts() {
   );
 }
 
-const TITLES = { "/": t("Dashboard"), "/system": t("System Info"), "/managers": t("Managers"), "/agents": t("Containers"), "/deploy": t("Deploy"), "/groups": t("Groups"), "/bulk": t("Bulk Operations"), "/logs": t("Log Upload"), "/syslog-config": t("Syslog Config"), "/simulations": t("Simulations"), "/benchmark-runner": t("Benchmark Runner"), "/benchmarks": t("Perf Metrics"), "/siem": t("SIEM Stats"), "/reports": t("Reports"), "/configs": t("Configs"), "/activity": t("Activity Log"), "/account": t("Account"), "/monitoring": t("Monitoring"), "/notifications": t("Notifications"), "/teams": t("Teams"), "/hosts": t("Hosts"), "/license": t("License") };
+const TITLES = { "/": t("Dashboard"), "/managers": t("SIEM Targets"), "/agents": t("Containers"), "/deploy": t("Deploy"), "/groups": t("Groups"), "/bulk": t("Bulk Operations"), "/logs": t("Log Upload"), "/simulations": t("Simulations"), "/benchmark-runner": t("Benchmark Runner"), "/reports": t("Reports"), "/configs": t("Configs"), "/activity": t("Activity Log"), "/account": t("Account"), "/monitoring": t("Monitoring"), "/notifications": t("Notifications"), "/teams": t("Teams"), "/hosts": t("Hosts"), "/license": t("License") };
 
 // Which server the pages are showing, when it isn't this one
 function CurrentHost() {
@@ -289,18 +281,14 @@ function AppShell({ user }) {
         <main className="content" id="main" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/system" element={<SystemInfo />} />
             <Route path="/managers" element={<Managers />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/deploy" element={<Deploy />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/bulk" element={<BulkOps />} />
             <Route path="/logs" element={<LogUpload />} />
-            <Route path="/syslog-config" element={<SyslogConfigs />} />
             <Route path="/simulations" element={<Simulations />} />
             <Route path="/benchmark-runner" element={<BenchmarkRunner />} />
-            <Route path="/benchmarks" element={<Benchmarks />} />
-            <Route path="/siem" element={<SiemStats />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/configs" element={<Configs />} />
             <Route path="/activity" element={<Activity />} />
@@ -308,6 +296,11 @@ function AppShell({ user }) {
             <Route path="/monitoring" element={<Monitoring />} />
             <Route path="/hosts" element={<Hosts />} />
             <Route path="/license" element={<License />} />
+            {/* Pages merged into others; old bookmarks still land somewhere useful */}
+            <Route path="/system" element={<Navigate to="/" replace />} />
+            <Route path="/siem" element={<Navigate to="/" replace />} />
+            <Route path="/benchmarks" element={<Navigate to="/monitoring" replace />} />
+            <Route path="/syslog-config" element={<Navigate to="/managers" replace />} />
             {user.is_admin && <Route path="/notifications" element={<Notifications />} />}
             {user.is_admin && <Route path="/teams" element={<Teams />} />}
           </Routes>

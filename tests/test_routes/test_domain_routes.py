@@ -1,5 +1,5 @@
 """
-API coverage for groups, syslog profiles, reports, simulations, log upload and SIEM stats,
+API coverage for groups, reports, simulations, log upload and SIEM stats,
 against the LXC stub with in-container commands recorded (see the `attach` fixture).
 """
 import csv
@@ -45,41 +45,6 @@ def test_group_log_upload_runs_in_members(client, container, attach):
     assert resp.status_code == 200, resp.text
     assert any(call["name"] == container for call in attach.calls)
     client.delete("/groups/loggers")
-
-
-# ── syslog forwarding profiles ──────────────────────────────────────────
-
-def test_syslog_profile_crud(client):
-    created = client.post("/syslog-configs", json={"name": "fw-to-utm", "target_ip": "10.1.2.3",
-                                                   "target_port": 7014, "protocol": "udp"})
-    assert created.status_code == 200, created.text
-    config_id = created.json()["data"]["config_id"]
-    assert client.get(f"/syslog-configs/{config_id}").json()["data"]["target_ip"] == "10.1.2.3"
-    updated = client.put(f"/syslog-configs/{config_id}", json={"target_port": 514})
-    assert updated.status_code == 200 and client.get(f"/syslog-configs/{config_id}").json()["data"]["target_port"] == 514
-    assert config_id in [c["config_id"] for c in client.get("/syslog-configs").json()["data"]["configs"]]
-    assert client.delete(f"/syslog-configs/{config_id}").status_code == 200
-    assert client.get(f"/syslog-configs/{config_id}").status_code == 404
-
-
-@pytest.mark.parametrize("body", [{"name": "x", "target_ip": "1.2.3.4", "target_port": 70000},
-                                  {"name": "x", "target_ip": "1.2.3.4", "protocol": "carrier-pigeon"}])
-def test_syslog_profile_validation(client, body):
-    assert client.post("/syslog-configs", json=body).status_code == 422
-
-
-def test_syslog_connectivity_check(client):
-    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listener.bind(("127.0.0.1", 0))
-    listener.listen()
-    port = listener.getsockname()[1]
-    try:
-        resp = client.post("/syslog-configs/test-connectivity",
-                           params={"target_ip": "127.0.0.1", "target_port": port, "protocol": "tcp"})
-        assert resp.status_code == 200, resp.text
-        assert resp.json()["success"] is True
-    finally:
-        listener.close()
 
 
 # ── reports ─────────────────────────────────────────────────────────────

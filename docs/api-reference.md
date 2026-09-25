@@ -15,9 +15,8 @@ relative to `https://<server>:9000/api`. **Role** is the least role that may cal
 - [License](#license)
 - [Containers](#containers)
 - [Groups](#groups)
-- [Manager profiles](#manager-profiles)
+- [SIEM targets (manager profiles)](#siem-targets-manager-profiles)
 - [Configuration templates](#configuration-templates)
-- [Syslog configurations](#syslog-configurations)
 - [Simulations](#simulations)
 - [Benchmarks](#benchmarks)
 - [SIEM statistics](#siem-statistics)
@@ -441,14 +440,14 @@ Stop a container
 
 ### `POST /agents/{agent_id}/enable-syslog`
 
-Enable syslog on a UTMstack container (port 7014) and create a syslog config profile
+Turn on a UTMstack container's syslog listener (port 7014), so it can receive syslog simulations
 
 - **Role:** operator
 - **Query:** `protocol`
 
 ### `POST /agents/{agent_id}/disable-syslog`
 
-Disable syslog on a UTMstack container
+Turn off a UTMstack container's syslog listener
 
 - **Role:** operator
 - **Query:** `protocol`
@@ -565,7 +564,7 @@ Schedule periodic log uploads to all containers in a group.
   - `duration_seconds`: integer (optional)
   - `indefinite`: boolean, default `False`
 
-## Manager profiles
+## SIEM targets (manager profiles)
 
 ### `GET /managers`
 
@@ -600,10 +599,12 @@ Create a manager profile
   - `detection_username`: string (optional)
   - `detection_secret`: string (optional)
   - `detection_fingerprint`: string (optional)
+  - `syslog_port`: integer (optional)
+  - `syslog_protocol`: `udp` \| `tcp` (optional)
 
 ### `PUT /managers/{manager_id}`
 
-Update a manager profile. An empty detection_url or detection_fingerprint clears it.
+Update a manager profile. An empty detection_url or detection_fingerprint clears it;
 
 - **Role:** operator
 - **Body (JSON):**
@@ -622,6 +623,8 @@ Update a manager profile. An empty detection_url or detection_fingerprint clears
   - `detection_username`: string (optional)
   - `detection_secret`: string (optional)
   - `detection_fingerprint`: string (optional)
+  - `syslog_port`: integer (optional)
+  - `syslog_protocol`: `udp` \| `tcp` (optional)
 
 ### `DELETE /managers/{manager_id}`
 
@@ -632,6 +635,12 @@ Delete a manager profile
 ### `POST /managers/{manager_id}/detection/test`
 
 Check the profile's detection API: reachable, credentials accepted, alerts in the last 24 hours.
+
+- **Role:** operator
+
+### `POST /managers/{manager_id}/syslog/test`
+
+Check that the profile's syslog port can be reached (TCP), or send one test message (UDP)
 
 - **Role:** operator
 
@@ -661,61 +670,6 @@ Import a configuration template
 Export a configuration template
 
 - **Role:** viewer
-
-## Syslog configurations
-
-### `GET /syslog-configs`
-
-List all syslog config profiles
-
-- **Role:** viewer
-
-### `POST /syslog-configs`
-
-Create a syslog config profile
-
-- **Role:** operator
-- **Body (JSON):**
-  - `name` (required): string
-  - `description`: string (optional)
-  - `manager_profile_id`: string (optional)
-  - `target_ip` (required): string
-  - `target_port`: integer, default `514`
-  - `protocol`: `udp` \| `tcp`, default `tcp`
-  - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic` (optional)
-
-### `GET /syslog-configs/{config_id}`
-
-Get a syslog config profile
-
-- **Role:** viewer
-
-### `PUT /syslog-configs/{config_id}`
-
-Update a syslog config profile
-
-- **Role:** operator
-- **Body (JSON):**
-  - `name`: string (optional)
-  - `description`: string (optional)
-  - `manager_profile_id`: string (optional)
-  - `target_ip`: string (optional)
-  - `target_port`: integer (optional)
-  - `protocol`: `udp` \| `tcp` (optional)
-  - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic` (optional)
-
-### `DELETE /syslog-configs/{config_id}`
-
-Delete a syslog config profile
-
-- **Role:** operator
-
-### `POST /syslog-configs/test-connectivity`
-
-Test TCP/UDP connectivity to a syslog target
-
-- **Role:** operator
-- **Query:** `target_ip` (required), `target_port`, `protocol`
 
 ## Simulations
 
@@ -866,6 +820,12 @@ Compare multiple benchmarks side-by-side
   - `benchmark_ids` (required): list of string
 
 ## SIEM statistics
+
+### `GET /siem/summary`
+
+Per SIEM type: containers, running agents, agents that reach their manager, and the
+
+- **Role:** viewer
 
 ### `GET /siem/{siem_type}/stats`
 
