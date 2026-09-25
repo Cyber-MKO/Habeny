@@ -1,5 +1,6 @@
 """
-SIEM manager profile and syslog config profile models.
+SIEM manager profile (SIEM target) models: agent deployment defaults, the syslog port
+simulations send to, and the search API detection checks ask.
 """
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -25,6 +26,8 @@ class ManagerProfileCreate(BaseModel):
     detection_username: str | None = Field(None, max_length=200)
     detection_secret: str | None = Field(None, max_length=2000, description="Password, or an Elasticsearch API key")
     detection_fingerprint: str | None = Field(None, pattern=r"^([0-9A-F]{2}:){31}[0-9A-F]{2}$")
+    syslog_port: int | None = Field(None, ge=1, le=65535, description="Port the SIEM receives syslog on, at siem_ip")
+    syslog_protocol: SyslogProtocol | None = Field(None, description="tcp (default) or udp")
 
     @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
     @classmethod
@@ -54,42 +57,14 @@ class ManagerProfileUpdate(BaseModel):
     detection_username: str | None = Field(None, max_length=200)
     detection_secret: str | None = Field(None, max_length=2000)
     detection_fingerprint: str | None = Field(None, pattern=r"^(([0-9A-F]{2}:){31}[0-9A-F]{2})?$")
+    syslog_port: int | None = Field(None, ge=1, le=65535)
+    syslog_protocol: SyslogProtocol | None = None
 
     @field_validator('siem_ip', 'siem_version', 'siem_auth_key', 'agent_group')
     @classmethod
     def validate_install_fields(cls, v, info):
         """These values end up in agent install scripts and host paths."""
         return INSTALL_FIELD_CHECKS[info.field_name](v)
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-    )
-
-
-class SyslogConfigCreate(BaseModel):
-    """Create a syslog forwarding profile"""
-    name: str = Field(..., min_length=1, max_length=100)
-    description: str | None = Field(None, max_length=500)
-    manager_profile_id: str | None = Field(None, description="Link to a manager profile")
-    target_ip: str = Field(..., description="Syslog target IP/hostname")
-    target_port: int = Field(default=514, ge=1, le=65535)
-    protocol: SyslogProtocol = Field(default=SyslogProtocol.TCP)
-    siem_type: SIEMType | None = Field(None, description="SIEM type for context-aware behavior")
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-    )
-
-
-class SyslogConfigUpdate(BaseModel):
-    """Update a syslog config (all fields optional)"""
-    name: str | None = Field(None, min_length=1, max_length=100)
-    description: str | None = None
-    manager_profile_id: str | None = None
-    target_ip: str | None = None
-    target_port: int | None = Field(None, ge=1, le=65535)
-    protocol: SyslogProtocol | None = None
-    siem_type: SIEMType | None = None
 
     model_config = ConfigDict(
         use_enum_values=True,

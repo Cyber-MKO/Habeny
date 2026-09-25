@@ -1,17 +1,7 @@
 """
-All enums — container state, SIEM/OS types, simulation profiles, syslog devices, etc.
+All enums — SIEM/OS types, simulation profiles, syslog devices, etc.
 """
 from enum import Enum
-
-
-class ContainerState(str, Enum):
-    """LXC container states"""
-    STOPPED = "STOPPED"
-    RUNNING = "RUNNING"
-    FROZEN = "FROZEN"
-    STARTING = "STARTING"
-    STOPPING = "STOPPING"
-    ABORTING = "ABORTING"
 
 
 class SIEMType(str, Enum):
@@ -24,11 +14,10 @@ class SIEMType(str, Enum):
 
 
 class OSType(str, Enum):
-    """Supported operating system types"""
+    """Container images (app/core/os_images.py has one for each)"""
     UBUNTU_22_04 = "ubuntu_22_04"
-    UBUNTU_20_04 = "ubuntu_20_04"
-    DEBIAN_11 = "debian_11"
-    CENTOS_8 = "centos_8"
+    UBUNTU_24_04 = "ubuntu_24_04"
+    DEBIAN_12 = "debian_12"
 
 
 class ParallelMode(str, Enum):
@@ -51,24 +40,6 @@ class AgentLifecycleStatus(str, Enum):
     ERROR = "error"
     STARTING = "starting"
     STOPPING = "stopping"
-
-
-class SIEMConnectivityStatus(str, Enum):
-    """SIEM connectivity status"""
-    CONNECTED = "connected"
-    PENDING = "pending"
-    DISCONNECTED = "disconnected"
-    ERROR = "error"
-    NEVER_CONNECTED = "never_connected"
-
-
-class SimulationStatus(str, Enum):
-    """Simulation status"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    STOPPED = "stopped"
-    FAILED = "failed"
 
 
 class SimulationProfile(str, Enum):

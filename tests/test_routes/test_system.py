@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def test_system_info_lists_what_the_platform_supports(client):
     features = client.get("/system/info").json()["data"]["supported_features"]
     assert features["siem_types"] == ["wazuh", "ossec", "utmstack", "elastic"]
-    assert features["os_types"] == ["ubuntu_22_04", "ubuntu_20_04", "debian_11"]
+    assert features["os_types"] == ["ubuntu_22_04", "ubuntu_24_04", "debian_12"]
 
 
 def test_health_reflects_critical_alerts(client):

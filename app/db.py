@@ -1,5 +1,5 @@
 """
-SQLite persistence: agents, groups, manager and syslog profiles, metrics.
+SQLite persistence: agents, groups, manager profiles (SIEM targets), metrics.
 """
 import json
 import sqlite3
@@ -150,7 +150,7 @@ def mark_agent_deleted(db_path: Path, agent_name: str) -> None:
     with _connection(db_path) as conn:
         now = utc_now()
         conn.execute(
-            "UPDATE agents SET deleted_at = ?, updated_at = ? WHERE agent_name = ?",
+            "UPDATE agents SET deleted_at = ?, updated_at = ?, syslog_listener = NULL WHERE agent_name = ?",
             (now, now, agent_name)
         )
         conn.commit()
@@ -327,15 +327,16 @@ def create_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict
             INSERT INTO managers (manager_id, name, description, siem_type, siem_ip,
                 siem_version, siem_auth_key, os_type, agent_group, memory_limit,
                 cpu_shares, config_template_id, detection_url, detection_username,
-                detection_secret, detection_fingerprint, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                detection_secret, detection_fingerprint, syslog_port, syslog_protocol, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (manager_id, data["name"], data.get("description"), data["siem_type"],
              data.get("siem_ip"), data.get("siem_version"), encrypt_secret(data.get("siem_auth_key")),
              data.get("os_type", "ubuntu_22_04"), data.get("agent_group", "default"),
              data.get("memory_limit", "512MB"), data.get("cpu_shares", 1024),
              data.get("config_template_id"), data.get("detection_url"), data.get("detection_username"),
-             encrypt_secret(data.get("detection_secret")), data.get("detection_fingerprint"), now, now)
+             encrypt_secret(data.get("detection_secret")), data.get("detection_fingerprint"),
+             data.get("syslog_port"), data.get("syslog_protocol"), now, now)
         )
         conn.commit()
         return {**data, "manager_id": manager_id, "created_at": now, "updated_at": now}
@@ -368,7 +369,7 @@ def update_manager(db_path: Path, manager_id: str, data: dict[str, Any]) -> dict
         fields = ["name", "description", "siem_type", "siem_ip", "siem_version",
                   "siem_auth_key", "os_type", "agent_group", "memory_limit",
                   "cpu_shares", "config_template_id", "detection_url", "detection_username",
-                  "detection_secret", "detection_fingerprint"]
+                  "detection_secret", "detection_fingerprint", "syslog_port", "syslog_protocol"]
         updates = []
         values = []
         for f in fields:
@@ -395,69 +396,6 @@ def delete_manager(db_path: Path, manager_id: str) -> bool:
 
 
 # ===== SYSLOG CONFIGS =====
-
-def create_syslog_config(db_path: Path, config_id: str, data: dict[str, Any]) -> dict[str, Any]:
-    with _connection(db_path) as conn:
-        now = utc_now()
-        conn.execute(
-            """
-            INSERT INTO syslog_configs (config_id, name, description, manager_profile_id,
-                target_ip, target_port, protocol, siem_type, enabled, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (config_id, data["name"], data.get("description"), data.get("manager_profile_id"),
-             data["target_ip"], data.get("target_port", 514), data.get("protocol", "tcp"),
-             data.get("siem_type"), 1, now, now)
-        )
-        conn.commit()
-        return {**data, "config_id": config_id, "enabled": True, "created_at": now, "updated_at": now}
-
-
-def list_syslog_configs(db_path: Path) -> list[dict[str, Any]]:
-    with _connection(db_path) as conn:
-        rows = conn.execute("SELECT * FROM syslog_configs ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_syslog_config(db_path: Path, config_id: str) -> dict[str, Any] | None:
-    with _connection(db_path) as conn:
-        row = conn.execute("SELECT * FROM syslog_configs WHERE config_id = ?", (config_id,)).fetchone()
-        return dict(row) if row else None
-
-
-def update_syslog_config(db_path: Path, config_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
-    with _connection(db_path) as conn:
-        existing = conn.execute("SELECT * FROM syslog_configs WHERE config_id = ?", (config_id,)).fetchone()
-        if not existing:
-            return None
-        now = utc_now()
-        fields = ["name", "description", "manager_profile_id", "target_ip", "target_port",
-                  "protocol", "siem_type", "enabled"]
-        updates, values = [], []
-        for f in fields:
-            if f in data:
-                updates.append(f"{f} = ?")
-                values.append(data[f])
-        if not updates:
-            return dict(existing)
-        updates.append("updated_at = ?")
-        values.append(now)
-        values.append(config_id)
-        conn.execute(f"UPDATE syslog_configs SET {', '.join(updates)} WHERE config_id = ?", values)
-        conn.commit()
-        row = conn.execute("SELECT * FROM syslog_configs WHERE config_id = ?", (config_id,)).fetchone()
-        return dict(row)
-
-
-def delete_syslog_config(db_path: Path, config_id: str) -> bool:
-    with _connection(db_path) as conn:
-        before = conn.total_changes
-        conn.execute("DELETE FROM syslog_configs WHERE config_id = ?", (config_id,))
-        conn.commit()
-        return conn.total_changes > before
-
-
-# ===== METRICS =====
 
 def record_metric(db_path: Path, metric_type: str, metric_name: str,
                   value: float, tags: str | None = None) -> None:

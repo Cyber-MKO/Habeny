@@ -55,6 +55,7 @@ def write_agent_metadata(agent_name: str, metadata: dict[str, Any]) -> None:
         "manager_port",
         "manager_status",
         "manager_reachable",
+        "syslog_listener",
         "created_at",
         "updated_at",
         "deleted_at"
@@ -169,14 +170,14 @@ def get_agent_info(container, detailed: bool = False) -> dict:
             "agent_group",
             "os_type",
             "created_at",
-            "tags",
             "siem_agent_status",
             "siem_agent_running",
             "siem_agent_last_check",
             "manager_host",
             "manager_port",
             "manager_status",
-            "manager_reachable"
+            "manager_reachable",
+            "syslog_listener",
         ]:
             value = metadata.get(key)
             if value is not None:

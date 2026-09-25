@@ -4,8 +4,8 @@ Shared by the app and the privileged helper, which only creates these images.
 """
 OS_IMAGES = {
     "ubuntu_22_04": {"distro": "ubuntu", "release": "jammy", "arch": "amd64"},
-    "ubuntu_20_04": {"distro": "ubuntu", "release": "focal", "arch": "amd64"},
-    "debian_11": {"distro": "debian", "release": "bullseye", "arch": "amd64"},
+    "ubuntu_24_04": {"distro": "ubuntu", "release": "noble", "arch": "amd64"},
+    "debian_12": {"distro": "debian", "release": "bookworm", "arch": "amd64"},
 }
 
 

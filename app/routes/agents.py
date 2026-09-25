@@ -2,7 +2,6 @@
 Container endpoints: deploy (+ live progress), list, stats, get, delete, bulk ops, start/stop, UTMstack syslog toggles.
 """
 import asyncio
-import contextlib
 import json
 import logging
 import time
@@ -15,7 +14,7 @@ from app.config import DB_PATH
 from app.core.common import check_root
 from app.core.lxc_backend import lxc
 from app.core.shell import execute_in_container
-from app.db import create_group, create_syslog_config, get_manager, get_or_create_agent_seq_id, group_exists
+from app.db import create_group, get_manager, get_or_create_agent_seq_id, group_exists
 from app.models import AgentDeploymentRequest, APIResponse, BulkOperationRequest, utc_now
 from app.services import licensing, tenancy
 from app.services.activity import log_activity
@@ -532,7 +531,7 @@ async def stop_agent(agent_id: str, root: bool = Depends(check_root), user: dict
 
 @router.post("/agents/{agent_id}/enable-syslog", response_model=APIResponse)
 async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), user: dict | None = Depends(current_user)):
-    """Enable syslog on a UTMstack container (port 7014) and create a syslog config profile"""
+    """Turn on a UTMstack container's syslog listener (port 7014), so it can receive syslog simulations"""
     try:
         if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
@@ -547,29 +546,15 @@ async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), us
         if not result.get("success"):
             return APIResponse(success=False, message="Failed to enable syslog", error=result.get("stderr", ""))
 
-        # Get the container's IP for the syslog config profile
         container = lxc.Container(agent_id)
         ips = container.get_ips() if container.running else []
-        agent_ip = ips[0] if ips else agent_id
-
-        # Auto-create a syslog config profile for this listener
-        profile_name = f"{agent_id}-syslog-{proto}"
-        config_id = str(uuid.uuid4())
-        with contextlib.suppress(Exception):  # profile may already exist from a previous enable
-            create_syslog_config(DB_PATH, config_id, {
-                "name": profile_name,
-                "description": f"Auto-created: syslog {proto.upper()} on {agent_id} port 7014",
-                "target_ip": agent_ip,
-                "target_port": 7014,
-                "protocol": proto,
-                "siem_type": "utmstack",
-            })
+        # Remembered on the container, so syslog simulations can offer it as a destination
+        write_agent_metadata(agent_id, {"syslog_listener": proto})
 
         log_activity("utmstack_syslog_enabled", {"agent_id": agent_id, "protocol": proto})
         return APIResponse(success=True, message=f"Syslog {proto.upper()} enabled on {agent_id} (port 7014)", data={
             "agent_id": agent_id, "protocol": proto, "port": 7014,
-            "syslog_config_profile": profile_name,
-            "target_ip": agent_ip,
+            "target_ip": ips[0] if ips else None,
             "output": result.get("stdout", ""),
         })
     except HTTPException:
@@ -580,7 +565,7 @@ async def enable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), us
 
 @router.post("/agents/{agent_id}/disable-syslog", response_model=APIResponse)
 async def disable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), user: dict | None = Depends(current_user)):
-    """Disable syslog on a UTMstack container"""
+    """Turn off a UTMstack container's syslog listener"""
     try:
         if not _visible_container(agent_id, user):
             raise HTTPException(status_code=404, detail=f"Container '{agent_id}' not found")
@@ -595,6 +580,7 @@ async def disable_utmstack_syslog(agent_id: str, protocol: str = Query("tcp"), u
         if not result.get("success"):
             return APIResponse(success=False, message="Failed to disable syslog", error=result.get("stderr", ""))
 
+        write_agent_metadata(agent_id, {"syslog_listener": None})
         log_activity("utmstack_syslog_disabled", {"agent_id": agent_id, "protocol": proto})
         return APIResponse(success=True, message=f"Syslog {proto.upper()} disabled on {agent_id}", data={
             "agent_id": agent_id, "protocol": proto, "output": result.get("stdout", ""),

@@ -7,9 +7,20 @@ The release workflow publishes a version's section here as its release notes.
 
 ## [Unreleased]
 
-**Upgrading:** options that the API accepted but that did nothing are removed (see
-"Removed"). Scripts that call `GET /api/` for platform information should use
-`GET /api/system/info` instead.
+**Upgrading:**
+- Options that the API accepted but that did nothing are removed (see "Removed"). Scripts
+  that call `GET /api/` for platform information should use `GET /api/system/info` instead.
+- **Saved syslog configs are now part of SIEM targets** (manager profiles). Migration v0009
+  moves each one onto the profile it was linked to, when that profile has the same address
+  or none, and otherwise makes it a profile of its own (type "none", i.e. syslog only), so
+  no destination is lost. `/api/syslog-configs` is removed: use `syslog_port` and
+  `syslog_protocol` on `/api/managers`, and `POST /api/managers/{id}/syslog/test`.
+  UTMstack syslog listeners turned on before the upgrade need turning on again (container
+  Details) to appear as syslog simulation destinations.
+- **Container images:** Ubuntu 20.04 and Debian 11 are replaced by Ubuntu 24.04 and
+  Debian 12. Migration v0010 moves SIEM targets that name a retired image to its
+  replacement (and `centos_8`, which never had an image, to Ubuntu 22.04). Existing
+  containers keep running; API calls that ask for a retired image are refused (422).
 
 ### Added
 - **Checking what the SIEM detected.** After an attack simulation, Habeny asks the SIEM's
@@ -21,6 +32,24 @@ The release workflow publishes a version's section here as its release notes.
   and SIEM. `HABENY_DETECTION_DELAY_SECONDS` sets how long to wait for the SIEM first.
   **Upgrading:** migration v0008 adds the settings to manager profiles.
 - `GET /api/reports` lists the reports you can see; the Reports page's history uses it.
+- **SIEM targets:** manager profiles can hold the port the SIEM receives syslog on, with a
+  connectivity test. Syslog simulations pick their destination from SIEM targets with a
+  syslog port and from UTMstack containers whose listener is on.
+- The Dashboard shows a row per SIEM type: containers, agents running, agents reaching their
+  manager, and the latest detection check (`GET /api/siem/summary`).
+
+### Changed
+- **Fewer pages.** The Dashboard now also shows the host's resources, active alerts, a
+  per-SIEM summary and (under Server details) what the System page showed. Monitoring now
+  also has the history charts and performance numbers from Perf Metrics. The System, Perf
+  Metrics and SIEM Stats pages are gone; their old addresses open the Dashboard or
+  Monitoring.
+- The deploy endpoint's API latency is no longer shown in the interface; it's Habeny's own
+  engineering metric, and stays in the Prometheus metrics (`/api/metrics`).
+- The custom EPS simulation's source IP, destination IP and first sequence number are under
+  **Advanced**: they only fill the built-in event format.
+- Managers is renamed **SIEM Targets**, and the Syslog Config page is merged into it. The
+  UTMstack syslog listener (port 7014) is turned on and off in the container's Details.
 
 ### Removed
 - Options that were accepted but had no effect:
@@ -33,6 +62,11 @@ The release workflow publishes a version's section here as its release notes.
   - log upload's "log type"
   - the `debian_10` OS type, which silently deployed Ubuntu 22.04 instead; it's now refused
 - `GET /api/`, which duplicated `GET /api/system/info`.
+- `/api/syslog-configs` (see "Upgrading").
+- Unused API models and enums (`AgentInfo`, `SIEMConnectivity`, `ContainerState`,
+  `SIEMConnectivityStatus`, `SimulationStatus`), left over after the models removed above.
+- The unused `tags` field on containers: containers can't be tagged. Groups organize and
+  target containers; teams control access.
 - From the interface: Deploy → Parallel mode (the default is kept), the Containers "Seq"
   column, and Reports → "Fetch report by ID" (Report History now lists every report).
 
@@ -49,6 +83,12 @@ The release workflow publishes a version's section here as its release notes.
   View button didn't work. It now lists every report you can see.
 - The Dashboard's platform status always said "Healthy". It now says "Degraded" while a
   critical alert is active.
+- SIEM Stats and `GET /api/siem/{type}/stats` counted only Wazuh agents as connected,
+  because they checked for the Wazuh service on every container. Connected now means the
+  agent runs and reaches its manager, as each container's status check reports it, for
+  every SIEM type.
+- The syslog connectivity test couldn't run from the interface (it was called with the
+  wrong HTTP method), and blocked the server for up to 5 seconds while it waited.
 
 ## [2.2.0] - 2026-09-24
 

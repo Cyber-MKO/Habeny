@@ -4,9 +4,7 @@ Pydantic models split by domain. Import from here: ``from app.models import APIR
 from app.models.activity import ActivityLog
 from app.models.agents import (
     AgentDeploymentRequest,
-    AgentInfo,
     AgentSelector,
-    SIEMConnectivity,
 )
 from app.models.auth import (
     ApiTokenCreateRequest,
@@ -26,13 +24,10 @@ from app.models.common import utc_now
 from app.models.configs import ConfigImportRequest, ConfigTemplate
 from app.models.enums import (
     AgentLifecycleStatus,
-    ContainerState,
     OSType,
     ParallelMode,
-    SIEMConnectivityStatus,
     SIEMType,
     SimulationProfile,
-    SimulationStatus,
     SyslogDeviceType,
     SyslogProtocol,
 )
@@ -46,8 +41,6 @@ from app.models.operations import (
 from app.models.profiles import (
     ManagerProfileCreate,
     ManagerProfileUpdate,
-    SyslogConfigCreate,
-    SyslogConfigUpdate,
 )
 from app.models.reports import (
     Report,
@@ -58,7 +51,6 @@ from app.models.reports import (
 )
 from app.models.simulations import (
     CustomLogSimulationRequest,
-    SimulationInfo,
     SimulationStartRequest,
     SyslogSimulationRequest,
 )
@@ -76,28 +68,20 @@ __all__ = [
     "TwoFactorCodeRequest",
     "TwoFactorDisableRequest",
     "utc_now",
-    "ContainerState",
     "SIEMType",
     "OSType",
     "ParallelMode",
     "SyslogProtocol",
     "AgentLifecycleStatus",
-    "SIEMConnectivityStatus",
-    "SimulationStatus",
     "SimulationProfile",
     "SyslogDeviceType",
     "AgentDeploymentRequest",
-    "SIEMConnectivity",
-    "AgentInfo",
     "AgentSelector",
     "SimulationStartRequest",
     "CustomLogSimulationRequest",
-    "SimulationInfo",
     "SyslogSimulationRequest",
     "ManagerProfileCreate",
     "ManagerProfileUpdate",
-    "SyslogConfigCreate",
-    "SyslogConfigUpdate",
     "ConfigImportRequest",
     "ConfigTemplate",
     "LogUploadRequest",

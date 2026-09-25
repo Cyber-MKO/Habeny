@@ -18,6 +18,43 @@ const COLUMNS = [
   { key: "agent_group", label: t("Group"), render: (r) => r.agent_group || "—" },
 ];
 
+// UTMstack only: its agent can listen for syslog on port 7014, a destination for syslog simulations
+function UtmSyslogListener({ agent, onChanged }) {
+  const { toast } = useStore();
+  const [protocol, setProtocol] = useState("tcp");
+  const [busy, setBusy] = useState(false);
+  const on = agent.syslog_listener;
+  const change = async (enable) => {
+    setBusy(true);
+    try {
+      const res = await (enable ? api.enableUtmSyslog : api.disableUtmSyslog)(agent.agent_name, enable ? protocol : on);
+      toast(res.message, res.success ? "success" : "error");
+      if (res.success) onChanged();
+    } catch (e) { toast(e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <fieldset className="detection-fields">
+      <legend>{t("Syslog listener (port 7014)")}</legend>
+      <p className="auth-hint">
+        {on ? t("Listening for syslog on {address} over {protocol}. Syslog simulations can send to it.", { address: `${agent.ip_addresses?.[0] || agent.agent_name}:7014`, protocol: on.toUpperCase() })
+          : t("Off. Turn it on to send syslog simulations to this container's UTMstack agent.")}
+      </p>
+      <div className="btn-group">
+        {on ? <button className="btn btn-sm btn-danger" onClick={() => change(false)} disabled={busy}>{t("Turn off")}</button> : (
+          <>
+            <label className="sr-only" htmlFor="utm-syslog-protocol">{t("Protocol")}</label>
+            <select id="utm-syslog-protocol" className="select" style={{ width: "auto" }} value={protocol} onChange={(e) => setProtocol(e.target.value)} disabled={busy}>
+              <option value="tcp">TCP</option><option value="udp">UDP</option>
+            </select>
+            <button className="btn btn-sm btn-primary" onClick={() => change(true)} disabled={busy}>{t("Turn on")}</button>
+          </>
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
 export default function Agents() {
   const { toast } = useStore();
   const confirm = useConfirm();
@@ -144,6 +181,9 @@ export default function Agents() {
       {detail && (
         <Modal title={t("Container: {detail}", { detail })} onClose={() => { setDetail(null); setDetailData(null); }}>
           {detailData ? <Details data={detailData} /> : <Spinner />}
+          {detailData?.siem_type === "utmstack" && detailData.lifecycle_status === "running" && (
+            <UtmSyslogListener agent={detailData} onChanged={() => showDetail(detailData)} />
+          )}
           <div className="btn-group" style={{ marginTop: 12 }}>
             <button className="btn btn-sm btn-primary" onClick={() => { setDetail(null); setDetailData(null); setConsoleName(detail); }}>{t("Open Console")}</button>
           </div>

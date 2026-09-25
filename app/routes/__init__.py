@@ -33,7 +33,6 @@ def register_routes(app: FastAPI) -> None:
         siem,
         simulations,
         static,
-        syslog_configs,
         system,
         teams,
         users,
@@ -56,7 +55,6 @@ def register_routes(app: FastAPI) -> None:
         activity,
         managers,
         benchmarks,
-        syslog_configs,
         siem,
     ):
         app.include_router(module.router, dependencies=[Depends(require_access)])

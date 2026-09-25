@@ -81,6 +81,13 @@ lxc-attach -n "$CONTAINER" -- grep -Eq '^[A-Z][a-z]{2} [ 0-9][0-9] [0-9:]{8} [^ 
     || fail "no syslog-format brute force lines in /var/log/auth.log"
 lxc-attach -n "$CONTAINER" -- grep -q 'HTTP/1.1" [0-9]' /var/log/apache2/access.log || fail "no web attack lines"
 
+step "Deploying a Debian 12 container (the other image family)"
+RESULT="$(api POST /agents/deploy "{\"count\":1,\"siem_type\":\"none\",\"os_type\":\"debian_12\",\"agent_base_name\":\"$NAME-deb\",\"deployment_id\":\"itest-2\"}")"
+echo "$RESULT" | field 'd["success"]' | grep -qx True || { echo "$RESULT" >&2; fail "Debian 12 deployment failed"; }
+DEBIAN="$(echo "$RESULT" | field 'd["data"]["deployed_agents"][0]["agent_name"]')"
+lxc-attach -n "$DEBIAN" -- cat /etc/os-release | grep -q bookworm || fail "not a Debian 12 container"
+api DELETE "/agents/$DEBIAN" >/dev/null
+
 step "Full backup, then verify it"
 BACKUP="$(api POST /system/backups | field 'd["data"]["backup"]["name"]')"
 habeny backup verify "$DATA_DIR/backups/$BACKUP"

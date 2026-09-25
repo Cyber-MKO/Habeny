@@ -935,6 +935,15 @@ tbody tr:hover td { background: rgba(27, 179, 199, 0.05); }
 .account-username { display: inline-flex; align-items: center; gap: 8px; }
 
 /* ── Dashboard ──────────────────────────────────────────── */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-head .section-title { margin-bottom: 0; }
+.section-head + .card { margin-top: 12px; }
+.server-details { margin-top: 20px; }
+.advanced-fields { margin-top: 12px; }
+.advanced-fields summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.server-details summary { cursor: pointer; margin-bottom: 0; }
+.server-details[open] summary { margin-bottom: 12px; }
 .dashboard-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .dashboard-split { grid-template-columns: 1fr; } }
 .auth-divider { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 12px; }

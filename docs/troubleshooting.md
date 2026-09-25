@@ -133,8 +133,8 @@ Change its SIEM type.
    fails enrollment; the agent's log says so (Wazuh: `/var/ossec/logs/ossec.log`).
 5. Agent version: some SIEM managers refuse agents newer than themselves. Deploy the same
    version as the manager (the SIEM version field, or the manager profile).
-6. **SIEM Stats** counts agents Habeny sees as connected; your SIEM's own view is the
-   reference.
+6. The **Dashboard**'s SIEM rows count agents that run and reach their manager, as each
+   container reports it; your SIEM's own view is the reference.
 
 ## Simulations and log uploads
 
@@ -143,7 +143,10 @@ Change its SIEM type.
   detect it out of the box.
 - **Syslog simulation traffic doesn't arrive:** check the target address and port, the
   protocol (TCP or UDP) the SIEM listens on, and firewalls between the Habeny server and the
-  SIEM. **Syslog Config → Test** checks connectivity.
+  SIEM. On the SIEM target, **Test syslog port** checks connectivity (a UDP test can only
+  send, not confirm).
+- **A UTMstack container doesn't show under Send to:** turn its syslog listener on in the
+  container's Details. Listeners turned on before version 2.3 need turning on again there.
 - **Log upload says the path is invalid:** the destination must be an absolute path inside
   the container, such as `/var/log/auth.log`, using only letters, digits and `_ . @ + / -`;
   `..` isn't allowed.
@@ -157,7 +160,7 @@ Change its SIEM type.
 | "The SIEM's certificate isn't from a trusted authority" | a self-signed certificate (usual for the Wazuh indexer) | check the fingerprint and **Trust this certificate** on the manager profile |
 | "presented a different certificate than the one confirmed" | the SIEM's certificate changed | if that's expected, clear the fingerprint and trust the new one; otherwise investigate |
 | "The SIEM rejected the credentials" | wrong user name, password or API key, or the account lacks read access | fix them on the manager profile; see [admin-guide.md](admin-guide.md#checking-detections) |
-| 0 of N detected, and the details show no alerts at all | the agents aren't connected, the agent doesn't watch the log file, or the SIEM hadn't indexed yet | check SIEM Stats and the agent's log; **Check now** again after a few minutes; raise `HABENY_DETECTION_DELAY_SECONDS` |
+| 0 of N detected, and the details show no alerts at all | the agents aren't connected, the agent doesn't watch the log file, or the SIEM hadn't indexed yet | check the Dashboard's SIEM row and the agent's log; **Check now** again after a few minutes; raise `HABENY_DETECTION_DELAY_SECONDS` |
 | Alerts listed, but not counted as detected (Wazuh) | alerts fired, but not the rules the profile should trigger | see which rules fired; your ruleset may use other ids or be tuned down |
 | Elastic: events received but no alerts | no enabled detection rule matches these events | enable matching rules in Kibana (Security → Rules) |
 | "Not checked": Habeny restarted before the check | a restart during the wait | **Detections → Check now** |

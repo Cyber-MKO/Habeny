@@ -140,3 +140,16 @@ def test_schedule_api_hides_the_stored_request(client, monkeypatch):
     from app.services.logs import schedule_public
     public = schedule_public({"schedule_id": "s", "task": object(), "request": {"content": "secret-ish"}})
     assert public == {"schedule_id": "s"}
+
+
+def test_benchmarks_left_running_are_aborted_at_startup(app):
+    """A benchmark marked running with no task behind it (crash, restart) ends as aborted
+    when Habeny starts, without anyone calling POST /benchmarks/cleanup."""
+    import app as app_package
+    from app.services import benchmarks as bm
+
+    bm._save_benchmark({"benchmark_id": "left-running", "scenario_id": "linear_scale", "status": "running",
+                        "started_at": bm._now()})
+    app_package._initialize_storage()
+    stored = bm.get_benchmark("left-running")
+    assert stored["status"] == "aborted" and stored["completed_at"]

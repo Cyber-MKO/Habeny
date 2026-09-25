@@ -175,7 +175,7 @@ export default function BenchmarkRunner() {
             <div className="section-title">{t("Configuration")}</div>
             <div className="form-grid">
               <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <label htmlFor="benchmark-runner-manager-profile">{t("Manager Profile")}</label>
+                <label htmlFor="benchmark-runner-manager-profile">{t("SIEM Target")}</label>
                 <select id="benchmark-runner-manager-profile" className="select" onChange={(e) => {
                   const mgr = managers.find((m) => m.manager_id === e.target.value);
                   if (!mgr) { setLaunchConfig((p) => ({ ...p, manager_profile_id: "" })); return; }
