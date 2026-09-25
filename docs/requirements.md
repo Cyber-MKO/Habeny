@@ -22,10 +22,9 @@ plan to run.
 - Habeny can't run in Docker (see [admin-guide.md](admin-guide.md#installing)).
 - ARM (aarch64) isn't supported yet.
 
-**Container images** Habeny can deploy: Ubuntu 22.04 (default), Ubuntu 20.04 and Debian 11,
+**Container images** Habeny can deploy: Ubuntu 22.04 (default), Ubuntu 24.04 and Debian 12,
 downloaded from the LXC image server (images.linuxcontainers.org) the first time each is
-used. Ubuntu 20.04 and Debian 11 no longer get standard security updates from their
-vendors; use them only to test agents that need them.
+used. All three get standard security updates from their vendors.
 
 **SIEM agents:** Wazuh 4.x, OSSEC (Atomicorp packages), Elastic Agent 8.x/9.x with Fleet,
 and UTMStack. Habeny installs the agent version you choose (or the default shown on the

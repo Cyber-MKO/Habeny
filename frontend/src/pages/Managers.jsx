@@ -8,7 +8,7 @@ import { Details } from "../components/Details";
 import { t } from "../i18n";
 
 const SIEM_TYPES = ["wazuh", "ossec", "utmstack", "elastic", "none"];
-const OS_TYPES = ["ubuntu_22_04", "ubuntu_20_04", "debian_11"];
+const OS_TYPES = ["ubuntu_22_04", "ubuntu_24_04", "debian_12"];
 
 const EMPTY_FORM = {
   name: "", description: "", siem_type: "wazuh", siem_ip: "", siem_version: "4.14.2",

@@ -266,8 +266,8 @@ export default function Deploy() {
               <label htmlFor="deploy-os-type">{t("OS Type")}</label>
               <select id="deploy-os-type" className="select" value={form.os_type} onChange={(e) => set("os_type", e.target.value)}>
                 <option value="ubuntu_22_04">{t("Ubuntu 22.04")}</option>
-                <option value="ubuntu_20_04">{t("Ubuntu 20.04")}</option>
-                <option value="debian_11">{t("Debian 11")}</option>
+                <option value="ubuntu_24_04">{t("Ubuntu 24.04")}</option>
+                <option value="debian_12">{t("Debian 12")}</option>
               </select>
             </div>
             <div className="field">

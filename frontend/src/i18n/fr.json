@@ -173,7 +173,6 @@
   "Custom EPS log event": "Événement de journal EPS personnalisé",
   "Custom simulation started": "Simulation personnalisée lancée",
   "Dashboard": "Tableau de bord",
-  "Debian 11": "Debian 11",
   "Delete": "Supprimer",
   "Delete channel": "Supprimer le canal",
   "Delete config": "Supprimer la configuration",
@@ -637,7 +636,6 @@
   "UTMstack Auth Key": "Clé d'authentification UTMstack",
   "UTMstack auth key": "Clé d'authentification UTMstack",
   "UTMstack: filebeat config will be auto-updated to monitor the destination path": "UTMstack : la configuration filebeat sera mise à jour automatiquement pour surveiller le chemin de destination",
-  "Ubuntu 20.04": "Ubuntu 20.04",
   "Ubuntu 22.04": "Ubuntu 22.04",
   "Unknown device": "Appareil inconnu",
   "Update": "Mettre à jour",
@@ -918,5 +916,7 @@
   "UTMstack containers listening for syslog": "Conteneurs UTMstack à l'écoute du syslog",
   "Give a SIEM target a syslog port on the SIEM Targets page, or turn on a UTMstack container's listener in its details.": "Donnez un port syslog à une cible SIEM sur la page Cibles SIEM, ou activez l'écoute d'un conteneur UTMstack dans ses détails.",
   "Advanced": "Avancé",
-  "Values for the built-in event format: the source and destination addresses in each event, and the first event's sequence number.": "Valeurs du format d'événement intégré : les adresses source et destination de chaque événement, et le numéro de séquence du premier événement."
+  "Values for the built-in event format: the source and destination addresses in each event, and the first event's sequence number.": "Valeurs du format d'événement intégré : les adresses source et destination de chaque événement, et le numéro de séquence du premier événement.",
+  "Ubuntu 24.04": "Ubuntu 24.04",
+  "Debian 12": "Debian 12"
 }

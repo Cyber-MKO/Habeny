@@ -17,6 +17,10 @@ The release workflow publishes a version's section here as its release notes.
   `syslog_protocol` on `/api/managers`, and `POST /api/managers/{id}/syslog/test`.
   UTMstack syslog listeners turned on before the upgrade need turning on again (container
   Details) to appear as syslog simulation destinations.
+- **Container images:** Ubuntu 20.04 and Debian 11 are replaced by Ubuntu 24.04 and
+  Debian 12. Migration v0010 moves SIEM targets that name a retired image to its
+  replacement (and `centos_8`, which never had an image, to Ubuntu 22.04). Existing
+  containers keep running; API calls that ask for a retired image are refused (422).
 
 ### Added
 - **Checking what the SIEM detected.** After an attack simulation, Habeny asks the SIEM's
@@ -59,6 +63,8 @@ The release workflow publishes a version's section here as its release notes.
   - the `debian_10` OS type, which silently deployed Ubuntu 22.04 instead; it's now refused
 - `GET /api/`, which duplicated `GET /api/system/info`.
 - `/api/syslog-configs` (see "Upgrading").
+- Unused API models and enums (`AgentInfo`, `SIEMConnectivity`, `ContainerState`,
+  `SIEMConnectivityStatus`, `SimulationStatus`), left over after the models removed above.
 - The unused `tags` field on containers: containers can't be tagged. Groups organize and
   target containers; teams control access.
 - From the interface: Deploy → Parallel mode (the default is kept), the Containers "Seq"

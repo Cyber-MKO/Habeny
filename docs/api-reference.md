@@ -380,7 +380,7 @@ Deploy multiple containers with SIEM agents
   - `siem_type`: `none` \| `wazuh` \| `ossec` \| `utmstack` \| `elastic`, default `wazuh`
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional), default `4.14.2`
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8`, default `ubuntu_22_04`
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_24_04` \| `debian_12`, default `ubuntu_22_04`
   - `agent_group`: string, default `default`
   - `agent_base_name`: string, default `container`
   - `memory_limit`: string (optional), default `512MB`
@@ -590,7 +590,7 @@ Create a manager profile
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional)
   - `siem_auth_key`: string (optional)
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8`, default `ubuntu_22_04`
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_24_04` \| `debian_12`, default `ubuntu_22_04`
   - `agent_group`: string, default `default`
   - `memory_limit`: string (optional), default `512MB`
   - `cpu_shares`: integer (optional), default `1024`
@@ -614,7 +614,7 @@ Update a manager profile. An empty detection_url or detection_fingerprint clears
   - `siem_ip`: string (optional)
   - `siem_version`: string (optional)
   - `siem_auth_key`: string (optional)
-  - `os_type`: `ubuntu_22_04` \| `ubuntu_20_04` \| `debian_11` \| `centos_8` (optional)
+  - `os_type`: `ubuntu_22_04` \| `ubuntu_24_04` \| `debian_12` (optional)
   - `agent_group`: string (optional)
   - `memory_limit`: string (optional)
   - `cpu_shares`: integer (optional)

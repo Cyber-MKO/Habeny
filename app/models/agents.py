@@ -1,18 +1,14 @@
 """
 Agent deployment, status, info and selection models.
 """
-from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from app.models.common import INSTALL_FIELD_CHECKS, validate_alphanumeric_name
 from app.models.enums import (
     AgentLifecycleStatus,
-    ContainerState,
     OSType,
     ParallelMode,
-    SIEMConnectivityStatus,
     SIEMType,
 )
 
@@ -102,43 +98,6 @@ class AgentDeploymentRequest(BaseModel):
                 "cpu_shares": 2048
             }
         },
-    )
-
-
-class SIEMConnectivity(BaseModel):
-    """SIEM connectivity information"""
-    status: SIEMConnectivityStatus
-    last_check: datetime
-    agent_status: str | None = None
-    reason: str | None = None
-    last_event_time: datetime | None = None
-    events_per_second: float | None = None
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-    )
-
-
-class AgentInfo(BaseModel):
-    """Comprehensive container information"""
-    agent_id: str
-    agent_name: str
-    agent_seq_id: int | None = None
-    lifecycle_status: AgentLifecycleStatus
-    state: ContainerState
-    siem_type: SIEMType | None = None
-    siem_ip: str | None = None
-    siem_version: str | None = None
-    agent_group: str | None = None
-    os_type: OSType | None = None
-    init_pid: int = -1
-    ip_addresses: list[str] = Field(default_factory=list)
-    created_at: datetime | None = None
-    stats: dict[str, Any] | None = None
-    siem_connectivity: SIEMConnectivity | None = None
-
-    model_config = ConfigDict(
-        use_enum_values=True,
     )
 
 
