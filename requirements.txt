@@ -9,5 +9,5 @@ websockets==16.0          # WebSocket support for uvicorn (live metrics, contain
 pydantic==2.13.5
 cryptography==50.0.1      # encryption of stored SIEM auth keys
 PyJWT==2.15.0             # verifies single sign-on (OIDC) ID tokens
-reportlab==4.4.9          # PDF reports
+reportlab==5.0.1          # PDF reports
 matplotlib==3.10.8        # report charts
