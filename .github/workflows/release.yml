@@ -71,7 +71,7 @@ jobs:
         run: deploy/build-release.sh dist
       - name: Attach artifacts to this run (dry run)
         if: inputs.dry_run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: habeny-${{ env.TAG }}-dry-run
           path: dist/
