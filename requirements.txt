@@ -5,7 +5,7 @@
 #   sudo apt install python3-lxc
 fastapi==0.141.1
 uvicorn==0.53.0
-websockets==16.0          # WebSocket support for uvicorn (live metrics, container console)
+websockets==17.1          # WebSocket support for uvicorn (live metrics, container console)
 pydantic==2.13.5
 cryptography==50.0.1      # encryption of stored SIEM auth keys
 PyJWT==2.15.0             # verifies single sign-on (OIDC) ID tokens
